@@ -8,6 +8,8 @@
 
 const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
+const http = require("http");
+const https = require("https");
 const nacl = require("tweetnacl");
 const bs58 = require("bs58");
 const crypto = require("crypto");
@@ -232,6 +234,16 @@ app.get("/escrow/balance/:pubkey", (req, res) => {
 
 // ─── Proxy RPC (protegido pelo Shield) ───────────────────────────────────────
 
+// Keep TCP + TLS connections to the upstream RPC warm across requests.
+// Without an explicit agent with keepAlive, http-proxy-middleware defaults
+// to a fresh connection per request, which adds a TCP + TLS handshake
+// (typically hundreds of ms over the internet) to every proxied call.
+// With keep-alive the marginal cost collapses to a single round trip.
+const upstreamIsHttps = CONFIG.REAL_RPC_URL.startsWith("https:");
+const upstreamAgent = upstreamIsHttps
+  ? new https.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000 })
+  : new http.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000 });
+
 app.use(
   "/rpc",
   x402Shield,
@@ -239,6 +251,7 @@ app.use(
     target: CONFIG.REAL_RPC_URL,
     changeOrigin: true,
     pathRewrite: { "^/rpc": "" },
+    agent: upstreamAgent,
     on: {
       proxyReq: (proxyReq, req) => {
         // Remove o cabeçalho x402 antes de encaminhar ao RPC real
