@@ -48,6 +48,39 @@ Timing:
 
 Bilhões de requisições RPC por mês no ecossistema Solana (Helius sozinho reporta tráfego na casa de bilhões). Se 1% dessas requisições virar prioridade paga a 1 lamport cada, o volume priorizado é de ordem de milhões de dólares/ano — e a camada que intermedia isso cobra uma fração de cada passagem. Somos a primeira implementação com deploy público e medições reais.
 
+## Modelos de negócio — comparativo de risco, receita e investimento
+
+Para cada caminho de monetização há um perfil diferente de risco, potencial de receita e capital necessário para começar.
+
+| # | Modelo | Risco | Receita potencial | Investimento inicial |
+|---|--------|:-----:|:-----------------:|:--------------------:|
+| 1 | **Nós somos o operador** — operar nós RPC próprios e cobrar agentes diretamente (B2C) | 🔴 Alto | 🟢 Muito alta | 🔴 Alto |
+| 2 | **SaaS para operadores** — licenciar o software para Helius, Triton, Jito (B2B) | 🟡 Médio | 🟢 Alta | 🟡 Médio |
+| 3 | **Agregador / broker neutro** — rotear agentes entre múltiplos nós habilitados | 🔴 Alto | 🟡 Média | 🟡 Médio |
+| 4 | **Open protocol + serviços profissionais** — spec público + monetizar via consulting | 🟢 Baixo | 🟡 Baixa–Média | 🟢 Baixo |
+| 5 | **Gestor de reputação** — Trust-Score-as-a-Service cross-operador | 🟡 Médio | 🟢 Média–Alta | 🟡 Médio |
+
+**Detalhamento:**
+
+**Opção 1 — Nós somos o operador (B2C direto)**
+Capital intensivo (hardware Solana-grade custa dezenas de milhares de dólares) e competição direta com players já estabelecidos (Helius levantou US$ 25M). Requer equipe de SRE, SLA 24/7 e suporte. Em contrapartida, a margem é total — 100% da receita por requisição vai direto ao operador, sem intermediário.
+
+**Opção 2 — SaaS para operadores (B2B licenciado)**
+O melhor equilíbrio risco/retorno para o estágio atual. Sem infra própria: o operador traz os servidores, nós trazemos o protocolo. Receita via licença recorrente ou revenue share (ex.: 5% de cada 402 cobrado). O risco principal é o ciclo de venda B2B mais longo e a possibilidade de operadores forkearem o código open-source. Mitigante: manter o Trust-Score centralizado como moat.
+
+**Opção 3 — Agregador / broker neutro**
+Problema chicken-and-egg clássico: precisa de operadores dispostos a participar *e* de agentes dispostos a usar, ao mesmo tempo. Adiciona uma camada de latência no roteamento. Margens de broker são historicamente finas. Volume muito alto pode compensar, mas demanda capital para chegar lá.
+
+**Opção 4 — Open protocol + serviços profissionais**
+Menor risco financeiro imediato — o custo principal é o tempo de desenvolvimento já investido. A abertura do spec constrói credibilidade e atrai o ecossistema (exatamente o que o Colosseum valoriza). O lado fraco: consulting não escala; sem receita recorrente previsível. Funciona bem como *estratégia de entrada* antes de monetizar via Opção 2.
+
+**Opção 5 — Gestor de reputação (Trust-Score-as-a-Service)**
+Modelo de SaaS de alta margem com efeito de rede: quanto mais operadores aderirem, mais valioso o score de cada agente. Os dados cross-operador formam um *data moat* difícil de replicar. O risco principal é o mercado ainda não existir — requer educação e adoção simultânea de múltiplos operadores para destravar valor.
+
+**Sequência recomendada:** Opção 4 primeiro (abre o protocolo, ganha credibilidade no ecossistema, custo quase zero) → Opção 2 em seguida (monetiza operadores com licença SaaS) → Opção 5 como segunda linha de receita recorrente assim que houver dois ou mais operadores no ar.
+
+---
+
 ## Próximo passo
 
 - **Se você é investidor:** toda IA que conversa com Solana vai passar por esta camada. Somos a primeira implementação com deploy público, certificado válido e medições reais. Conversar sobre uma rodada.
