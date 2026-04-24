@@ -16,6 +16,10 @@ import * as bs58 from "bs58";
 export interface X402Challenge {
   destination: string;
   amount_micro_lamports: number;
+  /** Base (non-discounted) price in µL — useful to show the discount applied. */
+  amount_base_micro_lamports?: number;
+  /** Trust-Score (0..100) attributed to the hinted pubkey, if any. */
+  trust_score?: number;
   nonce: string;
   ttl_seconds: number;
 }
@@ -105,8 +109,14 @@ export class X402Provider extends Connection {
   // ─── Lógica central de negociação ──────────────────────────────────────────
 
   private async _fetchWithX402<T>(url: string, body: string, retrying = false): Promise<T> {
+    const pubkey = this.keypair.publicKey.toBase58();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      // Hint the agent's pubkey so the Shield can look up Trust-Score
+      // and apply a discount on the challenge before the client signs.
+      // The hint is non-authoritative — Step 2's signature binds the
+      // discounted price to the owner of the signing key.
+      "X-x402-Agent-Pubkey": pubkey,
     };
 
     const response = await this._fetch(url, { method: "POST", headers, body });
@@ -149,7 +159,11 @@ export class X402Provider extends Connection {
     // ── Refaz a requisição com a prova de pagamento ───────────────────────────
     const retryResponse = await this._fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: authHeader },
+      headers: {
+        "Content-Type": "application/json",
+        "X-x402-Agent-Pubkey": pubkey,
+        Authorization: authHeader,
+      },
       body,
     });
 
@@ -171,6 +185,8 @@ export class X402Provider extends Connection {
     const destination =
       response.headers.get("X-x402-Payment-Destination") ?? "";
     const amount = parseInt(response.headers.get("X-x402-Amount") ?? "0", 10);
+    const amountBaseHdr = response.headers.get("X-x402-Amount-Base");
+    const trustScoreHdr = response.headers.get("X-x402-Trust-Score");
     const nonce = response.headers.get("X-x402-Nonce") ?? "";
     const ttl = parseInt(response.headers.get("X-x402-Nonce-TTL") ?? "30", 10);
 
@@ -178,7 +194,14 @@ export class X402Provider extends Connection {
       throw new Error("x402: Malformed 402 challenge headers");
     }
 
-    return { destination, amount_micro_lamports: amount, nonce, ttl_seconds: ttl };
+    return {
+      destination,
+      amount_micro_lamports: amount,
+      amount_base_micro_lamports: amountBaseHdr ? parseInt(amountBaseHdr, 10) : undefined,
+      trust_score: trustScoreHdr ? parseInt(trustScoreHdr, 10) : undefined,
+      nonce,
+      ttl_seconds: ttl,
+    };
   }
 
   // ─── Liquidação off-chain (MVP, zero-latência) ──────────────────────────────

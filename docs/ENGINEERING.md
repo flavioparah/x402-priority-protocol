@@ -235,6 +235,66 @@ SMOKE PASSED
 
 ---
 
+## 2026-04-23 — Session 1 (continued): Trust-Score shipped ahead of schedule (O-006)
+
+### Why this matters
+
+Trust-Score was labeled "Week 2" in the pitch deck. Implementing it in Week 1 turns the deck's promise into running code, which is both a substance win (less planned, more demonstrated) and a narrative win (the team ships ahead of its own roadmap).
+
+### What changed
+
+**Server (index.js):**
+- New `reputation: Map<pubkey, { paidCount, firstPaidAt, lastPaidAt, totalPaid }>`.
+- `getTrustScore(pubkey)` — `min(100, paidCount * 5)`; saturates at 20 successful payments.
+- `applyTrustDiscount(price, score)` — linear discount, 0..50 % off base price, clamped to `BASE_PRICE_MICRO_LAMPORTS` as a floor so discounts never drop below the minimum spam cost.
+- `recordPayment` called inside the successful branch of `verifyX402Authorization`, so reputation accumulates only on *cryptographically verified* payments.
+- New 402 response headers: `X-x402-Amount-Base`, `X-x402-Trust-Score`. Existing `X-x402-Amount` now carries the discounted price, and the response body adds `amount_base_micro_lamports` and `trust_score`.
+- New endpoint `GET /reputation/:pubkey` for inspectors.
+
+**SDK (x402-client-sdk.ts):**
+- Emits `X-x402-Agent-Pubkey: <bs58>` on every request, so the Shield can look up the agent's score *before* quoting the price.
+- `X402Challenge` interface gains `trust_score` and `amount_base_micro_lamports` for clients that want to display the discount.
+- Retry request also carries the hint, in case the Shield re-challenges (nonce expired, etc.).
+
+**Tests + examples:**
+- `test/smoke.js` gained two assertions: `X-x402-Trust-Score` header present on 402, and `/reputation/:pubkey` reflects accumulated state.
+- `examples/trust-progression.js` (+ `npm run demo:trust`) — runs N requests, prints a per-request table with score, base vs paid price, discount %, and an ASCII bar. Used for the pitch video demo segment.
+
+### Decisions
+
+#### D-011 — Trust hint via a non-authoritative request header
+
+The client sends `X-x402-Agent-Pubkey` to claim a Trust-Score discount. This is unauthenticated at the point it arrives — anyone can claim any pubkey.
+
+**Why not require a signature on the hint?** Signing the hint would add another round trip (client must know a server-issued nonce to sign), which defeats the whole point of the hint being fast.
+
+**How this stays safe:** the challenge nonce is *bound to the hinted pubkey* at issue time (`nonceData.hintedPubkey`). When the client signs and retries, `verifyX402Authorization` requires the signer's pubkey to equal the hinted pubkey. If they differ, the payment is rejected. So Alice cannot claim Bob's reputation to get his price and then sign with Alice's key — the Shield rejects. The hint is "cosmetic until the signer proves ownership."
+
+**Edge case:** if Alice claims Bob's pubkey and NEVER retries (just wastes the nonce), she consumed an in-memory nonce slot and leaked information about Bob's score. Low-impact DoS — nonces expire in 30 s, and the score is intended to be mostly public info anyway (the `/reputation/:pubkey` endpoint exposes it by design).
+
+#### D-012 — Scoring formula: 5 points per payment, cap at 100
+
+Saturates at 20 successful payments. Chosen for demo legibility — the pitch video can show the full curve in 22 requests (under a minute). For production, parameterize via env var and wire to a time-weighted decay (old payments should eventually stop counting).
+
+**Why linear + cap rather than log or sqrt?** Simplest thing that demonstrates the narrative. Real-world tuning can come after we have actual traffic data on how agents behave.
+
+#### D-013 — Discount cap at 50 %
+
+`price = base * (1 - score / 200)` — score 100 gives a 50 % discount. Not 100 %, because:
+
+1. Even a maxed-out agent should still pay *something*. Zero-price requests break the anti-spam property.
+2. Operators need stable margins. A flat 50 % cap is predictable.
+
+Floor clamp to `BASE_PRICE_MICRO_LAMPORTS` ensures we never discount below the minimum configured spam cost.
+
+### Open issues delta
+
+- **O-006** — ✅ closed (shipped Trust-Score end-to-end).
+- **O-009** (new) — reputation is in-memory and per-process, same caveat as escrow. A Shield restart wipes everyone's score. For any serious deployment this belongs in Redis (or an append-only on-chain log for stronger non-repudiation).
+- **O-010** (new) — no time-weighted decay. An agent that paid 20× one year ago keeps its discount forever. Before mainnet traffic, add exponential decay or a rolling window (e.g. only count payments in the last 30 days).
+
+---
+
 ## Template for future entries
 
 ```

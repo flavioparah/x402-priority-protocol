@@ -143,11 +143,11 @@ All configurable via env vars (see `index.js`):
 
 ## Roadmap
 
-**Week 1 — MVP (current)**
+**Week 1 — MVP (shipped)**
 Off-chain escrow, Ed25519 signed nonces, dynamic pricing, proxy pass-through.
 
-**Week 2 — Trust Score**
-`X-x402-Trust-Score` header. Well-behaved recurring agents accumulate score; their per-request price decays. Reputation as a defense against Sybil while preserving pseudonymity.
+**Week 2 — Trust Score (shipped)**
+Reputation ledger per pubkey. Agents hint their pubkey via `X-x402-Agent-Pubkey` on the request; the Shield looks up the score (0..100, one point per 5¢ of reputation × 5 points per paid request, saturating at 20 payments) and discounts the challenge up to 50 %. The signer pubkey must match the hint, so the discount is not spoofable. Progression visible via `npm run demo:trust` — 22 requests, score 0→100, average savings 25 %. `GET /reputation/:pubkey` inspects any agent's record.
 
 **Week 3 — Moat**
 Open-source protocol spec and reference implementations. Build a network of RPC operator partners (Helius, Triton, Jito) for whom this is a drop-in revenue layer.

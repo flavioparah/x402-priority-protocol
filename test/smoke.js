@@ -62,6 +62,35 @@ async function main() {
   }
   ok(`escrow debited ${before - after} µL across 2 requests`);
 
+  // 5. Trust-Score header must be advertised on 402 responses.
+  //    Prove it by making a raw POST that guarantees a 402 back.
+  const pubkey = kp.publicKey.toBase58();
+  const raw = await fetch(SHIELD_URL + "/rpc", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-x402-Agent-Pubkey": pubkey },
+    body: JSON.stringify({ jsonrpc: "2.0", id: "smoke", method: "getHealth", params: [] }),
+  });
+  if (raw.status !== 402) {
+    throw new Error(`expected 402 on raw POST, got ${raw.status} (is RPC_LOAD_THRESHOLD=0?)`);
+  }
+  const trustHdr = raw.headers.get("X-x402-Trust-Score");
+  if (trustHdr === null) {
+    throw new Error("X-x402-Trust-Score header missing — Shield may predate Trust-Score support");
+  }
+  const trustScore = parseInt(trustHdr, 10);
+  if (!(trustScore >= 10)) {
+    throw new Error(`expected trust score >= 10 after 2 payments, got ${trustScore}`);
+  }
+  ok(`X-x402-Trust-Score: ${trustScore} (reputation accumulated from prior payments)`);
+
+  // 6. /reputation/:pubkey inspector endpoint.
+  const repRes = await fetch(SHIELD_URL + "/reputation/" + pubkey);
+  const rep = await repRes.json();
+  if (rep.paid_count < 2 || rep.trust_score !== trustScore) {
+    throw new Error(`reputation endpoint mismatch: ${JSON.stringify(rep)}`);
+  }
+  ok(`/reputation/${pubkey.slice(0,8)}… reports paidCount=${rep.paid_count} score=${rep.trust_score}`);
+
   console.log("\n\x1b[32mSMOKE PASSED\x1b[0m");
 }
 

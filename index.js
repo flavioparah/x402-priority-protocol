@@ -48,6 +48,20 @@ const escrowBalances = new Map([
   ["AgentPubkeyBase58HereAAAAAAAAAAAAAAAAAAAAAAAA", 1_000_000],
 ]);
 
+/**
+ * Trust-Score ledger (Week-2 feature): tracks every successful payment
+ * per pubkey. Score grows linearly with paid-count up to 100.
+ *
+ * The discount a scored agent receives on a 402 challenge is applied BEFORE
+ * the client signs, so the signed amount matches the discounted price. We
+ * then require the signer's pubkey to equal the hinted pubkey (set via the
+ * X-x402-Agent-Pubkey request header) — otherwise Alice could claim Bob's
+ * score, get his price, then sign with her own key.
+ *
+ * @type {Map<string, { paidCount: number, firstPaidAt: number, lastPaidAt: number, totalPaid: number }>}
+ */
+const reputation = new Map();
+
 // ─── Funções auxiliares ───────────────────────────────────────────────────────
 
 /** Retorna carga sintética do nó (0.0 – 1.0). Em produção, leia métricas reais. */
@@ -62,6 +76,28 @@ function calcDynamicPrice(load) {
   return Math.round(CONFIG.BASE_PRICE_MICRO_LAMPORTS + ratio * (CONFIG.MAX_PRICE_MICRO_LAMPORTS - CONFIG.BASE_PRICE_MICRO_LAMPORTS));
 }
 
+/** Trust-Score for a pubkey: 0..100, saturating at 20 successful payments. */
+function getTrustScore(pubkeyB58) {
+  const rec = reputation.get(pubkeyB58);
+  if (!rec) return 0;
+  return Math.min(100, rec.paidCount * 5);
+}
+
+/** Apply the Trust-Score discount to a base price. Score 0..100 → 0..50% off. */
+function applyTrustDiscount(price, score) {
+  return Math.max(CONFIG.BASE_PRICE_MICRO_LAMPORTS, Math.round(price * (1 - score / 200)));
+}
+
+/** Record a successful payment against a pubkey's reputation. */
+function recordPayment(pubkeyB58, amount) {
+  const now = Date.now();
+  const rec = reputation.get(pubkeyB58) || { paidCount: 0, firstPaidAt: now, lastPaidAt: now, totalPaid: 0 };
+  rec.paidCount += 1;
+  rec.lastPaidAt = now;
+  rec.totalPaid += amount;
+  reputation.set(pubkeyB58, rec);
+}
+
 /** Verifica se o IP excedeu o limite de requisições. */
 function isRateLimited(ip) {
   const now = Date.now();
@@ -74,14 +110,21 @@ function isRateLimited(ip) {
   return counter.count > CONFIG.REQUESTS_PER_IP_LIMIT;
 }
 
-/** Gera um nonce único e armazena os detalhes do desafio. */
-function issueNonce(amount) {
+/**
+ * Gera um nonce único e armazena os detalhes do desafio.
+ * If a hinted pubkey was used to discount the price, bind the nonce to
+ * that pubkey — the signer must match, otherwise the discount would be
+ * spoofable (Alice claims Bob's score, pays at Bob's price, signs with
+ * her own key; see recordPayment/verify below).
+ */
+function issueNonce(amount, hintedPubkey) {
   const nonce = crypto.randomBytes(16).toString("hex");
   nonceStore.set(nonce, {
     amount,
     destination: CONFIG.PAYMENT_DESTINATION,
     expiresAt: Date.now() + CONFIG.NONCE_TTL_MS,
     used: false,
+    hintedPubkey: hintedPubkey || null,
   });
   return nonce;
 }
@@ -136,6 +179,13 @@ function verifyX402Authorization(authHeader) {
     if (Date.now() > nonceData.expiresAt) return { ok: false, reason: "Nonce expired" };
     if (amount < nonceData.amount) return { ok: false, reason: `Insufficient payment: need ${nonceData.amount}, got ${amount}` };
 
+    // If this challenge was discounted via a Trust-Score hint, the signer
+    // must be the same pubkey that was hinted. Otherwise the discount is
+    // spoofable (see issueNonce docstring).
+    if (nonceData.hintedPubkey && nonceData.hintedPubkey !== pubkeyB58) {
+      return { ok: false, reason: "Signer pubkey does not match the hinted pubkey for this challenge" };
+    }
+
     // Verifica saldo no escrow (MVP)
     const balance = escrowBalances.get(pubkeyB58) || 0;
     if (balance < amount) return { ok: false, reason: `Insufficient escrow balance: ${balance} < ${amount}` };
@@ -144,7 +194,10 @@ function verifyX402Authorization(authHeader) {
     nonceData.used = true;
     escrowBalances.set(pubkeyB58, balance - amount);
 
-    return { ok: true, pubkey: pubkeyB58, amount, nonce };
+    // Credit reputation so subsequent challenges for this pubkey are cheaper
+    recordPayment(pubkeyB58, amount);
+
+    return { ok: true, pubkey: pubkeyB58, amount, nonce, score: getTrustScore(pubkeyB58) };
   } catch (err) {
     return { ok: false, reason: `Verification error: ${err.message}` };
   }
@@ -164,7 +217,7 @@ function x402Shield(req, res, next) {
   if (authHeader) {
     const result = verifyX402Authorization(authHeader);
     if (result.ok) {
-      console.log(`[x402] ✓ Payment accepted from ${result.pubkey} (${result.amount} µL, nonce: ${result.nonce})`);
+      console.log(`[x402] ✓ Payment accepted from ${result.pubkey} (${result.amount} µL, nonce: ${result.nonce}, trust=${result.score})`);
       req.x402Verified = result;
       return next();
     }
@@ -172,16 +225,24 @@ function x402Shield(req, res, next) {
     console.warn(`[x402] ✗ Invalid proof from ${ip}: ${result.reason}`);
   }
 
-  // Emite o desafio 402
-  const amount = calcDynamicPrice(load);
-  const nonce = issueNonce(amount);
+  // Trust-Score discount: if the agent hints its pubkey (X-x402-Agent-Pubkey),
+  // look up its reputation and discount the challenge accordingly. The hint
+  // is cosmetic until the signer actually proves ownership in step 2 — see
+  // nonceData.hintedPubkey check inside verifyX402Authorization.
+  const hintedPubkey = req.headers["x-x402-agent-pubkey"] || null;
+  const trustScore = hintedPubkey ? getTrustScore(hintedPubkey) : 0;
+  const basePrice = calcDynamicPrice(load);
+  const amount = applyTrustDiscount(basePrice, trustScore);
+  const nonce = issueNonce(amount, hintedPubkey);
 
-  console.log(`[x402] ⚡ Challenging ${ip} — load: ${(load * 100).toFixed(1)}%, price: ${amount} µL`);
+  console.log(`[x402] ⚡ Challenging ${ip} — load: ${(load * 100).toFixed(1)}%, base: ${basePrice} µL, trust: ${trustScore}, final: ${amount} µL`);
 
   res.status(402).set({
     "X-x402-Status": "challenged",
     "X-x402-Payment-Destination": CONFIG.PAYMENT_DESTINATION,
     "X-x402-Amount": String(amount),
+    "X-x402-Amount-Base": String(basePrice),
+    "X-x402-Trust-Score": String(trustScore),
     "X-x402-Nonce": nonce,
     "X-x402-Nonce-TTL": String(CONFIG.NONCE_TTL_MS / 1000),
     "Content-Type": "application/json",
@@ -192,9 +253,11 @@ function x402Shield(req, res, next) {
     payment: {
       destination: CONFIG.PAYMENT_DESTINATION,
       amount_micro_lamports: amount,
+      amount_base_micro_lamports: basePrice,
+      trust_score: trustScore,
       nonce,
       ttl_seconds: CONFIG.NONCE_TTL_MS / 1000,
-      instructions: "Sign the payload and retry with: Authorization: x402 <sig>.<pubkey>.<msg>",
+      instructions: "Sign the payload and retry with: Authorization: x402 <sig>.<pubkey>.<msg>. Send X-x402-Agent-Pubkey to claim Trust-Score discount.",
     },
   });
 }
@@ -224,6 +287,24 @@ app.post("/escrow/deposit", express.json(), (req, res) => {
   const current = escrowBalances.get(pubkey) || 0;
   escrowBalances.set(pubkey, current + amount_micro_lamports);
   res.json({ pubkey, balance: escrowBalances.get(pubkey) });
+});
+
+// Endpoint de consulta de reputação (Trust-Score)
+app.get("/reputation/:pubkey", (req, res) => {
+  const pubkey = req.params.pubkey;
+  const rec = reputation.get(pubkey);
+  const score = getTrustScore(pubkey);
+  const nextDiscountPrice = applyTrustDiscount(CONFIG.MAX_PRICE_MICRO_LAMPORTS, score);
+  res.json({
+    pubkey,
+    trust_score: score,
+    paid_count: rec ? rec.paidCount : 0,
+    total_paid_micro_lamports: rec ? rec.totalPaid : 0,
+    first_paid_at: rec ? rec.firstPaidAt : null,
+    last_paid_at: rec ? rec.lastPaidAt : null,
+    current_discount_percent: score / 2,
+    example_price_at_max_load: nextDiscountPrice,
+  });
 });
 
 // Endpoint de consulta de saldo
