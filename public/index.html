@@ -7,20 +7,20 @@ import {
   ArrowRight, 
   Github, 
   Linkedin, 
-  Server,
   Activity,
   Wallet,
-  Lock,
-  Globe
+  Globe,
+  Code,
+  Layers,
+  Terminal as TerminalIcon
 } from 'lucide-react';
 
 /**
  * Componente NeuralBackground
- * Renderiza o fundo 3D que representa o fluxo de dados e o protocolo de filtragem.
+ * Renderiza o efeito de filtragem: Spam vermelho entrando no escudo e saindo como dados verdes fluidos.
  */
 const NeuralBackground = () => {
   const mountRef = useRef(null);
-  const scrollY = useRef(0);
 
   useEffect(() => {
     let width = window.innerWidth;
@@ -28,7 +28,7 @@ const NeuralBackground = () => {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    camera.position.z = 7;
+    camera.position.z = 8;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
@@ -38,146 +38,132 @@ const NeuralBackground = () => {
       mountRef.current.appendChild(renderer.domElement);
     }
 
-    // Cores do Protocolo
-    const colorSpamRed = new THREE.Color(0xff1100);    
-    const colorPrivilegeGreen = new THREE.Color(0x00ffab); 
-    const colorShieldCyan = new THREE.Color(0x00e0ff);    
+    const colorSpam = new THREE.Color(0xff2200);    
+    const colorPriority = new THREE.Color(0x00ffab); 
+    const colorShield = new THREE.Color(0x00e0ff);    
     
     const mainGroup = new THREE.Group();
     scene.add(mainGroup);
 
-    // Geometria do Escudo (O Validador)
-    const shieldShape = new THREE.Shape();
-    shieldShape.moveTo(0, 1.4);
-    shieldShape.quadraticCurveTo(1.2, 1.4, 1.2, 0.4);
-    shieldShape.quadraticCurveTo(1.2, -0.8, 0, -1.4);
-    shieldShape.quadraticCurveTo(-1.2, -0.8, -1.2, 0.4);
-    shieldShape.quadraticCurveTo(-1.2, 1.4, 0, 1.4);
-    
-    const shieldGeo = new THREE.ShapeGeometry(shieldShape);
+    // Escudo (O Filtro)
+    const shieldGeo = new THREE.TorusGeometry(1.5, 0.02, 16, 100);
     const shieldMat = new THREE.MeshBasicMaterial({ 
-      color: colorShieldCyan, 
-      wireframe: true, 
+      color: colorShield, 
       transparent: true, 
       opacity: 0.3 
     });
-    const shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
-    mainGroup.add(shieldMesh);
+    const shieldRing = new THREE.Mesh(shieldGeo, shieldMat);
+    shieldRing.rotation.y = Math.PI / 2;
+    mainGroup.add(shieldRing);
 
-    const chipGeo = new THREE.BoxGeometry(0.55, 0.55, 0.25);
-    const chipMat = new THREE.MeshBasicMaterial({ color: colorShieldCyan });
-    const chipMesh = new THREE.Mesh(chipGeo, chipMat);
-    mainGroup.add(chipMesh);
-
-    // Configuração do Sistema de Spam (Pontos Vermelhos)
-    const spamCount = 300; 
+    // Partículas de Spam (Entrada)
+    const spamCount = 200;
     const spamPoints = [];
+    const spamGeometry = new THREE.BufferGeometry();
+    const spamPositions = new Float32Array(spamCount * 3);
+    const spamSizes = new Float32Array(spamCount);
+
     for (let i = 0; i < spamCount; i++) {
       spamPoints.push({
-        pos: new THREE.Vector3(-15 - Math.random() * 10, (Math.random() - 0.5) * 18, (Math.random() - 0.5) * 10),
-        speed: 0.04 + Math.random() * 0.05,
-        noiseSeed: Math.random() * 100
+        x: -15 - Math.random() * 20,
+        y: (Math.random() - 0.5) * 15,
+        z: (Math.random() - 0.5) * 10,
+        speed: 0.05 + Math.random() * 0.1,
+        size: 5 + Math.random() * 15
       });
     }
 
-    const spamPointsMesh = new THREE.Points(
-      new THREE.BufferGeometry(),
-      new THREE.PointsMaterial({ color: colorSpamRed, size: 0.07, transparent: true, opacity: 0.8 })
-    );
-    mainGroup.add(spamPointsMesh);
+    const spamMaterial = new THREE.PointsMaterial({
+      color: colorSpam,
+      sizeAttenuation: false,
+      transparent: true,
+      opacity: 0.6,
+      size: 1.0
+    });
+    const spamSystem = new THREE.Points(spamGeometry, spamMaterial);
+    mainGroup.add(spamSystem);
 
-    const spamLinesMaterial = new THREE.LineBasicMaterial({ color: colorSpamRed, transparent: true, opacity: 0.1 });
-    const spamLinesGeo = new THREE.BufferGeometry();
-    const spamLines = new THREE.LineSegments(spamLinesGeo, spamLinesMaterial);
-    mainGroup.add(spamLines);
+    // Linhas Fluidas (Saída/Filtro)
+    const lineCount = 40;
+    const lineSegments = 50;
+    const lines = [];
 
-    // Configuração do Sistema x402 (Pontos Verdes de Prioridade)
-    const privCount = 150;
-    const privPoints = [];
-    for (let i = 0; i < privCount; i++) {
-      privPoints.push({
-        pos: new THREE.Vector3(0, 0, 0),
-        speed: 0.08 + Math.random() * 0.12,
-        lane: (Math.random() - 0.5) * 4,
-        active: false
+    for (let i = 0; i < lineCount; i++) {
+      const geometry = new THREE.BufferGeometry();
+      const points = [];
+      for (let j = 0; j < lineSegments; j++) {
+        points.push(new THREE.Vector3(0, 0, 0));
+      }
+      geometry.setFromPoints(points);
+      const material = new THREE.LineBasicMaterial({ 
+        color: colorPriority, 
+        transparent: true, 
+        opacity: 0.4 
       });
+      const line = new THREE.Line(geometry, material);
+      
+      lines.push({
+        mesh: line,
+        offset: Math.random() * Math.PI * 2,
+        speed: 0.02 + Math.random() * 0.03,
+        amplitude: 0.5 + Math.random() * 1.5,
+        active: false,
+        xPos: 0
+      });
+      mainGroup.add(line);
     }
 
-    const privPointsMesh = new THREE.Points(
-      new THREE.BufferGeometry(),
-      new THREE.PointsMaterial({ color: colorPrivilegeGreen, size: 0.05 })
-    );
-    mainGroup.add(privPointsMesh);
-
-    const privLinesMaterial = new THREE.LineBasicMaterial({ color: colorPrivilegeGreen, transparent: true, opacity: 0.5 });
-    const privLinesGeo = new THREE.BufferGeometry();
-    const privLines = new THREE.LineSegments(privLinesGeo, privLinesMaterial);
-    mainGroup.add(privLines);
-
-    // Gestão de Scroll
-    const onScroll = () => { 
-      scrollY.current = window.scrollY; 
-    };
-    window.addEventListener('scroll', onScroll);
-
-    // Loop de Animação
     const animate = () => {
       requestAnimationFrame(animate);
       const time = Date.now() * 0.001;
-      
-      const sF = scrollY.current * 0.0015;
-      mainGroup.position.y = sF * 0.4;
-      mainGroup.scale.set(1 + sF * 0.15, 1 + sF * 0.15, 1 + sF * 0.15);
-      mainGroup.rotation.x = sF * 0.1;
 
-      shieldMesh.rotation.y = Math.sin(time * 0.4) * 0.2;
-      chipMesh.rotation.z = time * 1.2;
-      chipMesh.scale.setScalar(1 + Math.sin(time * 5) * 0.05);
+      // Animando o Shield
+      shieldRing.scale.setScalar(1 + Math.sin(time * 2) * 0.05);
+      shieldRing.rotation.z += 0.01;
 
-      // Processamento de Spam
-      const spamPosArr = new Float32Array(spamCount * 3);
-      const spamLinesArr = [];
+      // Animando Spam (Entrada em Funil)
+      const spamPosAttr = new Float32Array(spamCount * 3);
       spamPoints.forEach((p, i) => {
-        p.pos.x += p.speed;
-        p.pos.y *= 0.98; 
-        p.pos.z *= 0.98;
-        p.pos.y += Math.sin(time + p.noiseSeed) * 0.02;
-        if (p.pos.x > 0) {
-          p.pos.x = -15 - Math.random() * 10;
-          p.pos.y = (Math.random() - 0.5) * 18;
-          p.pos.z = (Math.random() - 0.5) * 10;
+        p.x += p.speed;
+        
+        // Efeito de Funil: Conforme chega no X=0, Y e Z tendem a 0
+        const factor = Math.max(0, (p.x + 15) / 15); 
+        const pull = Math.pow(1 - Math.max(0, Math.min(1, (0 - p.x) / 5)), 2);
+        
+        const currentY = p.y * pull;
+        const currentZ = p.z * pull;
+
+        if (p.x > 0) {
+          p.x = -15 - Math.random() * 10;
         }
-        spamPosArr[i * 3] = p.pos.x;
-        spamPosArr[i * 3 + 1] = p.pos.y;
-        spamPosArr[i * 3 + 2] = p.pos.z;
-        if (i % 6 === 0) {
-          const next = spamPoints[(i + 1) % spamCount];
-          if (p.pos.distanceTo(next.pos) < 4) {
-            spamLinesArr.push(p.pos.x, p.pos.y, p.pos.z, next.pos.x, next.pos.y, next.pos.z);
+
+        spamPosAttr[i * 3] = p.x;
+        spamPosAttr[i * 3 + 1] = currentY;
+        spamPosAttr[i * 3 + 2] = currentZ;
+      });
+      spamGeometry.setAttribute('position', new THREE.BufferAttribute(spamPosAttr, 3));
+
+      // Animando Linhas Fluidas Verdes (Saída)
+      lines.forEach((l, i) => {
+        const positions = l.mesh.geometry.attributes.position.array;
+        l.xPos += l.speed * 5;
+        if (l.xPos > 15) l.xPos = 0;
+
+        for (let j = 0; j < lineSegments; j++) {
+          const segmentX = l.xPos - (j * 0.2);
+          if (segmentX < 0) {
+            positions[j * 3] = 0;
+            positions[j * 3 + 1] = 0;
+            positions[j * 3 + 2] = 0;
+          } else {
+            positions[j * 3] = segmentX;
+            positions[j * 3 + 1] = Math.sin(segmentX * 0.5 + time + l.offset) * l.amplitude;
+            positions[j * 3 + 2] = Math.cos(segmentX * 0.5 + time + l.offset) * l.amplitude;
           }
         }
+        l.mesh.geometry.attributes.position.needsUpdate = true;
+        l.mesh.material.opacity = Math.max(0, 0.6 * (1 - l.xPos / 15));
       });
-      spamPointsMesh.geometry.setAttribute('position', new THREE.BufferAttribute(spamPosArr, 3));
-      spamLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(spamLinesArr), 3));
-
-      // Processamento de Privilégio x402
-      const privPosArr = new Float32Array(privCount * 3);
-      const privLinesArr = [];
-      privPoints.forEach((p, i) => {
-        p.pos.x += p.speed;
-        p.pos.y = Math.sin(p.pos.x * 0.5 + i) * 0.15 + (p.lane * 0.5);
-        if (p.pos.x > 18) {
-          p.pos.x = 0;
-          p.pos.y = 0;
-          p.pos.z = 0;
-        }
-        privPosArr[i * 3] = p.pos.x;
-        privPosArr[i * 3 + 1] = p.pos.y;
-        privPosArr[i * 3 + 2] = p.pos.z;
-        privLinesArr.push(p.pos.x, p.pos.y, p.pos.z, p.pos.x - 1.5, p.pos.y, p.pos.z);
-      });
-      privPointsMesh.geometry.setAttribute('position', new THREE.BufferAttribute(privPosArr, 3));
-      privLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(privLinesArr), 3));
 
       renderer.render(scene, camera);
     };
@@ -195,230 +181,118 @@ const NeuralBackground = () => {
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('scroll', onScroll);
       if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
     };
   }, []);
 
-  return <div ref={mountRef} className="fixed inset-0 z-0 pointer-events-none opacity-90" />;
+  return <div ref={mountRef} className="fixed inset-0 z-0 pointer-events-none" />;
 };
-
-// --- Componentes de Interface (UI) ---
 
 const Button = ({ children, variant = 'primary', className = '', ...props }) => {
   const variants = {
-    primary: 'bg-[#00E0FF] hover:bg-[#00B8E0] text-[#050505] font-bold shadow-[0_0_25px_rgba(0,224,255,0.4)]',
-    secondary: 'bg-white/5 hover:bg-white/15 text-white border border-white/10 backdrop-blur-xl',
-    outline: 'border border-[#00E0FF] text-[#00E0FF] hover:bg-[#00E0FF]/10',
+    primary: 'bg-[#00E0FF] hover:bg-[#00B8E0] text-black font-black uppercase shadow-[0_0_20px_rgba(0,224,255,0.3)]',
+    secondary: 'bg-white/5 hover:bg-white/10 text-white border border-white/10 backdrop-blur-md',
   };
-  
   return (
-    <button 
-      className={`px-10 py-5 rounded-sm transition-all duration-500 flex items-center justify-center gap-3 text-[11px] uppercase tracking-[0.25em] font-mono border-l-2 border-r-2 border-transparent hover:border-[#00E0FF] ${variants[variant]} ${className}`} 
-      {...props}
-    >
+    <button className={`px-8 py-4 text-[10px] tracking-[0.3em] font-mono transition-all duration-300 flex items-center justify-center gap-3 ${variants[variant]} ${className}`} {...props}>
       {children}
     </button>
   );
 };
 
-const Badge = ({ children, color = "blue" }) => {
-  const colors = {
-    blue: "text-[#00E0FF] border-[#00E0FF]/40 bg-[#00E0FF]/10",
-    green: "text-[#00FFAB] border-[#00FFAB]/40 bg-[#00FFAB]/10",
-  };
-  
-  return (
-    <span className={`inline-block px-5 py-2 text-[10px] font-mono font-black tracking-[0.3em] uppercase border ${colors[color]} backdrop-blur-md`}>
-      {children}
-    </span>
-  );
-};
-
-/**
- * Componente Principal App
- */
 export default function App() {
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [simStep, setSimStep] = useState(0);
+  const [activeLog, setActiveLog] = useState(0);
+  const logs = [
+    { type: 'INBOUND', msg: 'Analisando pacotes de spam' },
+    { type: '402', msg: 'Desafio de pagamento enviado' },
+    { type: 'FILTER', msg: 'Assinatura RPC detectada' },
+    { type: 'UPGRADE', msg: 'Prioridade ultra-low latency aplicada' },
+    { type: 'SUCCESS', msg: 'Fluxo limpo estabelecido' }
+  ];
 
-  // Efeito de simulação do terminal
   useEffect(() => {
-    const timer = setInterval(() => setSimStep((prev) => (prev + 1) % 6), 3000);
+    const timer = setInterval(() => setActiveLog(p => (p + 1) % 5), 3000);
     return () => clearInterval(timer);
   }, []);
 
-  const terminalLogs = [
-    { text: "INBOUND: Pedido de agente não verificado detectado", color: "text-red-500" },
-    { text: "FILTER: A analisar padrão de comportamento (candidato x402)", color: "text-amber-400" },
-    { text: "PROTOCOL: Desafio emitido -> Handshake de carteira iniciado", color: "text-[#00E0FF]" },
-    { text: "VALIDATION: Pagamento 0.005 SOL verificado via SPL-Token", color: "text-[#00FFAB]" },
-    { text: "UPGRADE: Agente promovido para classe 'Privileged'", color: "text-[#00FFAB] font-bold" },
-    { text: "ROUTING: A redirecionar para via de alta prioridade x402", color: "text-white" },
-  ];
-
   return (
-    <div className="min-h-[250vh] bg-[#020202] text-gray-300 selection:bg-[#00E0FF]/40 font-mono overflow-x-hidden">
-      
+    <div className="bg-[#030303] text-gray-400 font-sans min-h-screen selection:bg-[#00E0FF]/30 overflow-x-hidden">
       <NeuralBackground />
+      <div className="fixed inset-0 pointer-events-none opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '80px 80px' }}></div>
 
-      {/* Camadas Visuais de Fundo */}
-      <div className="fixed inset-0 z-0 opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#00E0FF 1px, transparent 1px), linear-gradient(90deg, #00E0FF 1px, transparent 1px)', backgroundSize: '100px 100px' }}></div>
-      <div className="fixed inset-0 z-0 bg-gradient-to-tr from-[#020202] via-transparent to-[#020202] pointer-events-none opacity-60"></div>
-
-      {/* Navegação Principal */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#020202]/60 backdrop-blur-3xl">
-        <div className="max-w-7xl mx-auto px-10 h-24 flex items-center justify-between">
-          <div className="flex items-center gap-5">
-            <div className="relative flex items-center justify-center w-14 h-14 bg-[#00E0FF]/5 border border-[#00E0FF]/30">
-              <Shield className="w-9 h-9 text-[#00E0FF]/20" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Cpu className="w-5 h-5 text-[#00E0FF] drop-shadow-[0_0_12px_rgba(0,224,255,1)]" />
-              </div>
+      <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-black/50 backdrop-blur-xl h-20 flex items-center px-8">
+        <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 border border-[#00E0FF]/40 flex items-center justify-center bg-[#00E0FF]/5">
+              <Shield className="w-6 h-6 text-[#00E0FF]" />
             </div>
-            <div className="flex flex-col text-left">
-              <span className="text-lg font-black tracking-[0.4em] text-white leading-none uppercase">RPC PRIORITY</span>
-              <span className="text-[11px] font-bold tracking-[0.2em] text-[#00E0FF]/60 leading-tight">AUTH SYSTEM</span>
-            </div>
+            <span className="text-white font-mono font-black tracking-[0.4em] text-sm">RPC PRIORITY</span>
           </div>
-          
-          <div className="hidden lg:flex items-center gap-16 text-[12px] font-black uppercase tracking-[0.3em] text-gray-500">
-            <a href="#protocol" className="hover:text-[#00E0FF] transition-all cursor-pointer">Protocolo</a>
-            <a href="#sdk" className="hover:text-[#00E0FF] transition-all cursor-pointer">SDK</a>
-          </div>
-
-          <Button 
-            variant={isWalletConnected ? 'outline' : 'primary'} 
-            className="h-12 px-8" 
-            onClick={() => setIsWalletConnected(!isWalletConnected)}
-          >
-            <Wallet className="w-5 h-5" /> {isWalletConnected ? 'AGENTE_VALIDADO' : 'CONECTAR AGENTE'}
+          <Button variant="secondary" className="h-10 px-6">
+            <Wallet className="w-4 h-4" /> Connect Agent
           </Button>
         </div>
       </nav>
 
-      {/* Conteúdo Principal */}
-      <main className="relative z-10 pt-20">
-        
-        {/* Seção Hero - Ajustada para ficar mais em cima */}
-        <section className="max-w-7xl mx-auto px-10 mb-60 pt-10 text-center md:text-left">
-          <div className="max-w-5xl">
-            <Badge color="blue">Validação de Agentes de Elite</Badge>
-            <h1 className="text-4xl md:text-7xl font-bold text-white mt-6 mb-6 leading-[0.95] tracking-tighter uppercase">
-              Diga Adeus <br />
-              ao <span className="text-red-600 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">Spam.</span> <br />
-              Diga Olá ao <span className="text-[#00FFAB]">x402.</span>
-            </h1>
-            <p className="text-base md:text-lg text-gray-400 max-w-2xl leading-relaxed mb-10 font-sans backdrop-blur-md bg-white/5 p-5 border-l-2 border-[#00E0FF]">
-              Transforme agentes de IA desconhecidos em utilizadores de confiança. O protocolo RPC Priority filtra o ruído e garante largura de banda premium para quem paga em tempo real.
+      <section className="relative pt-60 pb-32 px-8">
+        <div className="max-w-7xl mx-auto">
+          <span className="inline-block px-4 py-1 border border-[#00FFAB]/30 text-[#00FFAB] text-[10px] font-mono tracking-[0.4em] uppercase mb-8">
+            Network Congestion Layer-0
+          </span>
+          <h1 className="text-6xl md:text-9xl font-bold text-white leading-[0.9] tracking-tighter uppercase mb-10">
+            Filtre o <br />
+            <span className="text-transparent" style={{ WebkitTextStroke: '1px rgba(255,255,255,0.2)' }}>Ruído.</span>
+          </h1>
+          <p className="text-xl text-gray-400 font-sans leading-relaxed mb-12 max-w-2xl">
+            RPC Priority Protocol transforma o caos do tráfego web em fluxos de dados otimizados. 
+            Utilizamos o erro HTTP 402 para priorizar o que realmente importa.
+          </p>
+          <div className="flex gap-6">
+            <Button>Launch Protocol <ArrowRight className="w-4 h-4" /></Button>
+            <Button variant="secondary">API Docs</Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 px-8">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-20 items-center">
+          <div className="bg-[#050505] border border-white/10 rounded-sm p-8 font-mono">
+            <div className="flex gap-2 mb-8 border-b border-white/5 pb-4">
+              <div className="w-3 h-3 rounded-full bg-red-500/20" />
+              <div className="w-3 h-3 rounded-full bg-yellow-500/20" />
+              <div className="w-3 h-3 rounded-full bg-green-500/20" />
+            </div>
+            {logs.map((log, i) => (
+              <div key={i} className={`flex gap-4 mb-3 text-xs transition-all duration-500 ${i === activeLog ? 'text-white translate-x-2' : 'text-gray-700'}`}>
+                <span className={i === activeLog ? 'text-[#00FFAB]' : ''}>[{log.type}]</span>
+                <span>{log.msg}</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <h2 className="text-4xl font-bold text-white mb-6 uppercase tracking-tight">Handshake de Prioridade</h2>
+            <p className="text-gray-500 leading-relaxed mb-8">
+              Nosso escudo neural detecta agentes automatizados sem stake e redireciona para o fluxo de filtragem. 
+              Apenas requisições autenticadas via 402 atravessam o funil para a rede principal.
             </p>
-            <div className="flex flex-wrap justify-center md:justify-start gap-6">
-              <Button className="h-14 px-10" onClick={() => window.open('https://github.com/flavioparah/x402-priority-protocol')}>
-                Inicie Integração <ArrowRight className="w-5 h-5" />
-              </Button>
-              <Button variant="secondary" className="h-14 px-10">Blueprint Técnico</Button>
-            </div>
-          </div>
-        </section>
-
-        {/* Seção de Funcionalidades */}
-        <section id="protocol" className="max-w-7xl mx-auto px-10 mb-80">
-          <div className="grid md:grid-cols-2 gap-10 text-left">
-            <div className="p-16 bg-[#020202]/40 backdrop-blur-2xl border border-white/5 hover:border-red-500/20 transition-all group">
-              <Activity className="w-12 h-12 text-red-500 mb-10 opacity-50 group-hover:opacity-100" />
-              <h3 className="text-3xl font-bold text-white mb-6">Filtro de Spam</h3>
-              <p className="text-gray-400 text-lg font-sans leading-relaxed">
-                Elimine 99% do tráfego não monetizável. Agentes sem credenciais de pagamento são retidos na camada de caos.
-              </p>
-            </div>
-            <div className="p-16 bg-[#00FFAB]/5 backdrop-blur-2xl border border-[#00FFAB]/20 hover:border-[#00FFAB]/50 transition-all group">
-              <Zap className="w-12 h-12 text-[#00FFAB] mb-10" />
-              <h3 className="text-3xl font-bold text-white mb-6">Privilégio x402</h3>
-              <p className="text-gray-400 text-lg font-sans leading-relaxed">
-                Agentes que cumprem o handshake x402 recebem prioridade imediata, saltando filas e garantindo latência zero.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Seção Terminal/Promoção */}
-        <section className="max-w-7xl mx-auto px-10 mb-96">
-          <div className="grid lg:grid-cols-2 gap-32 items-center text-left">
-            <div className="space-y-10">
-              <Badge color="green">Monitor de Qualificação</Badge>
-              <h2 className="text-5xl font-bold text-white tracking-tight leading-[1.1]">Promoção de Classe em Tempo Real.</h2>
-              <p className="text-lg text-gray-400 font-sans leading-relaxed">
-                O nosso motor de validação monitoriza cada byte. Assim que a transação Solana é confirmada, o agente é promovido da classe "Public" para "Privileged".
-              </p>
-              <div className="flex items-center gap-8 p-8 bg-[#00FFAB]/5 border border-[#00FFAB]/20 rounded-sm">
-                 <div className="relative">
-                   <div className="w-4 h-4 rounded-full bg-[#00FFAB] animate-ping absolute"></div>
-                   <div className="w-4 h-4 rounded-full bg-[#00FFAB] relative"></div>
-                 </div>
-                 <div className="text-white text-xl font-black tracking-widest font-mono uppercase">ESTADO: <span className="text-[#00FFAB]">X402_ACTIVE</span></div>
+            <div className="grid grid-cols-2 gap-8">
+              <div>
+                <div className="text-[#00E0FF] font-mono text-[10px] tracking-widest mb-1">LATÊNCIA</div>
+                <div className="text-2xl text-white font-bold tracking-tighter">8.4ms</div>
+              </div>
+              <div>
+                <div className="text-[#00FFAB] font-mono text-[10px] tracking-widest mb-1">BYPASS</div>
+                <div className="text-2xl text-white font-bold tracking-tighter">99.2%</div>
               </div>
             </div>
-            
-            {/* Mockup do Terminal */}
-            <div className="bg-[#050505] border border-white/10 rounded-sm overflow-hidden shadow-2xl relative">
-              <div className="absolute inset-0 bg-[#00E0FF]/5 pointer-events-none"></div>
-              <div className="bg-white/5 px-8 py-5 border-b border-white/10 flex justify-between items-center relative z-10">
-                <div className="text-[11px] text-[#00E0FF] font-black tracking-[0.5em] uppercase">AGENTE_PROMOTION_V1.log</div>
-                <div className="flex gap-3">
-                  <div className="w-3 h-3 bg-red-600/40"></div>
-                  <div className="w-3 h-3 bg-green-500"></div>
-                </div>
-              </div>
-              <div className="p-12 h-[350px] font-mono text-xs md:text-sm flex flex-col justify-end relative z-10 bg-black/40 backdrop-blur-xl text-left">
-                {terminalLogs.map((log, idx) => (
-                  <div key={idx} className={`mb-4 transition-all duration-1000 ${idx <= simStep ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'} ${log.color}`}>
-                    <span className="opacity-20 mr-6 tracking-normal">[{new Date().toLocaleTimeString()}]</span> {log.text}
-                  </div>
-                ))}
-                <div className="w-3 h-5 bg-[#00FFAB] animate-pulse mt-4"></div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {/* Rodapé */}
-      <footer className="border-t border-white/5 py-40 bg-[#010101] relative z-20 text-left">
-        <div className="max-w-7xl mx-auto px-10 grid md:grid-cols-3 gap-24">
-          <div className="space-y-10">
-            <div className="flex items-center gap-5">
-              <div className="relative flex items-center justify-center w-12 h-12 bg-[#00E0FF]/5 border border-[#00E0FF]/40">
-                <Shield className="w-7 h-7 text-[#00E0FF]/40" />
-                <div className="absolute inset-0 flex items-center justify-center"><Cpu className="w-3.5 h-3.5 text-[#00E0FF]" /></div>
-              </div>
-              <span className="text-2xl font-black tracking-[0.4em] text-white uppercase">RPC PRIORITY</span>
-            </div>
-            <p className="text-gray-500 font-sans leading-relaxed text-xl">Arquitetando a infraestrutura de confiança para a economia AI-to-AI.</p>
-          </div>
-          <div>
-            <h4 className="text-white font-black uppercase tracking-[0.4em] mb-12 text-sm">Protocolo</h4>
-            <ul className="space-y-6 text-[11px] font-bold uppercase tracking-[0.3em] text-gray-500">
-              <li><a href="#" className="hover:text-[#00E0FF] transition-all">Handshake x402</a></li>
-              <li><a href="#" className="hover:text-[#00E0FF] transition-all">Liquidação Solana</a></li>
-              <li><a href="#" className="hover:text-[#00E0FF] transition-all">Preços Dinâmicos</a></li>
-            </ul>
-          </div>
-          <div>
-             <h4 className="text-white font-black uppercase tracking-[0.4em] mb-12 text-sm">Laboratório</h4>
-             <div className="flex gap-8">
-                <a href="#" className="w-16 h-16 flex items-center justify-center border border-white/5 bg-white/5 text-white hover:text-[#00E0FF] hover:border-[#00E0FF]/40 transition-all"><Github className="w-8 h-8" /></a>
-                <a href="#" className="w-16 h-16 flex items-center justify-center border border-white/5 bg-white/5 text-white hover:text-[#00E0FF] hover:border-[#00E0FF]/40 transition-all"><Linkedin className="w-8 h-8" /></a>
-             </div>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-10 mt-40 pt-16 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-12">
-          <div className="text-[12px] text-gray-600 font-black tracking-[0.5em] uppercase">© {new Date().getFullYear()} RPC PRIORITY // PROTOCOL LAYER</div>
-          <div className="flex flex-wrap justify-center gap-12 text-[11px] text-[#00FFAB] font-black tracking-[0.4em] uppercase">
-            <span>NO MORE SPAM</span>
-            <span>HIGH PRIVILEGE ONLY</span>
-            <span className="text-white/20 italic tracking-normal font-sans">v1.4.0-stable</span>
-          </div>
-        </div>
+      </section>
+
+      <footer className="py-10 px-8 border-t border-white/5 text-center">
+        <p className="text-[10px] font-mono tracking-[0.4em] uppercase text-gray-600">
+          Powered by Solana & x402 Engineering
+        </p>
       </footer>
     </div>
   );
