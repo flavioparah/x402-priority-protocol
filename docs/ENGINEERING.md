@@ -156,6 +156,62 @@ npm run typecheck    # no emit
 
 ---
 
+## 2026-04-23 — Session 1 (addendum): perf fix, deploy manifests, pitch script
+
+### Status delta
+
+| Component | State | Notes |
+|-----------|-------|-------|
+| Shield proxy keep-alive | ✅ Fixed | ~270 ms p50 saved on retry RTT (O-004 closed) |
+| Docker image | ✅ Added | `Dockerfile` (production, prod-deps only) |
+| docker-compose | ✅ Added | Traefik labels + `portainer_default` network, matches amiginvisivel pattern |
+| `docs/DEPLOY.md` | ✅ Added | First-deploy + subsequent-deploy runbook for `ssh kvm4:/root/x402` |
+| `docs/PITCH-VIDEO.md` | ✅ Added | 3-min shot list, voiceover beats, production notes |
+
+### Benchmark delta (same N=100, same conditions)
+
+```
+                 before          after
+ baseline p50    131.8 ms        138.9 ms    (network noise)
+ x402 total p50  419.0 ms        151.5 ms    (−267.5 ms, −64%)
+ retry RTT p50   412.8 ms        145.5 ms    (−267.3 ms, this is the fix)
+ x402 OVHD p95     8.3 ms          8.7 ms    (unchanged, as expected)
+```
+
+Effective client-perceived latency collapsed from ~420 ms to ~150 ms. The x402 protocol overhead itself (what the KPI targets) was already under budget and remains unchanged — this fix is about the proxy's upstream connection hygiene, orthogonal to x402.
+
+### Decisions
+
+#### D-008 — Keep-alive HTTP(S) agent to the upstream RPC
+
+Fixes **O-004**. Added `https.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000 })` (or `http.Agent` if the upstream is plain HTTP) and passed it as the `agent` option to `createProxyMiddleware`.
+
+**Why:** See the before/after above. The default http-proxy-middleware behaviour (no explicit agent) opens a fresh TCP + TLS connection per request, which against a public Solana RPC across the internet is the dominant cost.
+
+**Consequences:** Up to 64 concurrent upstream sockets kept warm. Under sustained traffic this is strictly better; under very bursty traffic the first few requests after a 30-second idle still pay the reconnect tax (agent closes idle sockets after `keepAliveMsecs`). If we hit concurrency ceilings, raise `maxSockets` — public Solana RPCs tolerate high connection counts per client IP in our experience, but revisit if we see 429s.
+
+#### D-009 — Production deploy via Docker + Traefik on `portainer_default`
+
+Matches the existing VPS pattern (Vokano, amiginvisivel). Service name `x402-shield`, domain `x402.assistent.top`, TLS via Let's Encrypt `leresolver`, network `portainer_default` external.
+
+**Why:** The VPS already runs Traefik + Portainer in this configuration. Bolting on a new service is one compose file. A non-Docker deployment (systemd unit + nginx) would cost us an hour for zero upside.
+
+**Consequences:** The `docker-compose.yml` builds from the local `Dockerfile` which copies only the production-needed files (`index.js`, `package*.json`). The `demo.js`, `bench.js`, SDK TypeScript, and docs ship with the source repo but are not in the container image. `.env` provides secrets — critically, `PAYMENT_DESTINATION` — and is gitignored.
+
+#### D-010 — Dockerfile copies only runtime files, `npm ci --omit=dev`
+
+The container does not need `typescript`, `@solana/web3.js` (peer/dev), `@types/node`, or `nodemon`. Those are for local SDK builds and watch mode, not for the running Shield.
+
+**Consequences:** Smaller image. If we ever move the SDK build into CI and publish to npm, this split becomes a hard boundary. No action needed now.
+
+### Open issues delta
+
+- **O-004** — ✅ **closed** in this addendum (D-008).
+- **O-007** (new) — `.env` on the VPS is hand-edited. Good enough for the hackathon; long-term, use Portainer secrets or Docker secrets so `PAYMENT_DESTINATION` doesn't live in a writable file as plaintext.
+- **O-008** (new) — Container runs as `root` (node:22-alpine default). Fine for the demo. Harden by running as non-root user before any external traffic.
+
+---
+
 ## Template for future entries
 
 ```

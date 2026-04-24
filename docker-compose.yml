@@ -1,0 +1,28 @@
+services:
+  x402-shield:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: x402-shield
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      REAL_RPC_URL: ${REAL_RPC_URL:-https://api.mainnet-beta.solana.com}
+      PAYMENT_DESTINATION: ${PAYMENT_DESTINATION}
+      RPC_LOAD_THRESHOLD: ${RPC_LOAD_THRESHOLD:-0.75}
+      REQUESTS_PER_IP_LIMIT: ${REQUESTS_PER_IP_LIMIT:-100}
+      RATE_WINDOW_MS: ${RATE_WINDOW_MS:-60000}
+      BASE_PRICE: ${BASE_PRICE:-1000}
+      MAX_PRICE: ${MAX_PRICE:-50000}
+    networks:
+      - portainer_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.x402-shield.rule=Host(`x402.assistent.top`)"
+      - "traefik.http.routers.x402-shield.entrypoints=websecure"
+      - "traefik.http.routers.x402-shield.tls.certresolver=leresolver"
+      - "traefik.http.services.x402-shield.loadbalancer.server.port=3000"
+
+networks:
+  portainer_default:
+    external: true
