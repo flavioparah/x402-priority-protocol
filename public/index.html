@@ -3,289 +3,430 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RPC Priority Protocol</title>
+    <title>RPC Priority Protocol — Spam to Marketplace</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --acid: #c8ff00;
+            --danger: #ff3300;
+            --dark: #050506;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+        
+        * { cursor: crosshair; scroll-behavior: smooth; }
+
         body {
-            background-color: #030303;
-            color: #a3a3a3;
+            background-color: var(--dark);
+            color: #d1d1d1;
             font-family: 'Inter', sans-serif;
             overflow-x: hidden;
         }
-        .font-mono { font-family: 'Space Mono', monospace; }
+
+        .font-syne { font-family: 'Syne', sans-serif; }
+        .font-mono { font-family: 'DM Mono', monospace; }
+        
         .hero-title {
-            font-size: clamp(3rem, 10vw, 8rem);
+            font-size: clamp(2rem, 7vw, 6rem);
             line-height: 0.9;
-            letter-spacing: -0.05em;
+            letter-spacing: -0.03em;
+            font-weight: 800;
         }
-        .text-stroke {
-            -webkit-text-stroke: 1px rgba(255, 255, 255, 0.2);
-            color: transparent;
-        }
-        canvas {
+
+        #canvas-container {
             position: fixed;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             z-index: 0;
             pointer-events: none;
+            opacity: 0.7; /* Opacidade aumentada para destacar a filtragem */
         }
-        .glass {
-            background: rgba(255, 255, 255, 0.02);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+
+        .filter-gate {
+            position: fixed;
+            top: 0; left: 50%;
+            width: 2px;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent, var(--acid), transparent);
+            z-index: 1;
+            transform: translateX(-50%);
+            box-shadow: 0 0 30px var(--acid);
+            opacity: 0.3;
         }
-        .btn-primary {
-            background: #00E0FF;
+
+        .btn-acid {
+            background: var(--acid);
             color: #000;
-            box-shadow: 0 0 20px rgba(0, 224, 255, 0.3);
-            transition: all 0.3s ease;
+            font-family: 'DM Mono', monospace;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+            clip-path: polygon(0 0, 100% 0, 100% 70%, 92% 100%, 0 100%);
         }
-        .btn-primary:hover {
-            background: #00ffab;
+
+        .btn-acid:hover {
             transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(200, 255, 0, 0.2);
         }
-        #terminal-content div {
-            opacity: 0;
-            transform: translateX(-10px);
-            transition: all 0.5s ease;
+
+        .technical-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--acid);
         }
-        #terminal-content div.active {
-            opacity: 1;
-            transform: translateX(0);
+
+        .section-card {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(12px);
         }
+
+        .tag {
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 2px;
+            font-family: 'DM Mono';
+            text-transform: uppercase;
+        }
+
+        .stat-box {
+            border-left: 1px solid var(--acid);
+            padding-left: 1rem;
+        }
+
+        code { background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 3px; font-size: 0.9em; color: var(--acid); }
     </style>
 </head>
 <body>
 
     <div id="canvas-container"></div>
+    <div class="filter-gate"></div>
 
-    <!-- Navigation -->
-    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-black/50 backdrop-blur-xl h-20 flex items-center px-8">
-        <div class="max-w-7xl mx-auto w-full flex justify-between items-center">
+    <!-- Navegação -->
+    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-black/80 backdrop-blur-xl h-20 flex items-center px-6 md:px-12">
+        <div class="max-w-[1400px] mx-auto w-full flex justify-between items-center">
             <div class="flex items-center gap-4">
-                <div class="w-10 h-10 border border-[#00E0FF]/40 flex items-center justify-center bg-[#00E0FF]/5">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00E0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                </div>
-                <span class="text-white font-mono font-black tracking-[0.4em] text-sm uppercase">RPC PRIORITY PROTOCOL</span>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="var(--acid)">
+                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 6c1.1 0 2 .9 2 2v2h1v4H9v-4h1V9c0-1.1.9-2 2-2zm-1 4h2V9c0-.55-.45-1-1-1s-1 .45-1 1v2z"/>
+                </svg>
+                <span class="text-white font-syne font-bold tracking-tighter text-lg uppercase">RPC Priority</span>
             </div>
-            <button class="hidden md:flex glass px-6 py-2 text-[10px] text-white font-mono tracking-widest uppercase items-center gap-2 hover:bg-white/10 transition-all">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"></path><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                Connect Agent
-            </button>
+            <div class="hidden md:flex gap-8 text-[10px] font-mono uppercase tracking-widest text-white/40">
+                <a href="#operators" class="hover:text-white transition-colors">Operators</a>
+                <a href="#developers" class="hover:text-white transition-colors">AI Agents/Devs</a>
+                <a href="#ecosystem" class="hover:text-white transition-colors">Ecosystem</a>
+            </div>
+            <button class="btn-acid px-6 py-2 text-[10px] uppercase">Access Node</button>
         </div>
     </nav>
 
-    <!-- Main Content -->
     <main class="relative z-10">
-        <!-- Hero -->
-        <section class="pt-64 pb-32 px-8 max-w-7xl mx-auto">
-            <span class="inline-block px-4 py-1 border border-[#00FFAB]/30 text-[#00FFAB] text-[10px] font-mono tracking-[0.4em] uppercase mb-8">
-                Network Congestion Layer-0
-            </span>
-            <h1 class="hero-title font-black text-white uppercase mb-10">
-                Filter<br>
-                <span class="text-stroke">The Noise.</span>
-            </h1>
-            <p class="text-xl md:text-2xl text-gray-400 max-w-2xl leading-relaxed mb-12">
-                RPC Priority Protocol transforms web traffic chaos into optimized data streams. 
-                We leverage the HTTP 402 handshake to prioritize elite agents.
-            </p>
-            <div class="flex flex-wrap gap-6">
-                <button class="btn-primary px-10 py-5 text-[10px] font-mono font-bold tracking-[0.3em] uppercase">
-                    Launch Protocol
-                </button>
-                <button class="glass px-10 py-5 text-[10px] text-white font-mono tracking-[0.3em] uppercase">
-                    Documentation
-                </button>
-            </div>
-        </section>
+        
+        <!-- Hero Section -->
+        <section class="min-h-screen pt-40 pb-20 px-6 md:px-12 flex flex-col justify-center">
+            <div class="max-w-[1400px] mx-auto w-full">
+                <div class="mb-6 inline-flex items-center gap-4">
+                    <span class="tag bg-red-500/10 text-red-500 border border-red-500/20">Monetized Anti-Spam</span>
+                    <span class="tag bg-acid/10 text-acid border border-acid/20">Solana Layer-0</span>
+                </div>
+                
+                <h1 class="hero-title font-syne text-white uppercase mb-8">
+                    SPAM BECOMES <br>
+                    <span style="color: var(--acid)">A MARKETPLACE.</span>
+                </h1>
 
-        <!-- Stats -->
-        <section class="py-24 px-8 border-y border-white/5 bg-black/40">
-            <div class="max-w-7xl mx-auto grid md:grid-cols-3 gap-16">
-                <div class="group">
-                    <div class="text-[#00E0FF] font-mono text-[10px] tracking-[0.4em] uppercase mb-2">Latency</div>
-                    <div class="text-5xl font-bold text-white mb-2 tracking-tighter">8.4ms</div>
-                    <div class="text-gray-600 text-xs uppercase tracking-[0.1em]">Optimized for Solana agents</div>
-                </div>
-                <div class="group">
-                    <div class="text-[#00FFAB] font-mono text-[10px] tracking-[0.4em] uppercase mb-2">Bypass</div>
-                    <div class="text-5xl font-bold text-white mb-2 tracking-tighter">99.2%</div>
-                    <div class="text-gray-600 text-xs uppercase tracking-[0.1em]">Filtering success rate</div>
-                </div>
-                <div class="group">
-                    <div class="text-[#00E0FF] font-mono text-[10px] tracking-[0.4em] uppercase mb-2">Uptime</div>
-                    <div class="text-5xl font-bold text-white mb-2 tracking-tighter">99.9%</div>
-                    <div class="text-gray-600 text-xs uppercase tracking-[0.1em]">Distributed infrastructure</div>
+                <div class="grid lg:grid-cols-2 gap-12 lg:gap-24">
+                    <p class="text-lg md:text-xl text-gray-400 font-light leading-relaxed">
+                        If you operate a node, we pay you for defense. If you use a node, we give you priority without signup. 
+                        The same request that today is a loss and a headache turns into <span class="text-white font-medium italic">instant revenue and guaranteed access.</span>
+                    </p>
+                    <div class="flex flex-col gap-4 border-l border-white/10 pl-6">
+                        <div class="font-mono text-[10px] uppercase tracking-widest text-white/30">
+                            REVERSE PROXY IN 5 MINUTES
+                        </div>
+                        <code class="w-fit">docker-compose up -d</code>
+                        <div class="text-[10px] font-mono text-gray-500 uppercase tracking-tighter">No rewrites. No stack overhaul.</div>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- Terminal Section -->
-        <section class="py-40 px-8 max-w-7xl mx-auto grid lg:grid-cols-2 gap-20 items-center">
-            <div class="glass p-10 rounded-sm font-mono relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#00E0FF] to-transparent opacity-20"></div>
-                <div class="flex gap-2 mb-8 border-b border-white/10 pb-4">
-                    <div class="w-3 h-3 rounded-full bg-red-500/20"></div>
-                    <div class="w-3 h-3 rounded-full bg-yellow-500/20"></div>
-                    <div class="w-3 h-3 rounded-full bg-green-500/20"></div>
+        <!-- Segmento 1: Operadores -->
+        <section id="operators" class="py-24 px-6 md:px-12 border-t border-white/5">
+            <div class="max-w-[1400px] mx-auto">
+                <div class="flex flex-col md:flex-row gap-12 items-start mb-16">
+                    <div class="md:w-1/2">
+                        <span class="technical-label">Persona 01</span>
+                        <h2 class="font-syne text-3xl md:text-5xl text-white uppercase mt-4">RPC Node Operators</h2>
+                        <p class="text-gray-500 mt-4 font-mono text-xs uppercase tracking-wider">Helius, Triton, Jito, or Self-Hosted.</p>
+                    </div>
+                    <div class="md:w-1/2 p-6 border border-red-500/20 bg-red-500/5 rounded-sm">
+                        <h4 class="text-red-500 font-mono text-[10px] uppercase mb-2">Current Pain:</h4>
+                        <p class="text-gray-400 text-sm italic">"IP blocking doesn't generate revenue and punishes legitimate agents rotating infrastructure. Attacks are pure cost."</p>
+                    </div>
                 </div>
-                <div id="terminal-content" class="space-y-4 text-xs h-40">
-                    <div><span class="text-[#00E0FF]">[INBOUND]</span> Analyzing agent spam packets...</div>
-                    <div><span class="text-[#00E0FF]">[402]</span> Payment Required error sent to node.</div>
-                    <div><span class="text-[#00FFAB]">[FILTER]</span> x402 signature validated on ledger.</div>
-                    <div><span class="text-[#00FFAB]">[UPGRADE]</span> Ultra-low latency priority applied.</div>
-                    <div><span class="text-white font-bold">[SUCCESS]</span> Clean connection established with RPC.</div>
-                </div>
-            </div>
-            <div>
-                <h2 class="text-4xl md:text-6xl font-bold text-white mb-8 uppercase tracking-tighter leading-none">Priority <br>Handshake.</h2>
-                <p class="text-lg text-gray-500 leading-relaxed mb-8">
-                    Our neural shield detects automated agents without stake and redirects chaotic traffic to the filtering funnel. Only authenticated requests pass through to the mainnet.
-                </p>
-                <div class="flex gap-4 items-center text-[#00FFAB] font-mono text-[10px] tracking-widest uppercase animate-pulse">
-                    <div class="w-2 h-2 rounded-full bg-[#00FFAB]"></div>
-                    System Active: Monitoring traffic
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="section-card p-6">
+                        <div class="text-white font-syne text-md uppercase mb-2">Spam is Revenue</div>
+                        <p class="text-[11px] text-gray-500 leading-relaxed uppercase font-mono">Every request under load turns into μ-lamports in your pocket. Attackers fund your operation.</p>
+                    </div>
+                    <div class="section-card p-6">
+                        <div class="text-white font-syne text-md uppercase mb-2">Self-Running Defense</div>
+                        <p class="text-[11px] text-gray-500 leading-relaxed uppercase font-mono">No more manual IP hunting. Identity is a crypto key — only those who pay pass.</p>
+                    </div>
+                    <div class="section-card p-6">
+                        <div class="text-white font-syne text-md uppercase mb-2">Automatic Discounts</div>
+                        <p class="text-[11px] text-gray-500 leading-relaxed uppercase font-mono">Progressive Trust-Score: loyal clients with clean history pay up to 50% less automatically.</p>
+                    </div>
+                    <div class="section-card p-6">
+                        <div class="text-white font-syne text-md uppercase mb-2">No-Code Deploy</div>
+                        <p class="text-[11px] text-gray-500 leading-relaxed uppercase font-mono">A reverse proxy in front of your node. Doesn't touch your existing logic or stack.</p>
+                    </div>
                 </div>
             </div>
         </section>
+
+        <!-- Painel de Simulação -->
+        <section class="py-20 px-6 md:px-12 relative overflow-hidden">
+            <div class="max-w-[1400px] mx-auto section-card border-acid/20 p-8 md:p-12 relative z-10">
+                <div class="flex flex-col lg:flex-row justify-between items-start gap-12">
+                    <div class="lg:w-1/3">
+                        <span class="technical-label">Protocol Monitor</span>
+                        <h3 class="font-syne text-2xl text-white uppercase mt-2 mb-4">Real-time Defense</h3>
+                        <p class="text-xs font-mono text-gray-500 uppercase leading-relaxed mb-8">Simulating an active DDoS being converted into protocol revenue through micro-payments.</p>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="stat-box">
+                                <div class="text-[10px] font-mono text-gray-500 uppercase">Total Revenue</div>
+                                <div class="text-2xl font-syne text-white" id="sim-rev">$0.00</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="text-[10px] font-mono text-gray-500 uppercase">Requests/Sec</div>
+                                <div class="text-2xl font-syne text-acid" id="sim-rps">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="lg:w-2/3 w-full bg-black/60 p-4 border border-white/5 rounded-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-[10px] font-mono text-acid uppercase">Live Traffic Log</span>
+                            <span class="tag bg-acid text-black">Active Protection</span>
+                        </div>
+                        <div id="traffic-log" class="font-mono text-[9px] h-48 overflow-hidden flex flex-col-reverse gap-1 text-gray-500 uppercase">
+                            <!-- Logs automáticos -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Segmento 2: Desenvolvedores IA -->
+        <section id="developers" class="py-24 px-6 md:px-12 border-y border-white/5">
+            <div class="max-w-[1400px] mx-auto">
+                <div class="flex flex-col md:flex-row-reverse gap-12 items-start mb-16">
+                    <div class="md:w-1/2 text-right">
+                        <span class="technical-label">Persona 02</span>
+                        <h2 class="font-syne text-3xl md:text-5xl text-white uppercase mt-4">AI Agent Developers</h2>
+                        <p class="text-gray-500 mt-4 font-mono text-xs uppercase tracking-wider">Bots, Indexers, DeFi, MCP.</p>
+                    </div>
+                    <div class="md:w-1/2 p-6 border border-acid/20 bg-acid/5 rounded-sm">
+                        <h4 class="text-acid font-mono text-[10px] uppercase mb-4">Why Switch:</h4>
+                        <ul class="text-gray-400 text-xs font-mono space-y-3 uppercase">
+                            <li class="flex gap-3"><span class="text-acid">/01</span> Zero Friction: No credit cards, no signup.</li>
+                            <li class="flex gap-3"><span class="text-acid">/02</span> No Lock-in: Your key is your identity. Move between GCP/AWS freely.</li>
+                            <li class="flex gap-3"><span class="text-acid">/03</span> Real Savings: 26% average reduction based on reputation scores.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="section-card p-8 border-t-2 border-acid">
+                        <h3 class="text-white font-syne uppercase text-lg mb-3">Sovereign Access</h3>
+                        <p class="text-gray-500 text-[11px] font-mono leading-relaxed uppercase">Use your Solana key for authentication. No API keys to leak, no shared secrets.</p>
+                    </div>
+                    <div class="section-card p-8 border-t-2 border-acid">
+                        <h3 class="text-white font-syne uppercase text-lg mb-3">Pay-per-Need</h3>
+                        <p class="text-gray-500 text-[11px] font-mono leading-relaxed uppercase">Free during low load. Micro-fees only during spikes. Forget monthly fixed plans.</p>
+                    </div>
+                    <div class="section-card p-8 border-t-2 border-acid">
+                        <h3 class="text-white font-syne uppercase text-lg mb-3">Transparent SDK</h3>
+                        <p class="text-gray-500 text-[11px] font-mono leading-relaxed uppercase italic">Swap 'Connection' for 'X402Provider'. The rest of your code stays exactly the same.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Benefícios do Ecosistema -->
+        <section id="ecosystem" class="py-32 px-6 md:px-12 text-center">
+            <div class="max-w-4xl mx-auto">
+                <span class="technical-label">Aligning Incentives</span>
+                <h2 class="font-syne text-4xl md:text-6xl text-white uppercase mt-6 mb-12 italic">End the Adversarial Relationship</h2>
+                
+                <div class="grid md:grid-cols-2 gap-8 text-left">
+                    <div class="bg-white/5 p-8 border border-white/10 rounded-sm">
+                        <p class="text-xs font-mono text-gray-400 uppercase leading-relaxed">
+                            <span class="text-acid">Today:</span> Operators think all traffic is spam until proven otherwise. Devs think operators are expensive bottlenecks.
+                        </p>
+                    </div>
+                    <div class="bg-acid/10 p-8 border border-acid/30 rounded-sm">
+                        <p class="text-xs font-mono text-white uppercase leading-relaxed">
+                            <span class="text-acid">Protocol:</span> Paying traffic = Revenue. Clean history = Loyalty discounts. Attackers fund the defense.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </main>
 
-    <footer class="py-20 px-8 border-t border-white/5 text-center relative z-10">
-        <p class="text-[10px] font-mono tracking-[0.5em] uppercase text-gray-600">
-            RPC Priority Protocol — Built for the Solana Ecosystem
-        </p>
+    <footer class="py-12 px-6 md:px-12 border-t border-white/5 text-[9px] font-mono text-white/30 uppercase tracking-[0.4em]">
+        <div class="max-w-[1400px] mx-auto flex flex-col md:flex-row justify-between gap-4">
+            <span>RPC Priority Protocol — Spam to Marketplace</span>
+            <span>Solana Native Layer-0 Defense</span>
+            <span>© 2024 Built for the Agentic Era</span>
+        </div>
     </footer>
 
     <script>
-        // --- THREE.JS BACKGROUND LOGIC ---
-        let scene, camera, renderer, spamSystem, spamPoints = [];
-        let lines = [], shieldRing;
-        const lineCount = 40;
-        const lineSegments = 50;
-        const spamCount = 200;
+        // --- VISUALIZAÇÃO THREE.JS (CAOS -> FILTRO -> FLUIDEZ) ---
+        let scene, camera, renderer, points;
+        const count = 3000; // Aumentado para mais densidade
+        const particles = [];
 
-        function init() {
+        function init3D() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 8;
+            camera.position.z = 12;
 
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            // 1. Shield (The Funnel)
-            const shieldGeo = new THREE.TorusGeometry(1.5, 0.02, 16, 100);
-            const shieldMat = new THREE.MeshBasicMaterial({ color: 0x00e0ff, transparent: true, opacity: 0.3 });
-            shieldRing = new THREE.Mesh(shieldGeo, shieldMat);
-            shieldRing.rotation.y = Math.PI / 2;
-            scene.add(shieldRing);
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
 
-            // 2. Spam Particles (Inbound) - Red
-            const spamGeo = new THREE.BufferGeometry();
-            const spamPosArr = new Float32Array(spamCount * 3);
-            for (let i = 0; i < spamCount; i++) {
-                const p = {
-                    x: -15 - Math.random() * 20,
-                    y: (Math.random() - 0.5) * 15,
-                    z: (Math.random() - 0.5) * 10,
-                    speed: 0.05 + Math.random() * 0.1
-                };
-                spamPoints.push(p);
-                spamPosArr[i * 3] = p.x;
-                spamPosArr[i * 3 + 1] = p.y;
-                spamPosArr[i * 3 + 2] = p.z;
-            }
-            spamGeo.setAttribute('position', new THREE.BufferAttribute(spamPosArr, 3));
-            const spamMat = new THREE.PointsMaterial({ color: 0xff2200, size: 0.08, transparent: true, opacity: 0.6 });
-            spamSystem = new THREE.Points(spamGeo, spamMat);
-            scene.add(spamSystem);
-
-            // 3. Green Lines (Outbound)
-            for (let i = 0; i < lineCount; i++) {
-                const geo = new THREE.BufferGeometry();
-                const pts = [];
-                for (let j = 0; j < lineSegments; j++) pts.push(new THREE.Vector3(0, 0, 0));
-                geo.setFromPoints(pts);
-                const mat = new THREE.LineBasicMaterial({ color: 0x00ffab, transparent: true, opacity: 0.3 });
-                const line = new THREE.Line(geo, mat);
-                lines.push({
-                    mesh: line,
-                    offset: Math.random() * Math.PI * 2,
-                    speed: 0.02 + Math.random() * 0.04,
-                    amplitude: 0.4 + Math.random() * 1.2,
-                    xPos: 0
+            for (let i = 0; i < count; i++) {
+                // Lado esquerdo (caótico)
+                const x = (Math.random() - 1) * 15; // -15 a 0
+                const y = (Math.random() - 0.5) * 20;
+                const z = (Math.random() - 0.5) * 10;
+                
+                // Variáveis de movimento
+                particles.push({ 
+                    x, y, z, 
+                    vx: 0.05 + Math.random() * 0.1,
+                    vy: (Math.random() - 0.5) * 0.05,
+                    phase: Math.random() * Math.PI * 2,
+                    amp: Math.random() * 2
                 });
-                scene.add(line);
+
+                pos[i*3] = x;
+                pos[i*3+1] = y;
+                pos[i*3+2] = z;
+
+                // Cor inicial vermelha
+                colors[i*3] = 1.0; colors[i*3+1] = 0.1; colors[i*3+2] = 0.0;
             }
 
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const mat = new THREE.PointsMaterial({ size: 0.04, vertexColors: true, transparent: true, opacity: 0.8 });
+            points = new THREE.Points(geo, mat);
+            scene.add(points);
             animate();
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            const time = Date.now() * 0.001;
+            const positions = points.geometry.attributes.position.array;
+            const colors = points.geometry.attributes.color.array;
 
-            // Anim Shield
-            shieldRing.scale.setScalar(1 + Math.sin(time * 2) * 0.05);
-            shieldRing.rotation.z += 0.005;
+            for (let i = 0; i < count; i++) {
+                const p = particles[i];
+                
+                // Movimento da esquerda para a direita
+                p.x += p.vx;
 
-            // Anim Spam (Funnel)
-            const posAttr = spamSystem.geometry.attributes.position.array;
-            for (let i = 0; i < spamCount; i++) {
-                const p = spamPoints[i];
-                p.x += p.speed;
-                const pull = Math.pow(1 - Math.max(0, Math.min(1, (0 - p.x) / 6)), 2.5);
-                posAttr[i * 3] = p.x;
-                posAttr[i * 3 + 1] = p.y * pull;
-                posAttr[i * 3 + 2] = p.z * pull;
-                if (p.x > 0.5) p.x = -15 - Math.random() * 10;
-            }
-            spamSystem.geometry.attributes.position.needsUpdate = true;
-
-            // Anim Green Lines
-            lines.forEach(l => {
-                const attr = l.mesh.geometry.attributes.position.array;
-                l.xPos += l.speed * 5;
-                if (l.xPos > 15) l.xPos = 0;
-                for (let j = 0; j < lineSegments; j++) {
-                    const sx = l.xPos - (j * 0.25);
-                    if (sx < 0) {
-                        attr[j * 3] = attr[j * 3 + 1] = attr[j * 3 + 2] = 0;
-                    } else {
-                        attr[j * 3] = sx;
-                        attr[j * 3 + 1] = Math.sin(sx * 0.5 + time + l.offset) * l.amplitude;
-                        attr[j * 3 + 2] = Math.cos(sx * 0.5 + time + l.offset) * l.amplitude;
-                    }
+                // FUNIL CENTRAL: Perto de x=0, as partículas afunilam
+                const funnelForce = Math.exp(-Math.abs(p.x) * 0.5);
+                
+                if (p.x < 0) {
+                    // CAOS VERMELHO
+                    // Vibração aleatória alta no lado esquerdo
+                    p.y += (Math.random() - 0.5) * 0.2;
+                    colors[i*3] = 0.8 + Math.random() * 0.2; // R
+                    colors[i*3+1] = 0.1; // G
+                    colors[i*3+2] = 0.1; // B
+                } else {
+                    // FLUIDEZ VERDE
+                    // Movimento suave senoidal no lado direito
+                    p.y = Math.sin(p.x * 0.5 + p.phase) * p.amp;
+                    colors[i*3] = 0.1; // R
+                    colors[i*3+1] = 0.7 + (p.x * 0.03); // G (fica mais vivo quanto mais longe)
+                    colors[i*3+2] = 0.1; // B
                 }
-                l.mesh.geometry.attributes.position.needsUpdate = true;
-                l.mesh.material.opacity = Math.max(0, 0.4 * (1 - l.xPos / 15));
-            });
 
+                // Efeito de sucção no funil (centro x=0)
+                if (Math.abs(p.x) < 2) {
+                    p.y *= 0.9; // Achata o Y em direção ao centro
+                }
+
+                // Reset
+                if (p.x > 15) {
+                    p.x = -15;
+                    p.y = (Math.random() - 0.5) * 20;
+                }
+
+                positions[i*3] = p.x;
+                positions[i*3+1] = p.y;
+                positions[i*3+2] = p.z;
+            }
+
+            points.geometry.attributes.position.needsUpdate = true;
+            points.geometry.attributes.color.needsUpdate = true;
             renderer.render(scene, camera);
         }
 
-        // --- TERMINAL LOGIC ---
-        let currentLog = 0;
-        function cycleLogs() {
-            const container = document.getElementById('terminal-content');
-            const logDivs = container.getElementsByTagName('div');
+        // --- LÓGICA DO PAINEL DE SIMULAÇÃO ---
+        let totalRevenue = 0;
+        const log = document.getElementById('traffic-log');
+        const revEl = document.getElementById('sim-rev');
+        const rpsEl = document.getElementById('sim-rps');
+
+        const endpoints = ['getAccountInfo', 'getProgramAccounts', 'getBalance', 'sendTransaction'];
+
+        function runSim() {
+            const rps = Math.floor(Math.random() * 800) + 2400;
+            rpsEl.innerText = rps.toLocaleString();
+
+            const income = (rps * 0.000015);
+            totalRevenue += income;
+            revEl.innerText = '$' + totalRevenue.toFixed(2);
+
+            const div = document.createElement('div');
+            const ep = endpoints[Math.floor(Math.random() * endpoints.length)];
+            const time = new Date().toLocaleTimeString('en-GB', { hour12: false, minute:'2-digit', second:'2-digit' });
+            const fee = (Math.random() * 0.0008).toFixed(5);
             
-            for(let d of logDivs) d.classList.remove('active');
-            
-            if (logDivs.length > 0) {
-                logDivs[currentLog].classList.add('active');
-                currentLog = (currentLog + 1) % logDivs.length;
+            div.innerHTML = `[${time}] <span class="text-white">${ep}</span> | <span class="text-acid">+${fee} SOL</span> | STATUS: <span class="text-acid">FILTERED_OK</span>`;
+            log.appendChild(div);
+
+            if (log.children.length > 12) {
+                log.removeChild(log.firstChild);
             }
         }
 
         window.onload = () => {
-            init();
-            setInterval(cycleLogs, 2500);
-            cycleLogs();
+            init3D();
+            setInterval(runSim, 150);
         };
 
         window.onresize = () => {
