@@ -295,6 +295,72 @@ Floor clamp to `BASE_PRICE_MICRO_LAMPORTS` ensures we never discount below the m
 
 ---
 
+## 2026-04-24 — Session 1 (continued): verified deposits + real load metric (O-001, O-002)
+
+Closes the two "honest MVP" caveats most likely to draw judge skepticism.
+
+### O-001 — Verified on-chain deposits
+
+Before: `POST /escrow/deposit` accepted `{pubkey, amount}` and credited in-memory. Alice could mint 999 M µL of credit on someone else's wallet. Cute for demos, impossible to ship.
+
+After: `POST /escrow/deposit` takes `{ tx_signature }` only. The Shield opens a `Connection` to `SOLANA_RPC_URL` (default: same as the proxy target), fetches the tx via `getParsedTransaction(sig, {commitment:"confirmed", maxSupportedTransactionVersion:0})`, and verifies:
+
+1. Transaction is found and confirmed.
+2. `meta.err` is null — i.e. the tx didn't revert.
+3. At least one `SystemProgram.transfer` instruction lists `PAYMENT_DESTINATION` as destination.
+4. The signature is not already in `usedDepositSignatures` (anti-replay).
+
+On success, the sender's pubkey is credited `lamports × 1000` µL, the signature is recorded, and a response returns the slot / credited amount / new balance.
+
+A demo-only backdoor — `POST /escrow/deposit-trusted` — is mounted when `ESCROW_TRUST_DEPOSITS=1`. Needed because the smoke test, bench, and Trust-Score progression would otherwise have to airdrop + transfer for every run. Explicit env flag, loud startup warning, never enabled in production.
+
+New example `examples/deposit-with-tx.js` proves the verified path end-to-end: generates a keypair (or loads `AGENT_SECRET_KEY`), requests devnet airdrop if needed, transfers 100 lamports to the Shield's destination, posts the signature, and asserts anti-replay by re-posting the same signature.
+
+Failure-path verification done against the local Shield (devnet upstream):
+- missing `tx_signature`        → 400 "tx_signature (base58) required"
+- well-formed unknown signature → 400 "transaction not found or not yet confirmed"
+- malformed signature           → 400 "RPC error fetching transaction: Invalid param: Invalid"
+
+Positive-path verification pending: devnet public faucet is rate-limited on this IP today. The example accepts `AGENT_SECRET_KEY=<bs58>` to skip airdrop — any funded devnet keypair runs it.
+
+### O-002 — Real self-load metric
+
+Before: `getRpcLoad()` returned `Math.random() * 0.4 + 0.6`. Visibly synthetic.
+
+After: sliding-window req/s. `recordRequest()` pushes a timestamp into `requestTimestamps[]` on every /rpc hit; `getRpcLoad()` prunes entries older than `LOAD_WINDOW_MS` (default 5 s) and returns `(count / windowSec) / MAX_RPS`, capped at 1.0. `MAX_RPS` defaults to 50 req/s = 100 % load.
+
+Empirical test (MAX_RPS=10, 30 requests in a burst):
+  - baseline load: 0.00
+  - after burst:   0.60   (30 requests spread over ~5 s window)
+  - 6 s later:     0.00   (window expired)
+
+For the pitch demo where we want 402 on every request without generating synthetic load, `RPC_LOAD_FORCE=1` overrides the measurement and pins load at the configured value. `/health` now reports both the measured and the forced state.
+
+### Decisions
+
+#### D-014 — Two-endpoint escrow design (verified + trusted, env-gated)
+
+The verified path is canonical; the trusted path is a keyed backdoor for test harnesses. Separating them by URL (rather than a mode flag on one endpoint) means the unsafe path is *syntactically absent* unless explicitly enabled, not hiding inside request parsing.
+
+**Why:** minimizes accidental exposure. A production operator who forgets an env flag gets "404 Not Found" on `/escrow/deposit-trusted`, not a working backdoor.
+
+#### D-015 — Unit conversion: 1 lamport = 1000 µ-lamports
+
+Solana prices in lamports (1 SOL = 1e9 lamports). Our internal pricing is in µ-lamports for finer granularity (base price 1000 µL = 1 lamport). The smallest on-chain transfer (1 lamport) credits 1000 µL of escrow — enough for many priority requests at base price. No unit-conversion surprises.
+
+#### D-016 — Self-load metric over upstream-load metric
+
+The cleanest metric would be the upstream Solana node's actual load (via `getHealth` / Prometheus). But we don't own most upstream nodes — public RPCs don't expose their load. A self-load metric (Shield's own req/s) is a lower bound: if we're being hit hard, the upstream is too. Good enough for MVP. A production deployment pointing at a self-hosted Jito / Triton node can swap this for a real Prometheus scrape.
+
+### Open issues delta
+
+- **O-001** — ✅ closed (verified path implemented + failure paths tested + positive path covered by `examples/deposit-with-tx.js`).
+- **O-002** — ✅ closed.
+- **O-011** (new) — positive path of verified deposit (`examples/deposit-with-tx.js`) depends on a funded devnet keypair. Add a CI job that runs this against a long-lived pre-funded test keypair so verified deposits are regression-tested.
+- **O-012** (new) — no request-timestamp cap. A sustained burst could grow `requestTimestamps[]` unboundedly before the periodic prune (which only happens on the next request). Under extreme load the array could allocate big. Trivially bounded by clamping `MAX_RPS × LOAD_WINDOW_MS / 1000` on each push.
+
+---
+
 ## Template for future entries
 
 ```

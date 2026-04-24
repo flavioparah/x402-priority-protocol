@@ -4,14 +4,18 @@
  *
  * Runs the complete 5-step protocol against a local Shield:
  *   1. Generate Ed25519 agent keypair
- *   2. Pre-fund the agent's escrow on the Shield
+ *   2. Pre-fund the agent's escrow on the Shield (trusted shortcut)
  *   3. Send a JSON-RPC request (expect 402 under load)
  *   4. Verify budget, sign the challenge payload
  *   5. Retry with Authorization: x402 <sig>.<pubkey>.<msg>
  *
  * Usage:
- *   Terminal 1:  RPC_LOAD_THRESHOLD=0 npm start      # force 402 on every request
+ *   Terminal 1:  RPC_LOAD_THRESHOLD=0 ESCROW_TRUST_DEPOSITS=1 npm start
  *   Terminal 2:  node demo.js                         # or: npm run demo
+ *
+ * NB: uses /escrow/deposit-trusted (no on-chain tx) so the demo is
+ * fast and deterministic. For the real verified-deposit flow, see
+ * examples/deposit-with-tx.js.
  *
  * Requires Node 18+ (native fetch).
  */
@@ -51,7 +55,7 @@ async function main() {
 
   // 2. Pre-fund escrow
   c.step(2, "Pre-funding escrow");
-  const deposit = await postJson(`${SHIELD_URL}/escrow/deposit`, {
+  const deposit = await postJson(`${SHIELD_URL}/escrow/deposit-trusted`, {
     pubkey: pubkeyB58,
     amount_micro_lamports: ESCROW_AMOUNT,
   });

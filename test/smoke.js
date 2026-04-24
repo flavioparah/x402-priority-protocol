@@ -10,7 +10,10 @@
  *
  * Requires:
  *   - A Shield running at $SHIELD_URL (default http://localhost:3000),
- *     preferably with RPC_LOAD_THRESHOLD=0 to force 402 on every call.
+ *     preferably with RPC_LOAD_THRESHOLD=0 to force 402 on every call
+ *     and ESCROW_TRUST_DEPOSITS=1 (smoke uses the trusted shortcut to
+ *     stay self-contained; the verified on-chain path is covered by
+ *     examples/deposit-with-tx.js against real devnet).
  *   - Compiled SDK in dist/ (run `npm run build` first).
  *
  * Exits 0 on pass, non-zero on any failure.
@@ -32,7 +35,7 @@ async function main() {
   });
 
   // 1. Escrow pre-funding
-  const before = await rpc.depositEscrow(SHIELD_URL, 200_000);
+  const before = await rpc.depositEscrowTrusted(SHIELD_URL, 200_000);
   if (before < 200_000) throw new Error(`deposit returned balance ${before}, expected >= 200000`);
   ok(`escrow credited — balance ${before} µL`);
 

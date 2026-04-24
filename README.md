@@ -41,7 +41,7 @@ PAYMENT_DESTINATION=YourSolWalletHere \
 npm start
 ```
 
-Hit the proxy without payment — under simulated load you get a 402 challenge:
+Hit the proxy without payment — if the sliding-window load is above the threshold, the Shield answers with a 402 challenge. For a guaranteed 402 on every request (useful for demos) start the Shield with `RPC_LOAD_FORCE=1`:
 
 ```bash
 curl -i -X POST http://localhost:3000/rpc \
@@ -104,8 +104,17 @@ On a 402, the SDK parses the challenge, optionally prompts the caller via `onCha
 
 | Mode | Latency | Trust model |
 |------|---------|-------------|
-| `offchain` *(default, MVP)* | Sub-millisecond verification | Agent pre-funds a pubkey-indexed escrow; each request debits via a signed nonce |
-| `onchain` | Seconds (confirmation) | Agent sends a `SystemProgram.transfer` and includes the signed tx |
+| `offchain` *(default, MVP)* | Sub-millisecond verification | Agent pre-funds a pubkey-indexed escrow; each request debits via a signed Ed25519 nonce |
+| `onchain` | Seconds (confirmation) | Agent sends `SystemProgram.transfer` and the Shield verifies the tx on-chain (reserved, see below) |
+
+### Escrow deposits
+
+Two endpoints, both credit the caller's escrow balance in µ-lamports (1 lamport = 1000 µL by the Shield's convention):
+
+| Endpoint | Request body | Trust |
+|---|---|---|
+| `POST /escrow/deposit` | `{ "tx_signature": "<base58>" }` | **Verified.** Shield fetches the tx from `SOLANA_RPC_URL`, asserts a `SystemProgram.transfer` to `PAYMENT_DESTINATION` exists, checks the signature hasn't been used before, and credits the sender's escrow at 1 lamport = 1000 µL. End-to-end example in [`examples/deposit-with-tx.js`](./examples/deposit-with-tx.js). |
+| `POST /escrow/deposit-trusted` | `{ "pubkey": "...", "amount_micro_lamports": N }` | **Trusted.** No on-chain check; credits whatever the caller claims. Mounts only if `ESCROW_TRUST_DEPOSITS=1`. Intended for tests, benchmarks, and the Trust-Score progression demo. Never enable in production. |
 
 ### Anti-replay
 
@@ -120,9 +129,15 @@ All configurable via env vars (see `index.js`):
 | Var | Default | Purpose |
 |-----|---------|---------|
 | `PORT` | `3000` | Listen port |
-| `REAL_RPC_URL` | `https://api.mainnet-beta.solana.com` | Upstream RPC |
-| `PAYMENT_DESTINATION` | `YourSolAddressHere` | Node operator's Solana wallet |
+| `REAL_RPC_URL` | `https://api.mainnet-beta.solana.com` | Upstream RPC the Shield proxies to |
+| `SOLANA_RPC_URL` | `$REAL_RPC_URL` | RPC the Shield uses to *verify deposits* (can differ from proxy target) |
+| `PAYMENT_DESTINATION` | `YourSolAddressHere` | Node operator's Solana wallet (must be a real pubkey for verified deposits) |
+| `DEPOSIT_COMMITMENT` | `confirmed` | Commitment required on a deposit tx before it credits escrow |
+| `ESCROW_TRUST_DEPOSITS` | `unset` | `1` mounts `/escrow/deposit-trusted` (no on-chain check) for tests/demos |
 | `RPC_LOAD_THRESHOLD` | `0.75` | Load above which 402 gating activates |
+| `MAX_RPS` | `50` | Req/s that equals "100 % load" for the sliding-window metric |
+| `LOAD_WINDOW_MS` | `5000` | Sliding-window duration (ms) for req/s load |
+| `RPC_LOAD_FORCE` | `unset` | `0..1` forces `getRpcLoad()` regardless of real traffic (demo mode) |
 | `REQUESTS_PER_IP_LIMIT` | `100` | Per-IP request cap per window |
 | `RATE_WINDOW_MS` | `60000` | Per-IP window (ms) |
 | `BASE_PRICE` | `1000` | Min µ-lamports per priority request |
@@ -134,10 +149,9 @@ All configurable via env vars (see `index.js`):
 
 **This is a hackathon MVP, not production.** Known limitations:
 
-- **In-memory state** — escrow, nonces, and rate counters live in `Map`/`Set`. Use Redis for multi-instance.
-- **Unverified deposits** — `POST /escrow/deposit` accepts any amount without confirming an on-chain transfer. Production must verify the deposit tx against the destination wallet.
-- **Simulated load metric** — `getRpcLoad()` returns `Math.random() * 0.4 + 0.6` for demo. Wire to Prometheus / node RPC stats before shipping.
-- **Single process** — no horizontal scaling yet; escrow state must be shared when scaled.
+- **In-memory state** — escrow, nonces, rate counters, and reputation live in `Map`/`Set`. A process restart wipes them. Use Redis for multi-instance.
+- **Load metric is self-measured** — `getRpcLoad()` returns req/s served by *this Shield* over a 5-second sliding window, normalized against `MAX_RPS`. That is correlated with but not identical to the upstream RPC node's load. Multi-Shield deployments would need a shared counter (or a Prometheus scrape of the upstream node). `RPC_LOAD_FORCE=<0..1>` overrides for demos.
+- **Single process** — no horizontal scaling yet; state must be shared when scaled.
 
 ---
 

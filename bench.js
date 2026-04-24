@@ -162,11 +162,14 @@ async function main() {
   const pubkeyB58 = bs58.encode(keypair.publicKey);
 
   const needed = (N + WARMUP) * 55_000; // MAX_PRICE ceiling buffer
-  const depositRes = await post(`${SHIELD_URL}/escrow/deposit`, JSON.stringify({
+  const depositRes = await post(`${SHIELD_URL}/escrow/deposit-trusted`, JSON.stringify({
     pubkey: pubkeyB58,
     amount_micro_lamports: needed,
   }));
-  if (!depositRes.ok) throw new Error(`Could not deposit escrow: ${depositRes.status}`);
+  if (!depositRes.ok) {
+    throw new Error(`Could not deposit escrow: ${depositRes.status}. ` +
+      `Start the Shield with ESCROW_TRUST_DEPOSITS=1 for benchmarks.`);
+  }
 
   // Warm up
   console.log(`\nWarming up…`);

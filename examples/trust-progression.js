@@ -66,14 +66,20 @@ async function main() {
   const pubkey = bs58.encode(keypair.publicKey);
   console.log(`  agent:  ${pubkey.slice(0, 16)}…${pubkey.slice(-4)}\n`);
 
-  // Pre-fund
+  // Pre-fund via the trusted shortcut — keeps the demo self-contained.
+  // For the verified on-chain path, see examples/deposit-with-tx.js.
   const maxEstimate = N * 55_000;
-  await fetch(SHIELD_URL + "/escrow/deposit", {
+  const dep = await fetch(SHIELD_URL + "/escrow/deposit-trusted", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pubkey, amount_micro_lamports: maxEstimate }),
   });
-  console.log(`  escrow: ${maxEstimate} µL pre-funded\n`);
+  if (!dep.ok) {
+    throw new Error(
+      `trusted deposit rejected (${dep.status}). Start the Shield with ESCROW_TRUST_DEPOSITS=1 for this demo.`
+    );
+  }
+  console.log(`  escrow: ${maxEstimate} µL pre-funded (trusted)\n`);
 
   const header = ` # │ score │ base price │ paid price │ discount`;
   const sep    = `───┼───────┼────────────┼────────────┼──────────`;

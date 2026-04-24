@@ -254,9 +254,49 @@ export class X402Provider extends Connection {
 
   // ─── Métodos de conveniência ────────────────────────────────────────────────
 
-  /** Deposita saldo no escrow do Shield (MVP) */
-  async depositEscrow(shieldBaseUrl: string, amountMicroLamports: number): Promise<number> {
+  /**
+   * Credit the Shield's escrow with a verified on-chain transaction.
+   *
+   * The caller transfers lamports to the Shield's PAYMENT_DESTINATION on
+   * Solana and passes the confirmed tx signature. The Shield fetches the
+   * tx, verifies the sender/destination/amount, and credits escrow at
+   * 1 lamport = 1000 µL. Anti-replay: each signature can be used once.
+   *
+   * Returns the resulting escrow balance for this agent's pubkey.
+   */
+  async depositEscrowWithTx(shieldBaseUrl: string, txSignature: string): Promise<{
+    pubkey: string;
+    credited_micro_lamports: number;
+    balance: number;
+    signature: string;
+    slot: number;
+  }> {
     const res = await this._fetch(`${shieldBaseUrl}/escrow/deposit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tx_signature: txSignature }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`escrow deposit rejected: ${res.status} ${err}`);
+    }
+    return res.json() as Promise<{
+      pubkey: string; credited_micro_lamports: number; balance: number; signature: string; slot: number;
+    }>;
+  }
+
+  /**
+   * DEMO/TEST ONLY: credit escrow without an on-chain transaction.
+   *
+   * Hits the Shield's /escrow/deposit-trusted endpoint, which the Shield
+   * only mounts when started with ESCROW_TRUST_DEPOSITS=1. Intended for
+   * smoke tests, benchmarks, and the Trust-Score progression demo where
+   * a Solana round trip per deposit is prohibitive.
+   *
+   * In production, use {@link depositEscrowWithTx} instead.
+   */
+  async depositEscrowTrusted(shieldBaseUrl: string, amountMicroLamports: number): Promise<number> {
+    const res = await this._fetch(`${shieldBaseUrl}/escrow/deposit-trusted`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -264,12 +304,21 @@ export class X402Provider extends Connection {
         amount_micro_lamports: amountMicroLamports,
       }),
     });
-    if (!res.ok) throw new Error("Failed to deposit escrow");
+    if (!res.ok) {
+      throw new Error(
+        `trusted deposit rejected (is the Shield running with ESCROW_TRUST_DEPOSITS=1?): ${res.status}`
+      );
+    }
     const data = await res.json() as { balance: number };
     return data.balance;
   }
 
-  /** Consulta saldo no escrow */
+  /** @deprecated Use depositEscrowTrusted (dev) or depositEscrowWithTx (prod). */
+  async depositEscrow(shieldBaseUrl: string, amountMicroLamports: number): Promise<number> {
+    return this.depositEscrowTrusted(shieldBaseUrl, amountMicroLamports);
+  }
+
+  /** Look up escrow balance for this agent's pubkey. */
   async getEscrowBalance(shieldBaseUrl: string): Promise<number> {
     const pubkey = this.keypair.publicKey.toBase58();
     const res = await this._fetch(`${shieldBaseUrl}/escrow/balance/${pubkey}`);
