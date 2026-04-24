@@ -4,3 +4,6 @@ dist/
 .env.local
 .DS_Store
 *.log
+
+# Team-internal context (pitch deck, exported chats). Not for the public repo.
+docs/context/
