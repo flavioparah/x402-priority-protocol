@@ -15,8 +15,8 @@ import {
 } from 'lucide-react';
 
 /**
- * NeuralBackground Component
- * Renders a 3D background representing the x402 filtering protocol.
+ * Componente NeuralBackground
+ * Renderiza o fundo 3D que representa o fluxo de dados e o protocolo de filtragem.
  */
 const NeuralBackground = () => {
   const mountRef = useRef(null);
@@ -33,7 +33,10 @@ const NeuralBackground = () => {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    mountRef.current.appendChild(renderer.domElement);
+    
+    if (mountRef.current) {
+      mountRef.current.appendChild(renderer.domElement);
+    }
 
     // Cores do Protocolo
     const colorSpamRed = new THREE.Color(0xff1100);    
@@ -43,7 +46,7 @@ const NeuralBackground = () => {
     const mainGroup = new THREE.Group();
     scene.add(mainGroup);
 
-    // Escudo Validador
+    // Geometria do Escudo (O Validador)
     const shieldShape = new THREE.Shape();
     shieldShape.moveTo(0, 1.4);
     shieldShape.quadraticCurveTo(1.2, 1.4, 1.2, 0.4);
@@ -66,7 +69,7 @@ const NeuralBackground = () => {
     const chipMesh = new THREE.Mesh(chipGeo, chipMat);
     mainGroup.add(chipMesh);
 
-    // Sistema de Spam
+    // Configuração do Sistema de Spam (Pontos Vermelhos)
     const spamCount = 300; 
     const spamPoints = [];
     for (let i = 0; i < spamCount; i++) {
@@ -88,7 +91,7 @@ const NeuralBackground = () => {
     const spamLines = new THREE.LineSegments(spamLinesGeo, spamLinesMaterial);
     mainGroup.add(spamLines);
 
-    // Sistema x402 (Verde)
+    // Configuração do Sistema x402 (Pontos Verdes de Prioridade)
     const privCount = 150;
     const privPoints = [];
     for (let i = 0; i < privCount; i++) {
@@ -111,9 +114,13 @@ const NeuralBackground = () => {
     const privLines = new THREE.LineSegments(privLinesGeo, privLinesMaterial);
     mainGroup.add(privLines);
 
-    const onScroll = () => { scrollY.current = window.scrollY; };
+    // Gestão de Scroll
+    const onScroll = () => { 
+      scrollY.current = window.scrollY; 
+    };
     window.addEventListener('scroll', onScroll);
 
+    // Loop de Animação
     const animate = () => {
       requestAnimationFrame(animate);
       const time = Date.now() * 0.001;
@@ -127,6 +134,7 @@ const NeuralBackground = () => {
       chipMesh.rotation.z = time * 1.2;
       chipMesh.scale.setScalar(1 + Math.sin(time * 5) * 0.05);
 
+      // Processamento de Spam
       const spamPosArr = new Float32Array(spamCount * 3);
       const spamLinesArr = [];
       spamPoints.forEach((p, i) => {
@@ -152,6 +160,7 @@ const NeuralBackground = () => {
       spamPointsMesh.geometry.setAttribute('position', new THREE.BufferAttribute(spamPosArr, 3));
       spamLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(spamLinesArr), 3));
 
+      // Processamento de Privilégio x402
       const privPosArr = new Float32Array(privCount * 3);
       const privLinesArr = [];
       privPoints.forEach((p, i) => {
@@ -194,7 +203,7 @@ const NeuralBackground = () => {
   return <div ref={mountRef} className="fixed inset-0 z-0 pointer-events-none opacity-90" />;
 };
 
-// --- UI Components ---
+// --- Componentes de Interface (UI) ---
 
 const Button = ({ children, variant = 'primary', className = '', ...props }) => {
   const variants = {
@@ -202,6 +211,7 @@ const Button = ({ children, variant = 'primary', className = '', ...props }) => 
     secondary: 'bg-white/5 hover:bg-white/15 text-white border border-white/10 backdrop-blur-xl',
     outline: 'border border-[#00E0FF] text-[#00E0FF] hover:bg-[#00E0FF]/10',
   };
+  
   return (
     <button 
       className={`px-10 py-5 rounded-sm transition-all duration-500 flex items-center justify-center gap-3 text-[11px] uppercase tracking-[0.25em] font-mono border-l-2 border-r-2 border-transparent hover:border-[#00E0FF] ${variants[variant]} ${className}`} 
@@ -217,6 +227,7 @@ const Badge = ({ children, color = "blue" }) => {
     blue: "text-[#00E0FF] border-[#00E0FF]/40 bg-[#00E0FF]/10",
     green: "text-[#00FFAB] border-[#00FFAB]/40 bg-[#00FFAB]/10",
   };
+  
   return (
     <span className={`inline-block px-5 py-2 text-[10px] font-mono font-black tracking-[0.3em] uppercase border ${colors[color]} backdrop-blur-md`}>
       {children}
@@ -224,32 +235,38 @@ const Badge = ({ children, color = "blue" }) => {
   );
 };
 
+/**
+ * Componente Principal App
+ */
 export default function App() {
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [simStep, setSimStep] = useState(0);
 
+  // Efeito de simulação do terminal
   useEffect(() => {
     const timer = setInterval(() => setSimStep((prev) => (prev + 1) % 6), 3000);
     return () => clearInterval(timer);
   }, []);
 
   const terminalLogs = [
-    { text: "INBOUND: Unverified Agent Request detected", color: "text-red-500" },
-    { text: "FILTER: Analyzing behavior pattern (x402 candidate)", color: "text-amber-400" },
-    { text: "PROTOCOL: Challenge issued -> Wallet handshake initiated", color: "text-[#00E0FF]" },
-    { text: "VALIDATION: Payment 0.005 SOL verified via SPL-Token", color: "text-[#00FFAB]" },
-    { text: "UPGRADE: Agent promoted to 'Privileged' class", color: "text-[#00FFAB] font-bold" },
-    { text: "ROUTING: Redirecting to x402 High-Priority Lane", color: "text-white" },
+    { text: "INBOUND: Pedido de agente não verificado detectado", color: "text-red-500" },
+    { text: "FILTER: A analisar padrão de comportamento (candidato x402)", color: "text-amber-400" },
+    { text: "PROTOCOL: Desafio emitido -> Handshake de carteira iniciado", color: "text-[#00E0FF]" },
+    { text: "VALIDATION: Pagamento 0.005 SOL verificado via SPL-Token", color: "text-[#00FFAB]" },
+    { text: "UPGRADE: Agente promovido para classe 'Privileged'", color: "text-[#00FFAB] font-bold" },
+    { text: "ROUTING: A redirecionar para via de alta prioridade x402", color: "text-white" },
   ];
 
   return (
     <div className="min-h-[250vh] bg-[#020202] text-gray-300 selection:bg-[#00E0FF]/40 font-mono overflow-x-hidden">
+      
       <NeuralBackground />
 
-      {/* Grid Overlay */}
+      {/* Camadas Visuais de Fundo */}
       <div className="fixed inset-0 z-0 opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#00E0FF 1px, transparent 1px), linear-gradient(90deg, #00E0FF 1px, transparent 1px)', backgroundSize: '100px 100px' }}></div>
       <div className="fixed inset-0 z-0 bg-gradient-to-tr from-[#020202] via-transparent to-[#020202] pointer-events-none opacity-60"></div>
 
+      {/* Navegação Principal */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#020202]/60 backdrop-blur-3xl">
         <div className="max-w-7xl mx-auto px-10 h-24 flex items-center justify-between">
           <div className="flex items-center gap-5">
@@ -259,7 +276,7 @@ export default function App() {
                 <Cpu className="w-5 h-5 text-[#00E0FF] drop-shadow-[0_0_12px_rgba(0,224,255,1)]" />
               </div>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col text-left">
               <span className="text-lg font-black tracking-[0.4em] text-white leading-none uppercase">RPC PRIORITY</span>
               <span className="text-[11px] font-bold tracking-[0.2em] text-[#00E0FF]/60 leading-tight">AUTH SYSTEM</span>
             </div>
@@ -275,21 +292,24 @@ export default function App() {
             className="h-12 px-8" 
             onClick={() => setIsWalletConnected(!isWalletConnected)}
           >
-            <Wallet className="w-5 h-5" /> {isWalletConnected ? 'AGENT_VALIDATED' : 'CONECTAR AGENTE'}
+            <Wallet className="w-5 h-5" /> {isWalletConnected ? 'AGENTE_VALIDADO' : 'CONECTAR AGENTE'}
           </Button>
         </div>
       </nav>
 
-      <main className="relative z-10 pt-32">
-        <section className="max-w-7xl mx-auto px-10 mb-80 pt-10 text-center md:text-left">
+      {/* Conteúdo Principal */}
+      <main className="relative z-10 pt-20">
+        
+        {/* Seção Hero - Ajustada para ficar mais em cima */}
+        <section className="max-w-7xl mx-auto px-10 mb-60 pt-10 text-center md:text-left">
           <div className="max-w-5xl">
             <Badge color="blue">Validação de Agentes de Elite</Badge>
-            <h1 className="text-5xl md:text-8xl font-bold text-white mt-6 mb-8 leading-[0.9] tracking-tighter uppercase">
+            <h1 className="text-4xl md:text-7xl font-bold text-white mt-6 mb-6 leading-[0.95] tracking-tighter uppercase">
               Diga Adeus <br />
               ao <span className="text-red-600 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">Spam.</span> <br />
               Diga Olá ao <span className="text-[#00FFAB]">x402.</span>
             </h1>
-            <p className="text-lg md:text-xl text-gray-400 max-w-2xl leading-relaxed mb-12 font-sans backdrop-blur-md bg-white/5 p-5 border-l-2 border-[#00E0FF]">
+            <p className="text-base md:text-lg text-gray-400 max-w-2xl leading-relaxed mb-10 font-sans backdrop-blur-md bg-white/5 p-5 border-l-2 border-[#00E0FF]">
               Transforme agentes de IA desconhecidos em utilizadores de confiança. O protocolo RPC Priority filtra o ruído e garante largura de banda premium para quem paga em tempo real.
             </p>
             <div className="flex flex-wrap justify-center md:justify-start gap-6">
@@ -301,9 +321,9 @@ export default function App() {
           </div>
         </section>
 
-        {/* Mais seções... */}
+        {/* Seção de Funcionalidades */}
         <section id="protocol" className="max-w-7xl mx-auto px-10 mb-80">
-          <div className="grid md:grid-cols-2 gap-10">
+          <div className="grid md:grid-cols-2 gap-10 text-left">
             <div className="p-16 bg-[#020202]/40 backdrop-blur-2xl border border-white/5 hover:border-red-500/20 transition-all group">
               <Activity className="w-12 h-12 text-red-500 mb-10 opacity-50 group-hover:opacity-100" />
               <h3 className="text-3xl font-bold text-white mb-6">Filtro de Spam</h3>
@@ -321,12 +341,13 @@ export default function App() {
           </div>
         </section>
 
+        {/* Seção Terminal/Promoção */}
         <section className="max-w-7xl mx-auto px-10 mb-96">
-          <div className="grid lg:grid-cols-2 gap-32 items-center">
+          <div className="grid lg:grid-cols-2 gap-32 items-center text-left">
             <div className="space-y-10">
               <Badge color="green">Monitor de Qualificação</Badge>
-              <h2 className="text-6xl font-bold text-white tracking-tight leading-[1.1]">Promoção de Classe em Tempo Real.</h2>
-              <p className="text-xl text-gray-400 font-sans leading-relaxed">
+              <h2 className="text-5xl font-bold text-white tracking-tight leading-[1.1]">Promoção de Classe em Tempo Real.</h2>
+              <p className="text-lg text-gray-400 font-sans leading-relaxed">
                 O nosso motor de validação monitoriza cada byte. Assim que a transação Solana é confirmada, o agente é promovido da classe "Public" para "Privileged".
               </p>
               <div className="flex items-center gap-8 p-8 bg-[#00FFAB]/5 border border-[#00FFAB]/20 rounded-sm">
@@ -338,6 +359,7 @@ export default function App() {
               </div>
             </div>
             
+            {/* Mockup do Terminal */}
             <div className="bg-[#050505] border border-white/10 rounded-sm overflow-hidden shadow-2xl relative">
               <div className="absolute inset-0 bg-[#00E0FF]/5 pointer-events-none"></div>
               <div className="bg-white/5 px-8 py-5 border-b border-white/10 flex justify-between items-center relative z-10">
@@ -347,7 +369,7 @@ export default function App() {
                   <div className="w-3 h-3 bg-green-500"></div>
                 </div>
               </div>
-              <div className="p-12 h-[350px] font-mono text-sm flex flex-col justify-end relative z-10 bg-black/40 backdrop-blur-xl">
+              <div className="p-12 h-[350px] font-mono text-xs md:text-sm flex flex-col justify-end relative z-10 bg-black/40 backdrop-blur-xl text-left">
                 {terminalLogs.map((log, idx) => (
                   <div key={idx} className={`mb-4 transition-all duration-1000 ${idx <= simStep ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'} ${log.color}`}>
                     <span className="opacity-20 mr-6 tracking-normal">[{new Date().toLocaleTimeString()}]</span> {log.text}
@@ -360,7 +382,8 @@ export default function App() {
         </section>
       </main>
 
-      <footer className="border-t border-white/5 py-40 bg-[#010101] relative z-20">
+      {/* Rodapé */}
+      <footer className="border-t border-white/5 py-40 bg-[#010101] relative z-20 text-left">
         <div className="max-w-7xl mx-auto px-10 grid md:grid-cols-3 gap-24">
           <div className="space-y-10">
             <div className="flex items-center gap-5">
