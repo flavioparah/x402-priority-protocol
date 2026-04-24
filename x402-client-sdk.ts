@@ -7,16 +7,7 @@
  * MVP: usa assinatura Ed25519 off-chain para liquidação zero-latência.
  */
 
-import {
-  Connection,
-  ConnectionConfig,
-  Keypair,
-  PublicKey,
-  SystemProgram,
-  Transaction,
-  SendOptions,
-  Commitment,
-} from "@solana/web3.js";
+import { Connection, ConnectionConfig, Keypair } from "@solana/web3.js";
 import * as nacl from "tweetnacl";
 import * as bs58 from "bs58";
 
@@ -53,11 +44,12 @@ export class X402Provider extends Connection {
   private keypair: Keypair;
   private config: Required<X402ProviderConfig>;
   private _fetch: typeof fetch;
+  private _requestId = 0;
 
   constructor(endpoint: string, keypair: Keypair, config: X402ProviderConfig = {}) {
     super(endpoint, config);
     this.keypair = keypair;
-    this._fetch = globalThis.fetch;
+    this._fetch = globalThis.fetch.bind(globalThis);
 
     this.config = {
       ...config,
@@ -68,33 +60,46 @@ export class X402Provider extends Connection {
       commitment: config.commitment ?? "confirmed",
     } as Required<X402ProviderConfig>;
 
-    // Sobrescreve o método interno _rpcRequest do Connection
-    this._patchRpcRequest();
+    // Intercept every RPC call that Connection issues.
+    //
+    // @solana/web3.js defines `_rpcRequest` as an *instance property* inside
+    // its constructor (via createRpcClient), so a method declared on the
+    // subclass prototype would be shadowed. We replace it here after super()
+    // has run. This catches getAccountInfo, getBalance, getSlot,
+    // getLatestBlockhash, sendTransaction, etc. in a single hook.
+    //
+    // NB: `_rpcRequest` is an internal contract of @solana/web3.js — revisit
+    // this override on any major-version bump of the SDK.
+    (this as any)._rpcRequest = this._x402RpcRequest.bind(this);
   }
 
   // ─── Core: intercepta todas as chamadas RPC ─────────────────────────────────
 
-  private _patchRpcRequest() {
-    // @ts-ignore — acessa método protegido da classe base
-    const originalFetch = this._rpcWebSocket?.socket?.send?.bind(this._rpcWebSocket?.socket);
-
-    // Sobrescreve o fetch HTTP usado pelo Connection internamente
-    // @ts-ignore
-    this._rpcBatchRequest = this._interceptedBatchRequest.bind(this);
+  private async _x402RpcRequest(methodName: string, args: unknown[]): Promise<unknown> {
+    // @solana/web3.js validates response `id` as a string (superstruct schema
+    // in jsonRpcResult). Sending a numeric id makes devnet echo a number and
+    // breaks client-side validation. Stringify before the request.
+    const body = JSON.stringify({
+      jsonrpc: "2.0",
+      id: String(++this._requestId),
+      method: methodName,
+      params: args,
+    });
+    return this._fetchWithX402(this.rpcEndpoint, body);
   }
 
   /**
-   * Método público para chamadas RPC arbitrárias com interceptação 402.
-   * Use este método em vez de `connection._rpcRequest` diretamente.
+   * Public escape hatch for arbitrary RPC methods with 402 interception.
+   * Equivalent to calling _rpcRequest directly but with a typed return.
    */
   async request<T = unknown>(method: string, params: unknown[]): Promise<T> {
-    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method, params });
+    const body = JSON.stringify({
+      jsonrpc: "2.0",
+      id: String(++this._requestId),
+      method,
+      params,
+    });
     return this._fetchWithX402<T>(this.rpcEndpoint, body);
-  }
-
-  private async _interceptedBatchRequest(requests: unknown[]) {
-    const body = JSON.stringify(requests);
-    return this._fetchWithX402(this.rpcEndpoint, body);
   }
 
   // ─── Lógica central de negociação ──────────────────────────────────────────
@@ -211,27 +216,17 @@ export class X402Provider extends Connection {
     return `x402 ${sigB58}.${pubkeyB58}.${msgB58}`;
   }
 
-  private async _payPriorityOnChain(challenge: X402Challenge): Promise<string> {
-    // Liquidação on-chain real (maior latência, mas sem necessidade de escrow pré-depositado)
-    const destination = new PublicKey(challenge.destination);
-    const { blockhash, lastValidBlockHeight } = await this.getLatestBlockhash();
-
-    const tx = new Transaction({
-      recentBlockhash: blockhash,
-      feePayer: this.keypair.publicKey,
-    }).add(
-      SystemProgram.transfer({
-        fromPubkey: this.keypair.publicKey,
-        toPubkey: destination,
-        lamports: Math.ceil(challenge.amount_micro_lamports / 1_000), // converte µL → lamports
-      })
+  private async _payPriorityOnChain(_challenge: X402Challenge): Promise<string> {
+    // TODO(week-2): on-chain settlement is not wired into the Shield yet.
+    // The current index.js server only verifies "x402 <sig>.<pubkey>.<msg>"
+    // (off-chain signature). Supporting "x402-tx <serialized>" requires
+    // server-side work: either simulate the SystemProgram.transfer, or
+    // require the caller to have already landed the tx and submit the sig
+    // with the signed transfer recipt.
+    throw new Error(
+      "x402: on-chain settlement not yet supported by the Shield. " +
+      "Use settlementMode: 'offchain' for the MVP."
     );
-
-    // Assina e serializa (sem enviar ainda — o Shield pode verificar)
-    tx.sign(this.keypair);
-    const serialized = bs58.encode(tx.serialize());
-
-    return `x402-tx ${serialized}`;
   }
 
   // ─── Métodos de conveniência ────────────────────────────────────────────────
