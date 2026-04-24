@@ -184,4 +184,4 @@ Built for the [Colosseum Frontier Hackathon](https://arena.colosseum.org/hackath
 
 ## License
 
-TBD. A permissive OSS license will be published alongside the Week 3 protocol spec release.
+Apache License 2.0 — see [LICENSE](./LICENSE). Aligns with the upstream Solana ecosystem (Solana itself and most core tooling are Apache-2.0) and carries an explicit patent grant.

@@ -212,6 +212,29 @@ The container does not need `typescript`, `@solana/web3.js` (peer/dev), `@types/
 
 ---
 
+## 2026-04-23 — Session 1 (continued): LICENSE, SDK smoke test
+
+### Changes
+
+- **LICENSE** — Apache-2.0, copyright to the three founders. Aligns with the upstream Solana ecosystem (the core is Apache-2.0) and carries an explicit patent grant. README "License: TBD" updated. Closes **O-005**.
+- **test/smoke.js + `npm test`** — regression guard for **O-003**. The SDK depends on an internal contract of `@solana/web3.js` (D-005: `_rpcRequest` as an instance property assigned in Connection's constructor). A web3.js upgrade that moves this hook will silently bypass our 402 interception. The smoke test calls `rpc.getSlot()` (Connection path) AND `rpc.request('getHealth', [])` (escape hatch), then asserts the escrow was debited — any breakage of the override fails loudly.
+
+Smoke test run (localhost Shield, devnet upstream):
+```
+✓ escrow credited — balance 200000 µL
+✓ rpc.getSlot() returned slot 457653963 (Connection path intercepted)
+✓ rpc.request('getHealth', []) returned ok (escape hatch works)
+✓ escrow debited 93651 µL across 2 requests
+SMOKE PASSED
+```
+
+### Open issues delta
+
+- **O-003** — partially closed. The *test* exists and catches the contract break. *Pinning* the web3.js version is not done — kept `^1.91.0` so we get patch fixes automatically. The smoke test is the safety net. Full closure needs this test in CI (not yet wired).
+- **O-005** — ✅ closed.
+
+---
+
 ## Template for future entries
 
 ```

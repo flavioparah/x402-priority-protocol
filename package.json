@@ -9,7 +9,9 @@
     "demo": "node demo.js",
     "bench": "node bench.js",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node test/smoke.js",
+    "test:smoke": "node test/smoke.js"
   },
   "dependencies": {
     "bs58": "^5.0.0",
