@@ -1,415 +1,1184 @@
-import React, { useState, useEffect, useRef } from 'react';
-import * as THREE from 'three';
-import { 
-  Shield, 
-  Zap, 
-  Cpu, 
-  ArrowRight, 
-  Github, 
-  Linkedin, 
-  Server,
-  Activity,
-  Wallet,
-  Lock,
-  Globe
-} from 'lucide-react';
-
-// --- Componente de Fundo Three.js com Narrativa de Qualificação de Agente ---
-
-const NeuralBackground = () => {
-  const mountRef = useRef(null);
-  const scrollY = useRef(0);
-
-  useEffect(() => {
-    let width = window.innerWidth;
-    let height = window.innerHeight;
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    camera.position.z = 7;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    mountRef.current.appendChild(renderer.domElement);
-
-    // --- Cores do Protocolo ---
-    const colorSpamRed = new THREE.Color(0xff1100);    // Caos/Spam
-    const colorPrivilegeGreen = new THREE.Color(0x00ffab); // Prioridade x402
-    const colorShieldCyan = new THREE.Color(0x00e0ff);    // Validador
-    
-    const mainGroup = new THREE.Group();
-    scene.add(mainGroup);
-
-    // --- Escudo (Shield) - O Validador de Classe ---
-    const shieldShape = new THREE.Shape();
-    shieldShape.moveTo(0, 1.4);
-    shieldShape.quadraticCurveTo(1.2, 1.4, 1.2, 0.4);
-    shieldShape.quadraticCurveTo(1.2, -0.8, 0, -1.4);
-    shieldShape.quadraticCurveTo(-1.2, -0.8, -1.2, 0.4);
-    shieldShape.quadraticCurveTo(-1.2, 1.4, 0, 1.4);
-    
-    const shieldGeo = new THREE.ShapeGeometry(shieldShape);
-    const shieldMat = new THREE.MeshBasicMaterial({ 
-      color: colorShieldCyan, 
-      wireframe: true, 
-      transparent: true, 
-      opacity: 0.3 
-    });
-    const shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
-    mainGroup.add(shieldMesh);
-
-    // Chip Central (O Cérebro do Protocolo)
-    const chipGeo = new THREE.BoxGeometry(0.55, 0.55, 0.25);
-    const chipMat = new THREE.MeshBasicMaterial({ color: colorShieldCyan });
-    const chipMesh = new THREE.Mesh(chipGeo, chipMat);
-    mainGroup.add(chipMesh);
-
-    // --- Sistema de Spam (Vermelho - Entrada Desordenada) ---
-    const spamCount = 300; 
-    const spamPoints = [];
-    
-    for (let i = 0; i < spamCount; i++) {
-      spamPoints.push({
-        pos: new THREE.Vector3(-15 - Math.random() * 10, (Math.random() - 0.5) * 18, (Math.random() - 0.5) * 10),
-        speed: 0.04 + Math.random() * 0.05,
-        noiseSeed: Math.random() * 100
-      });
-    }
-
-    const spamPointsMesh = new THREE.Points(
-      new THREE.BufferGeometry(),
-      new THREE.PointsMaterial({ color: colorSpamRed, size: 0.07, transparent: true, opacity: 0.8 })
-    );
-    mainGroup.add(spamPointsMesh);
-
-    const spamLinesMaterial = new THREE.LineBasicMaterial({ color: colorSpamRed, transparent: true, opacity: 0.1 });
-    const spamLinesGeo = new THREE.BufferGeometry();
-    const spamLines = new THREE.LineSegments(spamLinesGeo, spamLinesMaterial);
-    mainGroup.add(spamLines);
-
-    // --- Sistema x402 (Verde - Saída de Privilégio) ---
-    const privCount = 150;
-    const privPoints = [];
-    for (let i = 0; i < privCount; i++) {
-      privPoints.push({
-        pos: new THREE.Vector3(0, 0, 0),
-        speed: 0.08 + Math.random() * 0.12,
-        lane: (Math.random() - 0.5) * 4,
-        active: false
-      });
-    }
-
-    const privPointsMesh = new THREE.Points(
-      new THREE.BufferGeometry(),
-      new THREE.PointsMaterial({ color: colorPrivilegeGreen, size: 0.05 })
-    );
-    mainGroup.add(privPointsMesh);
-
-    const privLinesMaterial = new THREE.LineBasicMaterial({ color: colorPrivilegeGreen, transparent: true, opacity: 0.5 });
-    const privLinesGeo = new THREE.BufferGeometry();
-    const privLines = new THREE.LineSegments(privLinesGeo, privLinesMaterial);
-    mainGroup.add(privLines);
-
-    // --- Eventos ---
-    const onScroll = () => { scrollY.current = window.scrollY; };
-    window.addEventListener('scroll', onScroll);
-
-    // --- Loop de Animação ---
-    const animate = () => {
-      requestAnimationFrame(animate);
-      const time = Date.now() * 0.001;
-      
-      // Reatividade ao Scroll
-      const sF = scrollY.current * 0.0015;
-      mainGroup.position.y = sF * 0.4;
-      mainGroup.scale.set(1 + sF * 0.15, 1 + sF * 0.15, 1 + sF * 0.15);
-      mainGroup.rotation.x = sF * 0.1;
-
-      // Animação do Escudo Validador
-      shieldMesh.rotation.y = Math.sin(time * 0.4) * 0.2;
-      chipMesh.rotation.z = time * 1.2;
-      chipMesh.scale.setScalar(1 + Math.sin(time * 5) * 0.05); // Pulsar de processamento
-
-      // 1. Processar Spam (Entrada)
-      const spamPosArr = new Float32Array(spamCount * 3);
-      const spamLinesArr = [];
-      
-      spamPoints.forEach((p, i) => {
-        p.pos.x += p.speed;
-        
-        // Atração magnética para o Shield (Efeito Funil)
-        const approach = Math.max(0, (15 + p.pos.x) / 15); // 1 na origem, 0 no shield
-        p.pos.y *= 0.98; 
-        p.pos.z *= 0.98;
-        
-        // Ruído de movimento desordenado
-        p.pos.y += Math.sin(time + p.noiseSeed) * 0.02;
-
-        if (p.pos.x > 0) {
-          // Quando atinge o centro, "morre" no spam para renascer na esquerda
-          p.pos.x = -15 - Math.random() * 10;
-          p.pos.y = (Math.random() - 0.5) * 18;
-          p.pos.z = (Math.random() - 0.5) * 10;
-        }
-
-        spamPosArr[i * 3] = p.pos.x;
-        spamPosArr[i * 3 + 1] = p.pos.y;
-        spamPosArr[i * 3 + 2] = p.pos.z;
-
-        // Redes de spam conectadas por proximidade
-        if (i % 6 === 0) {
-          const next = spamPoints[(i + 1) % spamCount];
-          if (p.pos.distanceTo(next.pos) < 4) {
-            spamLinesArr.push(p.pos.x, p.pos.y, p.pos.z, next.pos.x, next.pos.y, next.pos.z);
-          }
-        }
-      });
-
-      spamPointsMesh.geometry.setAttribute('position', new THREE.BufferAttribute(spamPosArr, 3));
-      spamLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(spamLinesArr), 3));
-
-      // 2. Processar Privilégio x402 (Saída)
-      const privPosArr = new Float32Array(privCount * 3);
-      const privLinesArr = [];
-
-      privPoints.forEach((p, i) => {
-        p.pos.x += p.speed;
-        // Movimento retilíneo de alta performance
-        p.pos.y = Math.sin(p.pos.x * 0.5 + i) * 0.15 + (p.lane * 0.5);
-
-        if (p.pos.x > 18) {
-          p.pos.x = 0; // Renasce do Shield
-          p.pos.y = 0;
-          p.pos.z = 0;
-        }
-
-        privPosArr[i * 3] = p.pos.x;
-        privPosArr[i * 3 + 1] = p.pos.y;
-        privPosArr[i * 3 + 2] = p.pos.z;
-
-        // Fluxo contínuo (Privilégio)
-        privLinesArr.push(p.pos.x, p.pos.y, p.pos.z, p.pos.x - 1.5, p.pos.y, p.pos.z);
-      });
-
-      privPointsMesh.geometry.setAttribute('position', new THREE.BufferAttribute(privPosArr, 3));
-      privLines.geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(privLinesArr), 3));
-
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    const handleResize = () => {
-      width = window.innerWidth; height = window.innerHeight;
-      renderer.setSize(width, height);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('scroll', onScroll);
-      if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
-    };
-  }, []);
-
-  return <div ref={mountRef} className="fixed inset-0 z-0 pointer-events-none opacity-90" />;
-};
-
-// --- Componentes UI ---
-
-const Button = ({ children, variant = 'primary', className = '', ...props }) => {
-  const variants = {
-    primary: 'bg-[#00E0FF] hover:bg-[#00B8E0] text-[#050505] font-bold shadow-[0_0_25px_rgba(0,224,255,0.4)]',
-    secondary: 'bg-white/5 hover:bg-white/15 text-white border border-white/10 backdrop-blur-xl',
-    outline: 'border border-[#00E0FF] text-[#00E0FF] hover:bg-[#00E0FF]/10',
-  };
-  return (
-    <button className={`px-10 py-5 rounded-sm transition-all duration-500 flex items-center justify-center gap-3 text-[11px] uppercase tracking-[0.25em] font-mono border-l-2 border-r-2 border-transparent hover:border-[#00E0FF] ${variants[variant]} ${className}`} {...props}>
-      {children}
-    </button>
-  );
-};
-
-const Badge = ({ children, color = "blue" }) => {
-  const colors = {
-    blue: "text-[#00E0FF] border-[#00E0FF]/40 bg-[#00E0FF]/10",
-    green: "text-[#00FFAB] border-[#00FFAB]/40 bg-[#00FFAB]/10",
-  };
-  return <span className={`inline-block px-5 py-2 text-[10px] font-mono font-black tracking-[0.3em] uppercase border ${colors[color]} backdrop-blur-md`}>{children}</span>;
-};
-
-export default function App() {
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [simStep, setSimStep] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => setSimStep((prev) => (prev + 1) % 6), 3000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const terminalLogs = [
-    { text: "INBOUND: Unverified Agent Request detected", color: "text-red-500" },
-    { text: "FILTER: Analyzing behavior pattern (x402 candidate)", color: "text-amber-400" },
-    { text: "PROTOCOL: Challenge issued -> Wallet handshake initiated", color: "text-[#00E0FF]" },
-    { text: "VALIDATION: Payment 0.005 SOL verified via SPL-Token", color: "text-[#00FFAB]" },
-    { text: "UPGRADE: Agent promoted to 'Privileged' class", color: "text-[#00FFAB] font-bold" },
-    { text: "ROUTING: Redirecting to x402 High-Priority Lane", color: "text-white" },
-  ];
-
-  return (
-    <div className="min-h-[250vh] bg-[#020202] text-gray-300 selection:bg-[#00E0FF]/40 font-mono overflow-x-hidden">
-      
-      <NeuralBackground />
-
-      {/* Grid e Vinheta */}
-      <div className="fixed inset-0 z-0 opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'linear-gradient(#00E0FF 1px, transparent 1px), linear-gradient(90deg, #00E0FF 1px, transparent 1px)', backgroundSize: '100px 100px' }}></div>
-      <div className="fixed inset-0 z-0 bg-gradient-to-tr from-[#020202] via-transparent to-[#020202] pointer-events-none opacity-60"></div>
-
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#020202]/60 backdrop-blur-3xl">
-        <div className="max-w-7xl mx-auto px-10 h-24 flex items-center justify-between">
-          <div className="flex items-center gap-5">
-            <div className="relative flex items-center justify-center w-14 h-14 bg-[#00E0FF]/5 border border-[#00E0FF]/30">
-              <Shield className="w-9 h-9 text-[#00E0FF]/20" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Cpu className="w-5 h-5 text-[#00E0FF] drop-shadow-[0_0_12px_rgba(0,224,255,1)]" />
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-lg font-black tracking-[0.4em] text-white leading-none uppercase">RPC PRIORITY</span>
-              <span className="text-[11px] font-bold tracking-[0.2em] text-[#00E0FF]/60 leading-tight">AUTH SYSTEM</span>
-            </div>
-          </div>
-          
-          <div className="hidden lg:flex items-center gap-16 text-[12px] font-black uppercase tracking-[0.3em] text-gray-500">
-            <a href="#protocol" className="hover:text-[#00E0FF] transition-all cursor-pointer">Protocolo</a>
-            <a href="#sdk" className="hover:text-[#00E0FF] transition-all cursor-pointer">SDK</a>
-          </div>
-
-          <Button variant={isWalletConnected ? 'outline' : 'primary'} className="h-12 px-8" onClick={() => setIsWalletConnected(!isWalletConnected)}>
-            <Wallet className="w-5 h-5" /> {isWalletConnected ? 'AGENT_VALIDATED' : 'CONECTAR AGENTE'}
-          </Button>
-        </div>
-      </nav>
-
-      <main className="relative z-10 pt-32">
-        <section className="max-w-7xl mx-auto px-10 mb-80 pt-10 text-center md:text-left">
-          <div className="max-w-5xl">
-            <Badge color="blue">Validação de Agentes de Elite</Badge>
-            <h1 className="text-5xl md:text-8xl font-bold text-white mt-6 mb-8 leading-[0.9] tracking-tighter uppercase">
-              Diga Adeus <br />
-              ao <span className="text-red-600 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">Spam.</span> <br />
-              Diga Olá ao <span className="text-[#00FFAB]">x402.</span>
-            </h1>
-            <p className="text-lg md:text-xl text-gray-400 max-w-2xl leading-relaxed mb-12 font-sans backdrop-blur-md bg-white/5 p-5 border-l-2 border-[#00E0FF]">
-              Transforme agentes de IA desconhecidos em utilizadores de confiança. O protocolo RPC Priority filtra o ruído e garante largura de banda premium para quem paga em tempo real.
-            </p>
-            <div className="flex flex-wrap justify-center md:justify-start gap-6">
-              <Button className="h-14 px-10" onClick={() => window.open('https://github.com/flavioparah/x402-priority-protocol')}>
-                Inicie Integração <ArrowRight className="w-5 h-5" />
-              </Button>
-              <Button variant="secondary" className="h-14 px-10">Blueprint Técnico</Button>
-            </div>
-          </div>
-        </section>
-
-        <section id="protocol" className="max-w-7xl mx-auto px-10 mb-80">
-          <div className="grid md:grid-cols-2 gap-10">
-            <div className="p-16 bg-[#020202]/40 backdrop-blur-2xl border border-white/5 hover:border-red-500/20 transition-all group">
-              <Activity className="w-12 h-12 text-red-500 mb-10 opacity-50 group-hover:opacity-100" />
-              <h3 className="text-3xl font-bold text-white mb-6">Filtro de Spam</h3>
-              <p className="text-gray-400 text-lg font-sans leading-relaxed">
-                Elimine 99% do tráfego não monetizável. Agentes sem credenciais de pagamento são retidos na camada de caos.
-              </p>
-            </div>
-            <div className="p-16 bg-[#00FFAB]/5 backdrop-blur-2xl border border-[#00FFAB]/20 hover:border-[#00FFAB]/50 transition-all group">
-              <Zap className="w-12 h-12 text-[#00FFAB] mb-10" />
-              <h3 className="text-3xl font-bold text-white mb-6">Privilégio x402</h3>
-              <p className="text-gray-400 text-lg font-sans leading-relaxed">
-                Agentes que cumprem o handshake x402 recebem prioridade imediata, saltando filas e garantindo latência zero.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="max-w-7xl mx-auto px-10 mb-96">
-          <div className="grid lg:grid-cols-2 gap-32 items-center">
-            <div className="space-y-10">
-              <Badge color="green">Monitor de Qualificação</Badge>
-              <h2 className="text-6xl font-bold text-white tracking-tight leading-[1.1]">Promoção de Classe em Tempo Real.</h2>
-              <p className="text-xl text-gray-400 font-sans leading-relaxed">
-                O nosso motor de validação monitoriza cada byte. Assim que a transação Solana é confirmada, o agente é promovido da classe "Public" para "Privileged".
-              </p>
-              <div className="flex items-center gap-8 p-8 bg-[#00FFAB]/5 border border-[#00FFAB]/20 rounded-sm">
-                 <div className="relative">
-                   <div className="w-4 h-4 rounded-full bg-[#00FFAB] animate-ping absolute"></div>
-                   <div className="w-4 h-4 rounded-full bg-[#00FFAB] relative"></div>
-                 </div>
-                 <div className="text-white text-xl font-black tracking-widest font-mono uppercase">ESTADO: <span className="text-[#00FFAB]">X402_ACTIVE</span></div>
-              </div>
-            </div>
-            
-            <div className="bg-[#050505] border border-white/10 rounded-sm overflow-hidden shadow-2xl relative">
-              <div className="absolute inset-0 bg-[#00E0FF]/5 pointer-events-none"></div>
-              <div className="bg-white/5 px-8 py-5 border-b border-white/10 flex justify-between items-center relative z-10">
-                <div className="text-[11px] text-[#00E0FF] font-black tracking-[0.5em] uppercase">AGENTE_PROMOTION_V1.log</div>
-                <div className="flex gap-3">
-                  <div className="w-3 h-3 bg-red-600/40"></div>
-                  <div className="w-3 h-3 bg-green-500"></div>
-                </div>
-              </div>
-              <div className="p-12 h-[350px] font-mono text-sm flex flex-col justify-end relative z-10 bg-black/40 backdrop-blur-xl">
-                {terminalLogs.map((log, idx) => (
-                  <div key={idx} className={`mb-4 transition-all duration-1000 ${idx <= simStep ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-10'} ${log.color}`}>
-                    <span className="opacity-20 mr-6 tracking-normal">[{new Date().toLocaleTimeString()}]</span> {log.text}
-                  </div>
-                ))}
-                <div className="w-3 h-5 bg-[#00FFAB] animate-pulse mt-4"></div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t border-white/5 py-40 bg-[#010101] relative z-20">
-        <div className="max-w-7xl mx-auto px-10 grid md:grid-cols-3 gap-24">
-          <div className="space-y-10">
-            <div className="flex items-center gap-5">
-              <div className="relative flex items-center justify-center w-12 h-12 bg-[#00E0FF]/5 border border-[#00E0FF]/40">
-                <Shield className="w-7 h-7 text-[#00E0FF]/40" />
-                <div className="absolute inset-0 flex items-center justify-center"><Cpu className="w-3.5 h-3.5 text-[#00E0FF]" /></div>
-              </div>
-              <span className="text-2xl font-black tracking-[0.4em] text-white uppercase">RPC PRIORITY</span>
-            </div>
-            <p className="text-gray-500 font-sans leading-relaxed text-xl">Arquitetando a infraestrutura de confiança para a economia AI-to-AI.</p>
-          </div>
-          <div>
-            <h4 className="text-white font-black uppercase tracking-[0.4em] mb-12 text-sm">Protocolo</h4>
-            <ul className="space-y-6 text-[11px] font-bold uppercase tracking-[0.3em] text-gray-500">
-              <li><a href="#" className="hover:text-[#00E0FF] transition-all">Handshake x402</a></li>
-              <li><a href="#" className="hover:text-[#00E0FF] transition-all">Liquidação Solana</a></li>
-              <li><a href="#" className="hover:text-[#00E0FF] transition-all">Preços Dinâmicos</a></li>
-            </ul>
-          </div>
-          <div>
-             <h4 className="text-white font-black uppercase tracking-[0.4em] mb-12 text-sm">Laboratório</h4>
-             <div className="flex gap-8">
-                <a href="#" className="w-16 h-16 flex items-center justify-center border border-white/5 bg-white/5 text-white hover:text-[#00E0FF] hover:border-[#00E0FF]/40 transition-all"><Github className="w-8 h-8" /></a>
-                <a href="#" className="w-16 h-16 flex items-center justify-center border border-white/5 bg-white/5 text-white hover:text-[#00E0FF] hover:border-[#00E0FF]/40 transition-all"><Linkedin className="w-8 h-8" /></a>
-             </div>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-10 mt-40 pt-16 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-12">
-          <div className="text-[12px] text-gray-600 font-black tracking-[0.5em] uppercase">© {new Date().getFullYear()} RPC PRIORITY // PROTOCOL LAYER</div>
-          <div className="flex flex-wrap justify-center gap-12 text-[11px] text-[#00FFAB] font-black tracking-[0.4em] uppercase">
-            <span>NO MORE SPAM</span>
-            <span>HIGH PRIVILEGE ONLY</span>
-            <span className="text-white/20 italic tracking-normal font-sans">v1.4.0-stable</span>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>x402 Protocol — Priority RPC for AI Agents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --ink: #0d0d12;
+  --paper: #f5f3ee;
+  --acid: #c8ff00;
+  --acid2: #00ffc3;
+  --dim: #6b6b72;
+  --line: rgba(13,13,18,.12);
+  --purple: #6c47ff;
+  --mono: 'DM Mono', monospace;
+  --head: 'Syne', sans-serif;
+  --body: 'DM Sans', sans-serif;
+  --r: 6px;
+  --transition: .25s cubic-bezier(.4,0,.2,1);
 }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--body);
+  background: var(--ink);
+  color: var(--paper);
+  overflow-x: hidden;
+  cursor: none;
+}
+
+/* ─── Custom cursor ─────────────────────────── */
+#cursor {
+  position: fixed; top: 0; left: 0; z-index: 9999;
+  width: 10px; height: 10px;
+  background: var(--acid);
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%,-50%);
+  transition: width .15s, height .15s, background .15s;
+  mix-blend-mode: difference;
+}
+#cursor.hover { width: 28px; height: 28px; }
+
+/* ─── Noise overlay ─────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  opacity: .035;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px;
+}
+
+/* ─── Scrollbar ─────────────────────────────── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--acid); }
+
+/* ─── Nav ───────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 48px;
+  border-bottom: 1px solid transparent;
+  transition: border-color .3s, background .3s, backdrop-filter .3s;
+}
+nav.scrolled {
+  border-color: var(--line);
+  background: rgba(13,13,18,.85);
+  backdrop-filter: blur(16px);
+}
+.nav-logo {
+  font-family: var(--head);
+  font-size: 22px; font-weight: 800;
+  letter-spacing: -.04em;
+  color: var(--paper);
+  text-decoration: none;
+  display: flex; align-items: center; gap: 10px;
+}
+.nav-logo span { color: var(--acid); }
+.nav-links {
+  display: flex; gap: 36px; list-style: none;
+}
+.nav-links a {
+  font-family: var(--mono); font-size: 12px; font-weight: 400;
+  color: var(--dim); text-decoration: none; letter-spacing: .04em;
+  transition: color var(--transition);
+}
+.nav-links a:hover { color: var(--paper); }
+.nav-cta {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--acid); color: var(--ink);
+  border: none; padding: 10px 22px; border-radius: var(--r);
+  cursor: none; font-weight: 500; letter-spacing: .04em;
+  transition: transform .15s, box-shadow .15s;
+  text-decoration: none; display: inline-block;
+}
+.nav-cta:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(200,255,0,.25); }
+
+/* ─── Hero ──────────────────────────────────── */
+#hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 140px 48px 80px;
+  overflow: hidden;
+}
+.hero-grid {
+  position: absolute; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(200,255,0,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200,255,0,.06) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 30%, transparent 100%);
+}
+.hero-glow {
+  position: absolute; z-index: 0;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(108,71,255,.18) 0%, transparent 70%);
+  top: 50%; left: 50%; transform: translate(-50%,-50%);
+  pointer-events: none;
+  animation: pulse 6s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:.6;transform:translate(-50%,-50%) scale(1)} 50%{opacity:1;transform:translate(-50%,-50%) scale(1.08)} }
+
+.hero-status {
+  position: relative; z-index: 1;
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+  color: var(--dim); margin-bottom: 32px;
+}
+.hero-status::before {
+  content: '';
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--acid2);
+  box-shadow: 0 0 8px var(--acid2);
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.hero-h1 {
+  position: relative; z-index: 1;
+  font-family: var(--head);
+  font-size: clamp(52px, 8vw, 112px);
+  font-weight: 800;
+  line-height: .92;
+  letter-spacing: -.04em;
+  max-width: 900px;
+  margin-bottom: 32px;
+}
+.hero-h1 em {
+  font-style: normal;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--acid);
+}
+.hero-sub {
+  position: relative; z-index: 1;
+  font-size: 18px; font-weight: 300;
+  color: var(--dim); max-width: 520px;
+  line-height: 1.65; margin-bottom: 48px;
+}
+.hero-actions {
+  position: relative; z-index: 1;
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+}
+.btn-primary {
+  font-family: var(--mono); font-size: 13px; font-weight: 500;
+  background: var(--acid); color: var(--ink);
+  border: none; padding: 14px 28px; border-radius: var(--r);
+  cursor: none; letter-spacing: .04em;
+  transition: transform .15s, box-shadow .15s;
+  text-decoration: none; display: inline-block;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(200,255,0,.3); }
+.btn-ghost {
+  font-family: var(--mono); font-size: 13px; font-weight: 400;
+  background: transparent; color: var(--paper);
+  border: 1px solid var(--line); padding: 14px 28px; border-radius: var(--r);
+  cursor: none; letter-spacing: .04em;
+  transition: border-color var(--transition), color var(--transition);
+  text-decoration: none; display: inline-block;
+}
+.btn-ghost:hover { border-color: rgba(245,243,238,.4); }
+
+/* ─── Hero terminal ─────────────────────────── */
+.hero-terminal {
+  position: absolute; right: 48px; top: 50%;
+  transform: translateY(-50%);
+  width: 440px; z-index: 2;
+  background: rgba(245,243,238,.04);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+.terminal-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot.r { background: #ff5f56; }
+.dot.y { background: #ffbd2e; }
+.dot.g { background: #27c93f; }
+.terminal-title { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-left: 8px; letter-spacing: .04em; }
+.terminal-body { padding: 20px; font-family: var(--mono); font-size: 12px; line-height: 1.9; }
+.t-dim { color: var(--dim); }
+.t-acid { color: var(--acid); }
+.t-acid2 { color: var(--acid2); }
+.t-purple { color: #a78bfa; }
+.t-orange { color: #fb923c; }
+.t-cursor {
+  display: inline-block;
+  width: 8px; height: 14px;
+  background: var(--acid);
+  animation: tcursor .9s steps(1) infinite;
+  vertical-align: middle; margin-left: 2px;
+}
+@keyframes tcursor { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+
+/* ─── Stats strip ───────────────────────────── */
+#stats {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(4, 1fr);
+}
+.stat {
+  padding: 40px 48px;
+  border-right: 1px solid var(--line);
+  position: relative; overflow: hidden;
+  transition: background var(--transition);
+}
+.stat:last-child { border-right: none; }
+.stat:hover { background: rgba(245,243,238,.03); }
+.stat-n {
+  font-family: var(--head); font-size: 48px; font-weight: 800;
+  letter-spacing: -.04em; line-height: 1;
+  margin-bottom: 8px;
+}
+.stat-n .unit { font-size: 28px; color: var(--acid); }
+.stat-label { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: .06em; }
+
+/* ─── Section ───────────────────────────────── */
+section { position: relative; z-index: 1; }
+.section-tag {
+  font-family: var(--mono); font-size: 10px;
+  color: var(--acid); letter-spacing: .12em;
+  margin-bottom: 16px; display: block;
+}
+.section-h2 {
+  font-family: var(--head); font-size: clamp(36px, 5vw, 64px);
+  font-weight: 800; letter-spacing: -.04em; line-height: .95;
+  margin-bottom: 20px;
+}
+.section-sub {
+  font-size: 17px; font-weight: 300;
+  color: var(--dim); line-height: 1.65;
+  max-width: 520px;
+}
+
+/* ─── How it works ──────────────────────────── */
+#how {
+  padding: 120px 48px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start;
+}
+.steps { display: flex; flex-direction: column; gap: 0; margin-top: 48px; }
+.step {
+  display: flex; gap: 24px;
+  padding: 28px 0;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+  cursor: none;
+}
+.step:last-child { border-bottom: none; }
+.step-n {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--acid); flex-shrink: 0;
+  padding-top: 4px; letter-spacing: .06em;
+  width: 32px;
+}
+.step-content h3 {
+  font-family: var(--head); font-size: 18px; font-weight: 700;
+  letter-spacing: -.02em; margin-bottom: 6px;
+}
+.step-content p { font-size: 14px; color: var(--dim); line-height: 1.7; }
+.step-code {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--acid2); margin-top: 8px;
+  background: rgba(0,255,195,.06);
+  padding: 6px 10px; border-radius: 4px;
+  border-left: 2px solid var(--acid2);
+}
+.flow-diagram {
+  position: sticky; top: 120px;
+}
+.flow-box {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.flow-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  display: flex; align-items: center; gap: 8px;
+}
+.flow-header::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--acid); box-shadow: 0 0 6px var(--acid); }
+.flow-inner { padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+.fnode {
+  padding: 14px 18px; border-radius: 8px;
+  border: 1px solid var(--line);
+  font-family: var(--mono); font-size: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  transition: border-color var(--transition), background var(--transition);
+  cursor: none;
+}
+.fnode:hover { border-color: rgba(245,243,238,.25); background: rgba(245,243,238,.04); }
+.fnode.active { border-color: var(--acid); background: rgba(200,255,0,.06); }
+.fnode.err { border-color: #ff6b35; background: rgba(255,107,53,.06); }
+.fnode .label { color: var(--paper); }
+.fnode .tag {
+  font-size: 10px; letter-spacing: .04em;
+  padding: 3px 8px; border-radius: 3px;
+}
+.tag-green { background: rgba(200,255,0,.15); color: var(--acid); }
+.tag-red { background: rgba(255,107,53,.15); color: #ff6b35; }
+.tag-blue { background: rgba(0,255,195,.1); color: var(--acid2); }
+.tag-purple { background: rgba(167,139,250,.1); color: #a78bfa; }
+.farrow {
+  display: flex; justify-content: center;
+  color: var(--dim); font-size: 14px;
+  padding: 4px 0;
+}
+
+/* ─── Architecture ──────────────────────────── */
+#arch {
+  padding: 120px 48px;
+  border-top: 1px solid var(--line);
+}
+.arch-head {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 80px;
+  align-items: end; margin-bottom: 64px;
+}
+.arch-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line); border-radius: 10px;
+  overflow: hidden;
+}
+.arch-card {
+  background: var(--ink);
+  padding: 40px 32px;
+  transition: background var(--transition);
+  cursor: none;
+}
+.arch-card:hover { background: rgba(245,243,238,.03); }
+.arch-icon {
+  font-family: var(--mono); font-size: 28px; font-weight: 300;
+  color: var(--acid); margin-bottom: 20px; letter-spacing: -.02em;
+}
+.arch-card h3 {
+  font-family: var(--head); font-size: 20px; font-weight: 700;
+  letter-spacing: -.03em; margin-bottom: 10px;
+}
+.arch-card p { font-size: 14px; color: var(--dim); line-height: 1.7; }
+.arch-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
+.arch-tag {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .04em;
+  border: 1px solid var(--line); color: var(--dim);
+  padding: 4px 8px; border-radius: 3px;
+}
+
+/* ─── Integração ─────────────────────────────── */
+#code {
+  padding: 120px 48px;
+  border-top: 1px solid var(--line);
+}
+.int-head {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 80px; align-items: end; margin-bottom: 64px;
+}
+.int-docs { display: flex; flex-direction: column; gap: 10px; }
+.int-docs-link {
+  font-family: var(--mono); font-size: 12px;
+  color: var(--acid2); text-decoration: none; letter-spacing: .04em;
+  border-bottom: 1px solid rgba(0,255,195,.3); padding-bottom: 2px;
+  display: inline-block; width: fit-content;
+  transition: border-color var(--transition);
+}
+.int-docs-link:hover { border-color: var(--acid2); }
+.int-docs p { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: .04em; line-height: 1.7; }
+
+/* Antes/depois */
+.compare {
+  display: grid; grid-template-columns: 1fr 48px 1fr;
+  align-items: center; margin-bottom: 32px;
+}
+.compare-col { display: flex; flex-direction: column; gap: 0; }
+.compare-tag {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+  padding: 10px 18px;
+  border: 1px solid var(--line); border-bottom: none;
+  border-radius: 8px 8px 0 0;
+}
+.before-tag { color: var(--dim); }
+.after-tag  { color: var(--acid); background: rgba(200,255,0,.04); border-color: rgba(200,255,0,.2); }
+.compare-box {
+  font-family: var(--mono); font-size: 12px; line-height: 1.9;
+  padding: 20px 18px; background: #0a0a10;
+  border: 1px solid var(--line); border-radius: 0 0 8px 8px;
+}
+.after-box { border-color: rgba(200,255,0,.2); }
+.compare-caption {
+  font-size: 12px; color: var(--dim); margin-top: 10px;
+  padding: 0 4px; line-height: 1.5;
+}
+.compare-sep {
+  text-align: center; font-size: 20px;
+  color: var(--dim); font-family: var(--mono);
+}
+
+/* Install */
+.install {
+  background: #0a0a10;
+  border: 1px solid var(--line); border-radius: 10px;
+  overflow: hidden; max-width: 640px;
+}
+.install-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+  color: var(--dim); padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.install-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 20px;
+}
+.install-prompt { font-family: var(--mono); color: var(--acid); user-select: none; }
+.install-cmd { font-family: var(--mono); font-size: 13px; color: var(--paper); flex: 1; }
+.install-copy-btn {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+  background: transparent; border: 1px solid var(--line);
+  color: var(--dim); padding: 6px 14px; border-radius: 4px;
+  cursor: none; transition: border-color var(--transition), color var(--transition);
+}
+.install-copy-btn:hover { border-color: rgba(245,243,238,.3); color: var(--paper); }
+.install-copy-btn.copied { border-color: var(--acid); color: var(--acid); }
+.install-runtimes {
+  display: flex; gap: 0;
+  border-top: 1px solid var(--line);
+  padding: 10px 16px; gap: 4px;
+}
+.runtime-btn {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .04em;
+  background: transparent; border: 1px solid transparent;
+  color: var(--dim); padding: 4px 10px; border-radius: 4px;
+  cursor: none; transition: all var(--transition);
+}
+.runtime-btn:hover { color: var(--paper); }
+.runtime-btn.active { border-color: var(--line); color: var(--paper); background: rgba(245,243,238,.05); }
+
+@media (max-width: 900px) {
+  #code { padding: 80px 24px; }
+  .int-head { grid-template-columns: 1fr; gap: 24px; }
+  .compare { grid-template-columns: 1fr; }
+  .compare-sep { transform: rotate(90deg); padding: 8px 0; }
+}
+
+
+/* ─── Pricing / Adesão ──────────────────────── */
+#pricing {
+  padding: 120px 48px;
+  border-top: 1px solid var(--line);
+}
+
+/* ─── Join steps ────────────────────────────── */
+.join-steps {
+  display: grid; grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 0; align-items: start;
+  margin-bottom: 72px;
+}
+.join-divider {
+  font-family: var(--mono); font-size: 20px; color: var(--dim);
+  padding: 0 24px; padding-top: 18px;
+}
+.join-step {
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 32px 28px;
+  transition: border-color var(--transition), background var(--transition);
+  cursor: none;
+}
+.join-step:hover { border-color: rgba(200,255,0,.3); background: rgba(200,255,0,.03); }
+.join-n {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--acid); letter-spacing: .08em;
+  margin-bottom: 16px;
+}
+.join-body h3 {
+  font-family: var(--head); font-size: 20px; font-weight: 700;
+  letter-spacing: -.03em; margin-bottom: 10px;
+}
+.join-body p { font-size: 14px; color: var(--dim); line-height: 1.7; margin-bottom: 16px; }
+.join-code {
+  font-family: var(--mono); font-size: 11px; color: var(--acid2);
+  background: rgba(0,255,195,.06); border-left: 2px solid var(--acid2);
+  padding: 8px 12px; border-radius: 0 4px 4px 0;
+}
+
+/* ─── Cost table ────────────────────────────── */
+.cost-table {
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
+.cost-header {
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(245,243,238,.02);
+}
+.cost-note { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: .04em; }
+.cost-rows { display: flex; flex-direction: column; }
+.cost-row {
+  display: grid; grid-template-columns: 220px 100px 1fr;
+  align-items: center; gap: 24px;
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--line);
+  transition: background var(--transition);
+}
+.cost-row:last-child { border-bottom: none; }
+.cost-row:hover { background: rgba(245,243,238,.03); }
+.cost-load {
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: .04em;
+}
+.cost-bar {
+  height: 3px; border-radius: 2px; min-width: 0;
+  background: linear-gradient(90deg, var(--acid2), var(--acid));
+  transition: width .6s ease;
+}
+.cost-price {
+  font-family: var(--mono); font-size: 14px; font-weight: 500;
+  text-align: right;
+}
+.cost-price.zero  { color: var(--dim); }
+.cost-price.low   { color: var(--acid2); }
+.cost-price.mid   { color: var(--acid); }
+.cost-price.high  { color: #fb923c; }
+.cost-desc { font-size: 13px; color: var(--dim); }
+.cost-footer {
+  padding: 14px 28px;
+  border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+  letter-spacing: .04em;
+  background: rgba(245,243,238,.02);
+}
+
+/* ─── Pricing / Adesão mobile ───────────────── */
+@media (max-width: 900px) {
+  #pricing { padding: 80px 24px; }
+  .join-steps { grid-template-columns: 1fr; }
+  .join-divider { display: none; }
+  .cost-row { grid-template-columns: 1fr 80px; }
+  .cost-desc { display: none; }
+}
+
+/* ─── CTA final ─────────────────────────────── */
+#cta {
+  padding: 160px 48px;
+  text-align: center;
+  border-top: 1px solid var(--line);
+  position: relative; overflow: hidden;
+}
+#cta::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 60% 60% at 50% 100%, rgba(108,71,255,.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cta-h2 {
+  font-family: var(--head); font-size: clamp(48px, 7vw, 96px);
+  font-weight: 800; letter-spacing: -.04em; line-height: .9;
+  margin-bottom: 32px; position: relative; z-index: 1;
+}
+.cta-h2 span { color: var(--acid); }
+.cta-sub {
+  font-size: 18px; color: var(--dim); font-weight: 300;
+  margin-bottom: 48px; position: relative; z-index: 1;
+}
+.cta-actions { display: flex; gap: 16px; justify-content: center; position: relative; z-index: 1; }
+
+/* ─── Footer ────────────────────────────────── */
+footer {
+  padding: 40px 48px;
+  border-top: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.footer-logo {
+  font-family: var(--head); font-size: 18px; font-weight: 800;
+  letter-spacing: -.04em; color: var(--paper);
+}
+.footer-logo span { color: var(--acid); }
+.footer-links {
+  display: flex; gap: 28px; list-style: none;
+}
+.footer-links a {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--dim); text-decoration: none; letter-spacing: .04em;
+  transition: color var(--transition);
+}
+.footer-links a:hover { color: var(--paper); }
+.footer-copy { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: .04em; }
+
+/* ─── Ticker ────────────────────────────────── */
+.ticker-wrap {
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  overflow: hidden; padding: 14px 0;
+  background: rgba(200,255,0,.04);
+}
+.ticker {
+  display: flex; gap: 0;
+  animation: ticker 28s linear infinite;
+  white-space: nowrap;
+}
+.ticker-item {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--acid); letter-spacing: .08em;
+  padding: 0 32px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 12px;
+}
+.ticker-item::after { content: '·'; color: var(--dim); }
+@keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+/* ─── Animations ────────────────────────────── */
+.reveal {
+  opacity: 0; transform: translateY(24px);
+  transition: opacity .6s ease, transform .6s ease;
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ─── Mobile ────────────────────────────────── */
+@media (max-width: 900px) {
+  nav { padding: 18px 24px; }
+  .nav-links { display: none; }
+  #hero { padding: 120px 24px 80px; }
+  .hero-terminal { display: none; }
+  #stats { grid-template-columns: repeat(2, 1fr); }
+  .stat { padding: 32px 24px; }
+  #how { grid-template-columns: 1fr; padding: 80px 24px; }
+  .flow-diagram { display: none; }
+  #arch { padding: 80px 24px; }
+  .arch-head { grid-template-columns: 1fr; gap: 24px; }
+  .arch-grid { grid-template-columns: 1fr; }
+  #code { grid-template-columns: 1fr; padding: 80px 24px; }
+  #pricing { padding: 80px 24px; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  #cta { padding: 100px 24px; }
+  footer { flex-direction: column; gap: 24px; padding: 32px 24px; }
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+
+<!-- ─── Nav ──────────────────────────────────── -->
+<nav id="nav">
+  <a href="#hero" class="nav-logo">x<span>402</span></a>
+  <ul class="nav-links">
+    <li><a href="#how">Como funciona</a></li>
+    <li><a href="#arch">Arquitetura</a></li>
+    <li><a href="#code">SDK</a></li>
+    <li><a href="#pricing">Adesão</a></li>
+  </ul>
+  <a href="#pricing" class="nav-cta">Aderir ao protocolo</a>
+</nav>
+
+<!-- ─── Hero ─────────────────────────────────── -->
+<section id="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+
+  <div class="hero-status">REDE ATIVA — SOLANA MAINNET / DEVNET</div>
+
+  <h1 class="hero-h1">
+    Mercado de<br>
+    <em>Prioridade</em><br>
+    para Agentes IA
+  </h1>
+  <p class="hero-sub">
+    O protocolo x402 usa HTTP 402 para criar um mercado de acesso prioritário a nós RPC na Solana.
+    Agentes autônomos pagam micro-taxas e operam sem interrupção — mesmo sob congestionamento máximo.
+  </p>
+  <div class="hero-actions">
+    <a href="#pricing" class="btn-primary">Começar agora</a>
+    <a href="#how" class="btn-ghost">Como funciona</a>
+  </div>
+
+  <!-- terminal -->
+  <div class="hero-terminal">
+    <div class="terminal-bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span class="terminal-title">x402-agent.ts — negociação em tempo real</span>
+    </div>
+    <div class="terminal-body" id="terminal-body">
+      <div><span class="t-dim">// Agente inicializa conexão</span></div>
+      <div><span class="t-purple">const</span> <span class="t-acid">rpc</span> = <span class="t-purple">new</span> <span class="t-orange">X402Provider</span>(</div>
+      <div>&nbsp;&nbsp;<span class="t-acid2">"http://shield.x402.io/rpc"</span>,</div>
+      <div>&nbsp;&nbsp;agentKeypair,</div>
+      <div>&nbsp;&nbsp;{ priorityBudget: <span class="t-acid">5_000</span> }</div>
+      <div>);</div>
+      <div>&nbsp;</div>
+      <div id="t-line-req"><span class="t-dim">// → POST /rpc getAccountInfo</span></div>
+      <div id="t-line-402" style="display:none"><span class="t-orange">⚡ HTTP 402</span> <span class="t-dim">— carga: 91% — preço: </span><span class="t-acid">3.200 µL</span></div>
+      <div id="t-line-sign" style="display:none"><span class="t-dim">// Assina payload Ed25519...</span></div>
+      <div id="t-line-auth" style="display:none"><span class="t-acid2">Authorization:</span> <span class="t-dim">x402 sig.pubkey.msg</span></div>
+      <div id="t-line-ok" style="display:none"><span class="t-acid">✓ 200 OK</span> <span class="t-dim">— latência total: </span><span class="t-acid">+4ms</span></div>
+      <div id="t-line-data" style="display:none"><span class="t-purple">const</span> <span class="t-acid">info</span> = { lamports: <span class="t-acid">1_420_000</span>, ... }</div>
+      <div>&nbsp;</div>
+      <div><span class="t-dim">// Tudo transparente para o código do agente</span><span class="t-cursor"></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Ticker ────────────────────────────────── -->
+<div class="ticker-wrap">
+  <div class="ticker" id="ticker">
+    <div class="ticker-item">HTTP 402 PAYMENT REQUIRED</div>
+    <div class="ticker-item">SOLANA RPC PRIORITY MARKET</div>
+    <div class="ticker-item">ED25519 OFF-CHAIN SETTLEMENT</div>
+    <div class="ticker-item">ZERO LATENCY NEGOTIATION</div>
+    <div class="ticker-item">AI AGENTS PAY AUTONOMOUSLY</div>
+    <div class="ticker-item">DYNAMIC MICRO-LAMPORT PRICING</div>
+    <div class="ticker-item">ANTI-REPLAY NONCE PROTECTION</div>
+    <div class="ticker-item">HTTP 402 PAYMENT REQUIRED</div>
+    <div class="ticker-item">SOLANA RPC PRIORITY MARKET</div>
+    <div class="ticker-item">ED25519 OFF-CHAIN SETTLEMENT</div>
+    <div class="ticker-item">ZERO LATENCY NEGOTIATION</div>
+    <div class="ticker-item">AI AGENTS PAY AUTONOMOUSLY</div>
+    <div class="ticker-item">DYNAMIC MICRO-LAMPORT PRICING</div>
+    <div class="ticker-item">ANTI-REPLAY NONCE PROTECTION</div>
+  </div>
+</div>
+
+<!-- ─── Stats ─────────────────────────────────── -->
+<div id="stats">
+  <div class="stat reveal">
+    <div class="stat-n"><span class="counter" data-target="402">0</span></div>
+    <div class="stat-label">STATUS CODE REUTILIZADO</div>
+  </div>
+  <div class="stat reveal">
+    <div class="stat-n"><span class="counter" data-target="4">0</span><span class="unit">ms</span></div>
+    <div class="stat-label">OVERHEAD DE NEGOCIAÇÃO</div>
+  </div>
+  <div class="stat reveal">
+    <div class="stat-n"><span class="counter" data-target="50">0</span><span class="unit">k µL</span></div>
+    <div class="stat-label">PREÇO MÁXIMO POR REQ</div>
+  </div>
+  <div class="stat reveal">
+    <div class="stat-n"><span class="counter" data-target="0">0</span></div>
+    <div class="stat-label">MODIFICAÇÕES NO PROTOCOLO RPC</div>
+  </div>
+</div>
+
+<!-- ─── How it works ──────────────────────────── -->
+<section id="how">
+  <div>
+    <span class="section-tag reveal">// COMO FUNCIONA</span>
+    <h2 class="section-h2 reveal">Cinco etapas.<br>Invisível para<br>o agente.</h2>
+    <p class="section-sub reveal">A negociação acontece inteiramente na camada de transporte. O código do agente não precisa mudar — apenas trocar o endpoint.</p>
+
+    <div class="steps">
+      <div class="step reveal">
+        <span class="step-n">01</span>
+        <div class="step-content">
+          <h3>Handshake cego</h3>
+          <p>O agente envia uma requisição RPC normal. Não sabe que existe um Shield à frente.</p>
+          <div class="step-code">POST /rpc {"method":"getAccountInfo"}</div>
+        </div>
+      </div>
+      <div class="step reveal">
+        <span class="step-n">02</span>
+        <div class="step-content">
+          <h3>Interceptação 402</h3>
+          <p>O Shield detecta congestionamento. Bloqueia com HTTP 402 + nonce único + preço dinâmico.</p>
+          <div class="step-code">X-x402-Amount: 3200 · X-x402-Nonce: a1b2c3</div>
+        </div>
+      </div>
+      <div class="step reveal">
+        <span class="step-n">03</span>
+        <div class="step-content">
+          <h3>Avaliação do orçamento</h3>
+          <p>O SDK verifica se o preço cabe no <code>priorityBudget</code>. Acima do limite, lança <code>X402BudgetExceededError</code>.</p>
+        </div>
+      </div>
+      <div class="step reveal">
+        <span class="step-n">04</span>
+        <div class="step-content">
+          <h3>Liquidação off-chain</h3>
+          <p>Assina o payload com Ed25519. Reenvia a requisição com o token de autorização. Zero espera de bloco.</p>
+          <div class="step-code">Authorization: x402 sig.pubkey.msg</div>
+        </div>
+      </div>
+      <div class="step reveal">
+        <span class="step-n">05</span>
+        <div class="step-content">
+          <h3>Validação e passagem</h3>
+          <p>Shield verifica assinatura + nonce + saldo no escrow. Válido → encaminha ao RPC real. Latência total: ~4ms.</p>
+          <div class="step-code">200 OK — overhead: +4ms</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- flow diagram -->
+  <div class="flow-diagram reveal">
+    <div class="flow-box">
+      <div class="flow-header">Fluxo de dados em tempo real</div>
+      <div class="flow-inner" id="flow-inner">
+        <div class="fnode" id="f1"><span class="label">AI Agent</span><span class="tag tag-purple">@solana/web3.js</span></div>
+        <div class="farrow">↓</div>
+        <div class="fnode" id="f2"><span class="label">x402-Shield</span><span class="tag tag-green">Node.js</span></div>
+        <div class="farrow" id="fa3">↓</div>
+        <div class="fnode err" id="f3"><span class="label">HTTP 402 Challenge</span><span class="tag tag-red">blocked</span></div>
+        <div class="farrow" id="fa4">↓</div>
+        <div class="fnode" id="f4"><span class="label">Ed25519 Sign</span><span class="tag tag-blue">tweetnacl</span></div>
+        <div class="farrow">↓</div>
+        <div class="fnode" id="f5"><span class="label">Retry + Authorization</span><span class="tag tag-green">x402 token</span></div>
+        <div class="farrow">↓</div>
+        <div class="fnode active" id="f6"><span class="label">RPC Node</span><span class="tag tag-green">200 OK</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Architecture ──────────────────────────── -->
+<section id="arch">
+  <div class="arch-head">
+    <div>
+      <span class="section-tag reveal">// ARQUITETURA</span>
+      <h2 class="section-h2 reveal">Três peças.<br>Qualquer stack.</h2>
+    </div>
+    <p class="section-sub reveal">Cada componente pode rodar de forma independente. O Shield é agnóstico ao cliente — qualquer agente que entenda HTTP pode negociar.</p>
+  </div>
+
+  <div class="arch-grid">
+    <div class="arch-card reveal">
+      <div class="arch-icon">[A]</div>
+      <h3>x402-Shield</h3>
+      <p>Proxy reverso posicionado à frente do nó RPC. Monitora backpressure, emite desafios 402 com preço dinâmico e valida provas de pagamento.</p>
+      <div class="arch-tags">
+        <span class="arch-tag">Node.js 18+</span>
+        <span class="arch-tag">Express</span>
+        <span class="arch-tag">http-proxy-middleware</span>
+        <span class="arch-tag">Redis (prod)</span>
+      </div>
+    </div>
+    <div class="arch-card reveal">
+      <div class="arch-icon">[B]</div>
+      <h3>x402-Client-SDK</h3>
+      <p>Estende o <code>Connection</code> da Solana. Intercepta erros 402, negocia o pagamento via Ed25519 e refaz a requisição — tudo transparente para o agente.</p>
+      <div class="arch-tags">
+        <span class="arch-tag">TypeScript 5</span>
+        <span class="arch-tag">@solana/web3.js</span>
+        <span class="arch-tag">tweetnacl</span>
+        <span class="arch-tag">bs58</span>
+      </div>
+    </div>
+    <div class="arch-card reveal">
+      <div class="arch-icon">[C]</div>
+      <h3>Priority-Gateway</h3>
+      <p>Cofre de saldo (escrow) para liquidação instantânea. MVP usa memória + Map. Produção usa programa Anchor on-chain ou canal de estado.</p>
+      <div class="arch-tags">
+        <span class="arch-tag">Map (MVP)</span>
+        <span class="arch-tag">Anchor (v2)</span>
+        <span class="arch-tag">State Channels</span>
+        <span class="arch-tag">Redis</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Integração ──────────────────────────────── -->
+<section id="code">
+  <div class="int-head">
+    <div>
+      <span class="section-tag reveal">// INTEGRAÇÃO</span>
+      <h2 class="section-h2 reveal">Uma troca.<br>Prioridade<br>automática.</h2>
+      <p class="section-sub reveal">
+        O SDK estende o <code>@solana/web3.js</code> que você já usa.
+        Nenhuma outra mudança no código do seu agente.
+      </p>
+    </div>
+    <div class="int-docs reveal">
+      <a href="/docs" class="int-docs-link">Documentação completa →</a>
+      <p>Guia de início rápido, referência da API e exemplos de integração.</p>
+    </div>
+  </div>
+
+  <!-- Antes / Depois -->
+  <div class="compare reveal">
+    <div class="compare-col">
+      <div class="compare-tag before-tag">Antes — sem prioridade</div>
+      <div class="compare-box before-box">
+        <span class="ck">import</span> { <span class="cc">Connection</span> } <span class="ck">from</span> <span class="cs">'@solana/web3.js'</span><br><br>
+        <span class="ck">const</span> rpc = <span class="ck">new</span> <span class="cf">Connection</span>(<br>
+        &nbsp;&nbsp;<span class="cs">"https://api.mainnet-beta.solana.com"</span><br>
+        )
+      </div>
+      <div class="compare-caption">Acesso direto. Sem prioridade. Pode ser bloqueado sob carga.</div>
+    </div>
+
+    <div class="compare-sep">→</div>
+
+    <div class="compare-col">
+      <div class="compare-tag after-tag">Com x402 — prioridade automática</div>
+      <div class="compare-box after-box">
+        <span class="ck">import</span> { <span class="cc">X402Provider</span> } <span class="ck">from</span> <span class="cs">'@x402/sdk'</span><br><br>
+        <span class="ck">const</span> rpc = <span class="ck">new</span> <span class="cn">X402Provider</span>(<br>
+        &nbsp;&nbsp;<span class="cs">"https://shield.x402.io/rpc"</span>,<br>
+        &nbsp;&nbsp;agentKeypair<br>
+        )
+      </div>
+      <div class="compare-caption">Mesma API. Negociação 402 invisível. Prioridade garantida.</div>
+    </div>
+  </div>
+
+  <!-- Instalação -->
+  <div class="install reveal">
+    <div class="install-label">Instalar o SDK</div>
+    <div class="install-row">
+      <span class="install-prompt">$</span>
+      <span class="install-cmd" id="install-cmd">npm install @x402/sdk @solana/web3.js</span>
+      <button class="install-copy-btn" onclick="copyInstall(this)">Copiar</button>
+    </div>
+    <div class="install-runtimes">
+      <button class="runtime-btn active" onclick="setRuntime('npm install', this)">npm</button>
+      <button class="runtime-btn" onclick="setRuntime('bun add', this)">bun</button>
+      <button class="runtime-btn" onclick="setRuntime('yarn add', this)">yarn</button>
+      <button class="runtime-btn" onclick="setRuntime('pnpm add', this)">pnpm</button>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Adesão ─────────────────────────────────── -->
+<section id="pricing">
+  <span class="section-tag reveal">// ADESÃO</span>
+  <h2 class="section-h2 reveal">Sem planos.<br>Sem cadastro.<br>Só saldo.</h2>
+  <p class="section-sub reveal" style="margin-bottom: 64px">
+    O x402 é um protocolo aberto e permissionless. Você não assina nada —
+    conecta o SDK, deposita saldo no escrow e seus agentes operam com prioridade
+    de forma autônoma. O custo é exatamente o que a rede cobra, no momento em que cobra.
+  </p>
+
+  <!-- Três passos de adesão -->
+  <div class="join-steps reveal">
+    <div class="join-step">
+      <div class="join-n">01</div>
+      <div class="join-body">
+        <h3>Conectar o Shield</h3>
+        <p>Aponte o endpoint do seu agente para o x402-Shield em vez do RPC direto. Uma linha de configuração.</p>
+        <div class="join-code">"http://shield.x402.io/rpc"</div>
+      </div>
+    </div>
+    <div class="join-divider">→</div>
+    <div class="join-step">
+      <div class="join-n">02</div>
+      <div class="join-body">
+        <h3>Depositar saldo</h3>
+        <p>Deposite SOL no escrow do Shield via carteira ou instrução on-chain. Sem mínimo obrigatório.</p>
+        <div class="join-code">depositEscrow(shield, 1_000_000 µL)</div>
+      </div>
+    </div>
+    <div class="join-divider">→</div>
+    <div class="join-step">
+      <div class="join-n">03</div>
+      <div class="join-body">
+        <h3>Operar</h3>
+        <p>O agente negocia e paga automaticamente. Você recebe telemetria. Quando o saldo zera, recarrega.</p>
+        <div class="join-code">onPayment: ({amount}) => log(amount)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabela de custo real -->
+  <div class="cost-table reveal">
+    <div class="cost-header">
+      <span class="section-tag" style="margin:0">// CUSTO REAL POR REQUISIÇÃO</span>
+      <span class="cost-note">preço sobe linearmente com a carga do nó</span>
+    </div>
+    <div class="cost-rows">
+      <div class="cost-row">
+        <div class="cost-load">
+          <div class="cost-bar" style="width:0%"></div>
+          <span>Nó livre</span>
+        </div>
+        <div class="cost-price zero">0 µL</div>
+        <div class="cost-desc">Sem congestionamento — acesso direto, sem cobrança</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-load">
+          <div class="cost-bar" style="width:33%"></div>
+          <span>Carga 75–83%</span>
+        </div>
+        <div class="cost-price low">~8k µL</div>
+        <div class="cost-desc">Início do threshold — taxa mínima de prioridade</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-load">
+          <div class="cost-bar" style="width:66%"></div>
+          <span>Carga 83–91%</span>
+        </div>
+        <div class="cost-price mid">~25k µL</div>
+        <div class="cost-desc">Carga moderada — acesso garantido sobre a fila comum</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-load">
+          <div class="cost-bar" style="width:100%"></div>
+          <span>Carga 91–100%</span>
+        </div>
+        <div class="cost-price high">~50k µL</div>
+        <div class="cost-desc">Congestionamento máximo — prioridade absoluta garantida</div>
+      </div>
+    </div>
+    <div class="cost-footer">
+      <span>50.000 µL ≈ 0,00005 SOL &nbsp;·&nbsp; ao preço atual ≈ R$ 0,01 por requisição no pior caso</span>
+    </div>
+  </div>
+
+  <div style="text-align:center; margin-top: 56px" class="reveal">
+    <a href="#code" class="btn-primary" style="font-size:14px; padding: 16px 36px">Aderir ao protocolo</a>
+    <p style="margin-top: 16px; font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing:.04em">
+      Permissionless · Sem cadastro · Sem contrato · Código aberto
+    </p>
+  </div>
+</section>
+
+<!-- ─── CTA ───────────────────────────────────── -->
+<section id="cta">
+  <h2 class="cta-h2 reveal">
+    Seus agentes<br>nunca mais<br><span>param.</span>
+  </h2>
+  <p class="cta-sub reveal">Conecte. Deposite. Opere. Três passos, nenhuma fricção.</p>
+  <div class="cta-actions reveal">
+    <a href="#pricing" class="btn-primary">Aderir ao protocolo</a>
+    <a href="#code" class="btn-ghost">Ver o SDK</a>
+  </div>
+</section>
+
+<!-- ─── Footer ───────────────────────────────── -->
+<footer>
+  <div class="footer-logo">x<span>402</span> Protocol</div>
+  <ul class="footer-links">
+    <li><a href="#how">Como funciona</a></li>
+    <li><a href="#arch">Arquitetura</a></li>
+    <li><a href="#code">SDK</a></li>
+    <li><a href="#pricing">Adesão</a></li>
+  </ul>
+  <div class="footer-copy">MVP v0.1.0 — Solana</div>
+</footer>
+
+<script>
+// ─── Cursor ──────────────────────────────────────
+const cursor = document.getElementById('cursor');
+document.addEventListener('mousemove', e => {
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top  = e.clientY + 'px';
+});
+document.querySelectorAll('a,button,.step,.fnode,.arch-card,.price-card,.stat,.nav-cta').forEach(el => {
+  el.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+  el.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+});
+
+// ─── Nav scroll ──────────────────────────────────
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// ─── Reveal on scroll ────────────────────────────
+const revealEls = document.querySelectorAll('.reveal');
+const io = new IntersectionObserver(entries => {
+  entries.forEach((e,i) => {
+    if (e.isIntersecting) {
+      setTimeout(() => e.target.classList.add('visible'), i * 60);
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+revealEls.forEach(el => io.observe(el));
+
+// ─── Counter animation ────────────────────────────
+const counters = document.querySelectorAll('.counter');
+const cio = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const el = entry.target;
+    const target = parseInt(el.dataset.target);
+    const dur = 1200;
+    const start = performance.now();
+    const tick = now => {
+      const p = Math.min((now - start) / dur, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(ease * target);
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    cio.unobserve(el);
+  });
+}, { threshold: 0.5 });
+counters.forEach(c => cio.observe(c));
+
+// ─── Runtime switcher ────────────────────────────
+function setRuntime(cmd, btn) {
+  document.querySelectorAll('.runtime-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('install-cmd').textContent = cmd + ' @x402/sdk @solana/web3.js';
+}
+function copyInstall(btn) {
+  const text = document.getElementById('install-cmd').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copiado!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 1800);
+  });
+}
+
+// ─── Terminal animation ──────────────────────────
+const lines = [
+  { el: 't-line-req',  delay: 800  },
+  { el: 't-line-402',  delay: 1600 },
+  { el: 't-line-sign', delay: 2200 },
+  { el: 't-line-auth', delay: 2700 },
+  { el: 't-line-ok',   delay: 3200 },
+  { el: 't-line-data', delay: 3700 },
+];
+let started = false;
+const terminalEl = document.getElementById('terminal-body');
+const tio = new IntersectionObserver(entries => {
+  if (entries[0].isIntersecting && !started) {
+    started = true;
+    lines.forEach(({ el, delay }) => {
+      setTimeout(() => {
+        const node = document.getElementById(el);
+        if (node) node.style.display = 'block';
+      }, delay);
+    });
+    setTimeout(() => {
+      started = false;
+      lines.forEach(({ el }) => {
+        const node = document.getElementById(el);
+        if (node) node.style.display = 'none';
+      });
+      tio.observe(terminalEl);
+    }, 6000);
+  }
+}, { threshold: 0.5 });
+tio.observe(terminalEl);
+
+// ─── Flow diagram pulse ──────────────────────────
+const flowNodes = ['f1','f2','f3','f4','f5','f6'];
+let fi = 0;
+setInterval(() => {
+  flowNodes.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.borderColor = '';
+    el.style.background = '';
+  });
+  const el = document.getElementById(flowNodes[fi]);
+  if (el) {
+    el.style.borderColor = 'var(--acid)';
+    el.style.background = 'rgba(200,255,0,.06)';
+  }
+  fi = (fi + 1) % flowNodes.length;
+}, 900);
+</script>
+</body>
+</html>
