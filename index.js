@@ -200,7 +200,10 @@ function x402Shield(req, res, next) {
 // ─── Aplicação Express ────────────────────────────────────────────────────────
 
 const app = express();
-app.use(express.json());
+
+// NB: do NOT mount express.json() globally — it consumes the request body,
+// which breaks http-proxy-middleware for /rpc (upstream times out waiting for
+// a body that was already parsed and discarded). Apply per-route instead.
 
 // Health check (sem 402)
 app.get("/health", (req, res) => {
@@ -213,7 +216,7 @@ app.get("/health", (req, res) => {
 });
 
 // Endpoint de depósito no escrow (MVP — em produção, valide a tx on-chain)
-app.post("/escrow/deposit", (req, res) => {
+app.post("/escrow/deposit", express.json(), (req, res) => {
   const { pubkey, amount_micro_lamports } = req.body;
   if (!pubkey || !amount_micro_lamports) return res.status(400).json({ error: "pubkey e amount_micro_lamports obrigatórios" });
   const current = escrowBalances.get(pubkey) || 0;
