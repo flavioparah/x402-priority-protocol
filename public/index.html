@@ -1,299 +1,296 @@
-import React, { useState, useEffect, useRef } from 'react';
-import * as THREE from 'three';
-import { 
-  Shield, 
-  Zap, 
-  Cpu, 
-  ArrowRight, 
-  Github, 
-  Linkedin, 
-  Activity,
-  Wallet,
-  Globe,
-  Code,
-  Layers,
-  Terminal as TerminalIcon
-} from 'lucide-react';
-
-/**
- * Componente NeuralBackground
- * Renderiza o efeito de filtragem: Spam vermelho entrando no escudo e saindo como dados verdes fluidos.
- */
-const NeuralBackground = () => {
-  const mountRef = useRef(null);
-
-  useEffect(() => {
-    let width = window.innerWidth;
-    let height = window.innerHeight;
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    camera.position.z = 8;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    
-    if (mountRef.current) {
-      mountRef.current.appendChild(renderer.domElement);
-    }
-
-    const colorSpam = new THREE.Color(0xff2200);    
-    const colorPriority = new THREE.Color(0x00ffab); 
-    const colorShield = new THREE.Color(0x00e0ff);    
-    
-    const mainGroup = new THREE.Group();
-    scene.add(mainGroup);
-
-    // Escudo (O Filtro)
-    const shieldGeo = new THREE.TorusGeometry(1.5, 0.02, 16, 100);
-    const shieldMat = new THREE.MeshBasicMaterial({ 
-      color: colorShield, 
-      transparent: true, 
-      opacity: 0.3 
-    });
-    const shieldRing = new THREE.Mesh(shieldGeo, shieldMat);
-    shieldRing.rotation.y = Math.PI / 2;
-    mainGroup.add(shieldRing);
-
-    // Partículas de Spam (Entrada)
-    const spamCount = 200;
-    const spamPoints = [];
-    const spamGeometry = new THREE.BufferGeometry();
-    const spamPositions = new Float32Array(spamCount * 3);
-    const spamSizes = new Float32Array(spamCount);
-
-    for (let i = 0; i < spamCount; i++) {
-      spamPoints.push({
-        x: -15 - Math.random() * 20,
-        y: (Math.random() - 0.5) * 15,
-        z: (Math.random() - 0.5) * 10,
-        speed: 0.05 + Math.random() * 0.1,
-        size: 5 + Math.random() * 15
-      });
-    }
-
-    const spamMaterial = new THREE.PointsMaterial({
-      color: colorSpam,
-      sizeAttenuation: false,
-      transparent: true,
-      opacity: 0.6,
-      size: 1.0
-    });
-    const spamSystem = new THREE.Points(spamGeometry, spamMaterial);
-    mainGroup.add(spamSystem);
-
-    // Linhas Fluidas (Saída/Filtro)
-    const lineCount = 40;
-    const lineSegments = 50;
-    const lines = [];
-
-    for (let i = 0; i < lineCount; i++) {
-      const geometry = new THREE.BufferGeometry();
-      const points = [];
-      for (let j = 0; j < lineSegments; j++) {
-        points.push(new THREE.Vector3(0, 0, 0));
-      }
-      geometry.setFromPoints(points);
-      const material = new THREE.LineBasicMaterial({ 
-        color: colorPriority, 
-        transparent: true, 
-        opacity: 0.4 
-      });
-      const line = new THREE.Line(geometry, material);
-      
-      lines.push({
-        mesh: line,
-        offset: Math.random() * Math.PI * 2,
-        speed: 0.02 + Math.random() * 0.03,
-        amplitude: 0.5 + Math.random() * 1.5,
-        active: false,
-        xPos: 0
-      });
-      mainGroup.add(line);
-    }
-
-    const animate = () => {
-      requestAnimationFrame(animate);
-      const time = Date.now() * 0.001;
-
-      // Animando o Shield
-      shieldRing.scale.setScalar(1 + Math.sin(time * 2) * 0.05);
-      shieldRing.rotation.z += 0.01;
-
-      // Animando Spam (Entrada em Funil)
-      const spamPosAttr = new Float32Array(spamCount * 3);
-      spamPoints.forEach((p, i) => {
-        p.x += p.speed;
-        
-        // Efeito de Funil: Conforme chega no X=0, Y e Z tendem a 0
-        const factor = Math.max(0, (p.x + 15) / 15); 
-        const pull = Math.pow(1 - Math.max(0, Math.min(1, (0 - p.x) / 5)), 2);
-        
-        const currentY = p.y * pull;
-        const currentZ = p.z * pull;
-
-        if (p.x > 0) {
-          p.x = -15 - Math.random() * 10;
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPC Priority Protocol</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #030303;
+            color: #a3a3a3;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
         }
-
-        spamPosAttr[i * 3] = p.x;
-        spamPosAttr[i * 3 + 1] = currentY;
-        spamPosAttr[i * 3 + 2] = currentZ;
-      });
-      spamGeometry.setAttribute('position', new THREE.BufferAttribute(spamPosAttr, 3));
-
-      // Animando Linhas Fluidas Verdes (Saída)
-      lines.forEach((l, i) => {
-        const positions = l.mesh.geometry.attributes.position.array;
-        l.xPos += l.speed * 5;
-        if (l.xPos > 15) l.xPos = 0;
-
-        for (let j = 0; j < lineSegments; j++) {
-          const segmentX = l.xPos - (j * 0.2);
-          if (segmentX < 0) {
-            positions[j * 3] = 0;
-            positions[j * 3 + 1] = 0;
-            positions[j * 3 + 2] = 0;
-          } else {
-            positions[j * 3] = segmentX;
-            positions[j * 3 + 1] = Math.sin(segmentX * 0.5 + time + l.offset) * l.amplitude;
-            positions[j * 3 + 2] = Math.cos(segmentX * 0.5 + time + l.offset) * l.amplitude;
-          }
+        .font-mono { font-family: 'Space Mono', monospace; }
+        .hero-title {
+            font-size: clamp(3rem, 10vw, 8rem);
+            line-height: 0.9;
+            letter-spacing: -0.05em;
         }
-        l.mesh.geometry.attributes.position.needsUpdate = true;
-        l.mesh.material.opacity = Math.max(0, 0.6 * (1 - l.xPos / 15));
-      });
+        .text-stroke {
+            -webkit-text-stroke: 1px rgba(255, 255, 255, 0.2);
+            color: transparent;
+        }
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .btn-primary {
+            background: #00E0FF;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 224, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: #00ffab;
+            transform: translateY(-2px);
+        }
+        #terminal-content div {
+            opacity: 0;
+            transform: translateX(-10px);
+            transition: all 0.5s ease;
+        }
+        #terminal-content div.active {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body>
 
-      renderer.render(scene, camera);
-    };
+    <div id="canvas-container"></div>
 
-    animate();
-
-    const handleResize = () => {
-      width = window.innerWidth;
-      height = window.innerHeight;
-      renderer.setSize(width, height);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
-    };
-  }, []);
-
-  return <div ref={mountRef} className="fixed inset-0 z-0 pointer-events-none" />;
-};
-
-const Button = ({ children, variant = 'primary', className = '', ...props }) => {
-  const variants = {
-    primary: 'bg-[#00E0FF] hover:bg-[#00B8E0] text-black font-black uppercase shadow-[0_0_20px_rgba(0,224,255,0.3)]',
-    secondary: 'bg-white/5 hover:bg-white/10 text-white border border-white/10 backdrop-blur-md',
-  };
-  return (
-    <button className={`px-8 py-4 text-[10px] tracking-[0.3em] font-mono transition-all duration-300 flex items-center justify-center gap-3 ${variants[variant]} ${className}`} {...props}>
-      {children}
-    </button>
-  );
-};
-
-export default function App() {
-  const [activeLog, setActiveLog] = useState(0);
-  const logs = [
-    { type: 'INBOUND', msg: 'Analisando pacotes de spam' },
-    { type: '402', msg: 'Desafio de pagamento enviado' },
-    { type: 'FILTER', msg: 'Assinatura RPC detectada' },
-    { type: 'UPGRADE', msg: 'Prioridade ultra-low latency aplicada' },
-    { type: 'SUCCESS', msg: 'Fluxo limpo estabelecido' }
-  ];
-
-  useEffect(() => {
-    const timer = setInterval(() => setActiveLog(p => (p + 1) % 5), 3000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <div className="bg-[#030303] text-gray-400 font-sans min-h-screen selection:bg-[#00E0FF]/30 overflow-x-hidden">
-      <NeuralBackground />
-      <div className="fixed inset-0 pointer-events-none opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '80px 80px' }}></div>
-
-      <nav className="fixed top-0 w-full z-50 border-b border-white/5 bg-black/50 backdrop-blur-xl h-20 flex items-center px-8">
-        <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 border border-[#00E0FF]/40 flex items-center justify-center bg-[#00E0FF]/5">
-              <Shield className="w-6 h-6 text-[#00E0FF]" />
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-black/50 backdrop-blur-xl h-20 flex items-center px-8">
+        <div class="max-w-7xl mx-auto w-full flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <div class="w-10 h-10 border border-[#00E0FF]/40 flex items-center justify-center bg-[#00E0FF]/5">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00E0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                </div>
+                <span class="text-white font-mono font-black tracking-[0.4em] text-sm uppercase">RPC PRIORITY</span>
             </div>
-            <span className="text-white font-mono font-black tracking-[0.4em] text-sm">RPC PRIORITY</span>
-          </div>
-          <Button variant="secondary" className="h-10 px-6">
-            <Wallet className="w-4 h-4" /> Connect Agent
-          </Button>
+            <button class="hidden md:flex glass px-6 py-2 text-[10px] text-white font-mono tracking-widest uppercase items-center gap-2 hover:bg-white/10 transition-all">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5"></path><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                Connect Agent
+            </button>
         </div>
-      </nav>
+    </nav>
 
-      <section className="relative pt-60 pb-32 px-8">
-        <div className="max-w-7xl mx-auto">
-          <span className="inline-block px-4 py-1 border border-[#00FFAB]/30 text-[#00FFAB] text-[10px] font-mono tracking-[0.4em] uppercase mb-8">
-            Network Congestion Layer-0
-          </span>
-          <h1 className="text-6xl md:text-9xl font-bold text-white leading-[0.9] tracking-tighter uppercase mb-10">
-            Filtre o <br />
-            <span className="text-transparent" style={{ WebkitTextStroke: '1px rgba(255,255,255,0.2)' }}>Ruído.</span>
-          </h1>
-          <p className="text-xl text-gray-400 font-sans leading-relaxed mb-12 max-w-2xl">
-            RPC Priority Protocol transforma o caos do tráfego web em fluxos de dados otimizados. 
-            Utilizamos o erro HTTP 402 para priorizar o que realmente importa.
-          </p>
-          <div className="flex gap-6">
-            <Button>Launch Protocol <ArrowRight className="w-4 h-4" /></Button>
-            <Button variant="secondary">API Docs</Button>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20 px-8">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-20 items-center">
-          <div className="bg-[#050505] border border-white/10 rounded-sm p-8 font-mono">
-            <div className="flex gap-2 mb-8 border-b border-white/5 pb-4">
-              <div className="w-3 h-3 rounded-full bg-red-500/20" />
-              <div className="w-3 h-3 rounded-full bg-yellow-500/20" />
-              <div className="w-3 h-3 rounded-full bg-green-500/20" />
-            </div>
-            {logs.map((log, i) => (
-              <div key={i} className={`flex gap-4 mb-3 text-xs transition-all duration-500 ${i === activeLog ? 'text-white translate-x-2' : 'text-gray-700'}`}>
-                <span className={i === activeLog ? 'text-[#00FFAB]' : ''}>[{log.type}]</span>
-                <span>{log.msg}</span>
-              </div>
-            ))}
-          </div>
-          <div>
-            <h2 className="text-4xl font-bold text-white mb-6 uppercase tracking-tight">Handshake de Prioridade</h2>
-            <p className="text-gray-500 leading-relaxed mb-8">
-              Nosso escudo neural detecta agentes automatizados sem stake e redireciona para o fluxo de filtragem. 
-              Apenas requisições autenticadas via 402 atravessam o funil para a rede principal.
+    <!-- Main Content -->
+    <main class="relative z-10">
+        <!-- Hero -->
+        <section class="pt-64 pb-32 px-8 max-w-7xl mx-auto">
+            <span class="inline-block px-4 py-1 border border-[#00FFAB]/30 text-[#00FFAB] text-[10px] font-mono tracking-[0.4em] uppercase mb-8">
+                Network Congestion Layer-0
+            </span>
+            <h1 class="hero-title font-black text-white uppercase mb-10">
+                Filtre o <br>
+                <span class="text-stroke">Ruído.</span>
+            </h1>
+            <p class="text-xl md:text-2xl text-gray-400 max-w-2xl leading-relaxed mb-12">
+                O RPC Priority Protocol transforma o caos do tráfego web em fluxos de dados otimizados. 
+                Utilizamos o handshake HTTP 402 para priorizar agentes de elite.
             </p>
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <div className="text-[#00E0FF] font-mono text-[10px] tracking-widest mb-1">LATÊNCIA</div>
-                <div className="text-2xl text-white font-bold tracking-tighter">8.4ms</div>
-              </div>
-              <div>
-                <div className="text-[#00FFAB] font-mono text-[10px] tracking-widest mb-1">BYPASS</div>
-                <div className="text-2xl text-white font-bold tracking-tighter">99.2%</div>
-              </div>
+            <div class="flex flex-wrap gap-6">
+                <button class="btn-primary px-10 py-5 text-[10px] font-mono font-bold tracking-[0.3em] uppercase">
+                    Launch Protocol
+                </button>
+                <button class="glass px-10 py-5 text-[10px] text-white font-mono tracking-[0.3em] uppercase">
+                    Documentation
+                </button>
             </div>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <footer className="py-10 px-8 border-t border-white/5 text-center">
-        <p className="text-[10px] font-mono tracking-[0.4em] uppercase text-gray-600">
-          Powered by Solana & x402 Engineering
+        <!-- Stats -->
+        <section class="py-24 px-8 border-y border-white/5 bg-black/40">
+            <div class="max-w-7xl mx-auto grid md:grid-cols-3 gap-16">
+                <div class="group">
+                    <div class="text-[#00E0FF] font-mono text-[10px] tracking-[0.4em] uppercase mb-2">Latência</div>
+                    <div class="text-5xl font-bold text-white mb-2 tracking-tighter">8.4ms</div>
+                    <div class="text-gray-600 text-xs uppercase tracking-[0.1em]">Otimizado para agentes Solana</div>
+                </div>
+                <div class="group">
+                    <div class="text-[#00FFAB] font-mono text-[10px] tracking-[0.4em] uppercase mb-2">Bypass</div>
+                    <div class="text-5xl font-bold text-white mb-2 tracking-tighter">99.2%</div>
+                    <div class="text-gray-600 text-xs uppercase tracking-[0.1em]">Taxa de sucesso de filtragem</div>
+                </div>
+                <div class="group">
+                    <div class="text-[#00E0FF] font-mono text-[10px] tracking-[0.4em] uppercase mb-2">Uptime</div>
+                    <div class="text-5xl font-bold text-white mb-2 tracking-tighter">99.9%</div>
+                    <div class="text-gray-600 text-xs uppercase tracking-[0.1em]">Infraestrutura distribuída</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Terminal Section -->
+        <section class="py-40 px-8 max-w-7xl mx-auto grid lg:grid-cols-2 gap-20 items-center">
+            <div class="glass p-10 rounded-sm font-mono relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#00E0FF] to-transparent opacity-20"></div>
+                <div class="flex gap-2 mb-8 border-b border-white/10 pb-4">
+                    <div class="w-3 h-3 rounded-full bg-red-500/20"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500/20"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500/20"></div>
+                </div>
+                <div id="terminal-content" class="space-y-4 text-xs h-40">
+                    <div><span class="text-[#00E0FF]">[INBOUND]</span> Analisando pacotes de spam de agentes...</div>
+                    <div><span class="text-[#00E0FF]">[402]</span> Erro Payment Required enviado ao nó.</div>
+                    <div><span class="text-[#00FFAB]">[FILTER]</span> Assinatura x402 validada no ledger.</div>
+                    <div><span class="text-[#00FFAB]">[UPGRADE]</span> Prioridade ultra-low latency aplicada.</div>
+                    <div><span class="text-white font-bold">[SUCCESS]</span> Conexão limpa estabelecida com RPC.</div>
+                </div>
+            </div>
+            <div>
+                <h2 class="text-4xl md:text-6xl font-bold text-white mb-8 uppercase tracking-tighter leading-none">Handshake de <br>Prioridade.</h2>
+                <p class="text-lg text-gray-500 leading-relaxed mb-8">
+                    Nosso escudo neural detecta agentes automatizados sem stake e redireciona o tráfego caótico para o funil de filtragem. Apenas requisições autenticadas atravessam para a rede principal.
+                </p>
+                <div class="flex gap-4 items-center text-[#00FFAB] font-mono text-[10px] tracking-widest uppercase animate-pulse">
+                    <div class="w-2 h-2 rounded-full bg-[#00FFAB]"></div>
+                    Sistema Ativo: Monitorando tráfego
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="py-20 px-8 border-t border-white/5 text-center relative z-10">
+        <p class="text-[10px] font-mono tracking-[0.5em] uppercase text-gray-600">
+            RPC Priority Protocol — Built for the Solana Ecosystem
         </p>
-      </footer>
-    </div>
-  );
-}
+    </footer>
+
+    <script>
+        // --- THREE.JS BACKGROUND LOGIC ---
+        let scene, camera, renderer, spamSystem, spamPoints = [];
+        let lines = [], shieldRing;
+        const lineCount = 40;
+        const lineSegments = 50;
+        const spamCount = 200;
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 8;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // 1. Escudo (O Filtro)
+            const shieldGeo = new THREE.TorusGeometry(1.5, 0.02, 16, 100);
+            const shieldMat = new THREE.MeshBasicMaterial({ color: 0x00e0ff, transparent: true, opacity: 0.3 });
+            shieldRing = new THREE.Mesh(shieldGeo, shieldMat);
+            shieldRing.rotation.y = Math.PI / 2;
+            scene.add(shieldRing);
+
+            // 2. Partículas de Spam (Entrada) - Vermelho
+            const spamGeo = new THREE.BufferGeometry();
+            const spamPosArr = new Float32Array(spamCount * 3);
+            for (let i = 0; i < spamCount; i++) {
+                const p = {
+                    x: -15 - Math.random() * 20,
+                    y: (Math.random() - 0.5) * 15,
+                    z: (Math.random() - 0.5) * 10,
+                    speed: 0.05 + Math.random() * 0.1
+                };
+                spamPoints.push(p);
+                spamPosArr[i * 3] = p.x;
+                spamPosArr[i * 3 + 1] = p.y;
+                spamPosArr[i * 3 + 2] = p.z;
+            }
+            spamGeo.setAttribute('position', new THREE.BufferAttribute(spamPosArr, 3));
+            const spamMat = new THREE.PointsMaterial({ color: 0xff2200, size: 0.08, transparent: true, opacity: 0.6 });
+            spamSystem = new THREE.Points(spamGeo, spamMat);
+            scene.add(spamSystem);
+
+            // 3. Linhas Verdes (Saída)
+            for (let i = 0; i < lineCount; i++) {
+                const geo = new THREE.BufferGeometry();
+                const pts = [];
+                for (let j = 0; j < lineSegments; j++) pts.push(new THREE.Vector3(0, 0, 0));
+                geo.setFromPoints(pts);
+                const mat = new THREE.LineBasicMaterial({ color: 0x00ffab, transparent: true, opacity: 0.3 });
+                const line = new THREE.Line(geo, mat);
+                lines.push({
+                    mesh: line,
+                    offset: Math.random() * Math.PI * 2,
+                    speed: 0.02 + Math.random() * 0.04,
+                    amplitude: 0.4 + Math.random() * 1.2,
+                    xPos: 0
+                });
+                scene.add(line);
+            }
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = Date.now() * 0.001;
+
+            // Anim Shield
+            shieldRing.scale.setScalar(1 + Math.sin(time * 2) * 0.05);
+            shieldRing.rotation.z += 0.005;
+
+            // Anim Spam (Funil)
+            const posAttr = spamSystem.geometry.attributes.position.array;
+            for (let i = 0; i < spamCount; i++) {
+                const p = spamPoints[i];
+                p.x += p.speed;
+                const pull = Math.pow(1 - Math.max(0, Math.min(1, (0 - p.x) / 6)), 2.5);
+                posAttr[i * 3] = p.x;
+                posAttr[i * 3 + 1] = p.y * pull;
+                posAttr[i * 3 + 2] = p.z * pull;
+                if (p.x > 0.5) p.x = -15 - Math.random() * 10;
+            }
+            spamSystem.geometry.attributes.position.needsUpdate = true;
+
+            // Anim Linhas Verdes
+            lines.forEach(l => {
+                const attr = l.mesh.geometry.attributes.position.array;
+                l.xPos += l.speed * 5;
+                if (l.xPos > 15) l.xPos = 0;
+                for (let j = 0; j < lineSegments; j++) {
+                    const sx = l.xPos - (j * 0.25);
+                    if (sx < 0) {
+                        attr[j * 3] = attr[j * 3 + 1] = attr[j * 3 + 2] = 0;
+                    } else {
+                        attr[j * 3] = sx;
+                        attr[j * 3 + 1] = Math.sin(sx * 0.5 + time + l.offset) * l.amplitude;
+                        attr[j * 3 + 2] = Math.cos(sx * 0.5 + time + l.offset) * l.amplitude;
+                    }
+                }
+                l.mesh.geometry.attributes.position.needsUpdate = true;
+                l.mesh.material.opacity = Math.max(0, 0.4 * (1 - l.xPos / 15));
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // --- TERMINAL LOGIC ---
+        let currentLog = 0;
+        function cycleLogs() {
+            const container = document.getElementById('terminal-content');
+            const logDivs = container.getElementsByTagName('div');
+            
+            for(let d of logDivs) d.classList.remove('active');
+            
+            logDivs[currentLog].classList.add('active');
+            currentLog = (currentLog + 1) % logDivs.length;
+        }
+
+        window.onload = () => {
+            init();
+            setInterval(cycleLogs, 2500);
+            cycleLogs();
+        };
+
+        window.onresize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+    </script>
+</body>
+</html>
