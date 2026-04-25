@@ -130,25 +130,20 @@ M+6  ━━ GATE: contrato pago fechado?
 
 ---
 
-## 7. Perguntas que o consultor provavelmente vai fazer
+## 7. FAQ Defensivo
 
-**P: "Por que vocês e não Helius constrói isso?"**
-R: Porque Helius já vende API key + plano fixo e vai canibalizar a própria receita ao oferecer pay-per-request. Para eles, nosso produto vira upsell *novo* (não substituto), e por isso licenciar é mais barato que construir e desviar foco. Mas só depois de termos 2-3 operadores menores como prova.
+O FAQ completo (~25 perguntas detalhadas, cobrindo mercado, tecnologia, negócio, time e cenários de risco) está em [`FAQ-DEFENSIVO.md`](./FAQ-DEFENSIVO.md). Para a reunião com consultor, levar impresso. Algumas das perguntas mais críticas:
 
-**P: "O que impede um Helius de copiar em 3 meses?"**
-R: O código sim, em 3 meses. **A rede de Trust-Score** não — ela depende de outros operadores participarem, e Helius é o último que consegue convencê-los a participar (são concorrentes diretos). Esse é exatamente nosso ângulo de neutralidade.
+- A.1 Por que vocês e não Helius constrói isso?
+- A.2 O que impede Helius de copiar em 3 meses?
+- A.3 Vocês competem com Jito ou MEV?
+- A.4 Se a Solana adicionar RPC priority na infra, vocês morrem?
+- B.1 Como funciona o Trust-Score tecnicamente?
+- B.5 E se o operador receber pagamento e não dar prioridade?
+- C.6 E se vocês falharem em fechar o primeiro contrato em 6 meses?
+- E.2 Em que ponto vocês desistem?
 
-**P: "Se a Solana adicionar RPC priority na infra, vocês morrem?"**
-R: Improvável em 18-24 meses (Solana foundation está focada em throughput de validador, não em layer de RPC). Mas mesmo se acontecer: o Trust-Score *cross-operador* é coisa que protocolo nativo não vai fazer porque depende de identidade de aplicação, não de chave on-chain. Conversão para "oracle de reputação" sobrevive ao cenário.
-
-**P: "Por que não open-source tudo e ganhar via consulting?"**
-R: Consulting não escala e não é defensável. Já analisamos como Opção 4 — vira porta de entrada (M+0 a M+3, abrir o spec) mas não modelo terminal. Trust-Score como SaaS escala linearmente em receita com adoção sublinear em custo.
-
-**P: "Qual o investimento que precisam pra Plano A funcionar?"**
-R: ~US$ 150-300k de pré-seed cobrem 12 meses: 1 dev sênior + 1 BD + infra + jurídico para os primeiros 3-5 contratos B2B. Plano B tem custo menor (~US$ 80-150k) mas teto menor.
-
-**P: "Por que o Colosseum deveria selecionar isso?"**
-R: Categoria de **Public Goods**: o spec aberto vira infra do ecossistema Solana, não só vencedor isolado. Diferente de MCPay/Latinum (que são apps), nosso impacto é horizontal — beneficia todo operador e todo agente. Se ganharmos, o prêmio acelera a abertura do spec, que acelera a adoção, que acelera nossa Opção 2.
+Termos técnicos usados em respostas estão definidos em [`GLOSSARIO.md`](./GLOSSARIO.md). Roteiro do pitch falado está em [`PITCH-SCRIPT-PT.md`](./PITCH-SCRIPT-PT.md).
 
 ---
 
