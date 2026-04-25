@@ -77,7 +77,11 @@ Menor risco financeiro imediato — o custo principal é o tempo de desenvolvime
 **Opção 5 — Gestor de reputação (Trust-Score-as-a-Service)**
 Modelo de SaaS de alta margem com efeito de rede: quanto mais operadores aderirem, mais valioso o score de cada agente. Os dados cross-operador formam um *data moat* difícil de replicar. O risco principal é o mercado ainda não existir — requer educação e adoção simultânea de múltiplos operadores para destravar valor.
 
-**Sequência recomendada:** Opção 4 primeiro (abre o protocolo, ganha credibilidade no ecossistema, custo quase zero) → Opção 2 em seguida (monetiza operadores com licença SaaS) → Opção 5 como segunda linha de receita recorrente assim que houver dois ou mais operadores no ar.
+**Plano A — caminho principal:** Opção 4 + 2 + 5 combinados. Spec do protocolo aberto (Opção 4) constrói credibilidade no ecossistema. Server licenciado como SaaS para operadores (Opção 2) gera receita recorrente. Trust-Score centralizado (Opção 5) é o moat que sustenta tudo — efeito de rede em dados cross-operador, difícil de replicar.
+
+**Plano B — fallback se contrato B2B não fechar em 6 meses:** Opção 1 focada em nicho. Operamos nosso próprio nó RPC, mas atendendo apenas arbitradores DeFi e liquidadores que já pagam US$ 1k–10k/mês por latência previsível. Capital reduzido vs. Opção 1 ampla, validação imediata sem depender de terceiros.
+
+**Barreira à cópia:** o código é open-source por design (gera adoção). O moat real são os dados — Trust-Score cross-operador acumula valor com cada novo operador conectado, e novo entrante começa com zero histórico. Detalhe na [estratégia interna](./ESTRATEGIA.md).
 
 ---
 
