@@ -101,6 +101,16 @@
 </main>
 
 <script>
+  // ─── API base ─ when served from the marketing domain (rpcpriority.com),
+  // the page is static (nginx); route API calls to the demo shield.
+  const API_BASE = (() => {
+    const h = location.hostname;
+    if (h.startsWith("x402") && h.endsWith(".rpcpriority.com")) return "";
+    if (h === "localhost" || h === "127.0.0.1") return "";
+    return "https://x402.rpcpriority.com";
+  })();
+  const api = (path) => API_BASE + path;
+
   const HEADER_EXPLAIN = {
     'x-x402-status':              { en: 'Status of the negotiation — "challenged" means: pay to proceed.' },
     'x-x402-payment-destination': { en: 'Solana wallet pubkey of the operator. Where the payment lands on-chain.' },
@@ -111,7 +121,8 @@
     'x-x402-nonce-ttl':           { en: 'Seconds until the nonce expires. Sign and submit fast.' },
   };
 
-  const CURL_HOST = location.protocol + '//' + location.host;
+  // For curl preview: show the actual shield host, not the marketing domain.
+  const CURL_HOST = API_BASE || (location.protocol + '//' + location.host);
   document.getElementById('curl-host').textContent = CURL_HOST;
   document.getElementById('copy-curl').onclick = () => {
     const cmd = `curl -i -X POST ${CURL_HOST}/rpc -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'`;
@@ -127,7 +138,7 @@
     btn.disabled = true;
     label.textContent = '⌛ Calling…';
     try {
-      const resp = await fetch('/rpc', {
+      const resp = await fetch(api('/rpc'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth', params: [] })

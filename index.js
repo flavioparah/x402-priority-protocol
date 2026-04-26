@@ -455,7 +455,30 @@ function x402Shield(req, res, next) {
 
 // ─── Aplicação Express ────────────────────────────────────────────────────────
 
+// CORS — permite que as páginas servidas em rpcpriority.com (nginx separado, IP
+// 72.62.136.169) chamem os endpoints /info, /health, /stats/*, /reputation/*
+// e /rpc deste shield. As páginas hospedadas pelo próprio shield continuam
+// funcionando via mesmo origin (caso onde CORS é no-op).
+//
+// Importante: expomos os headers X-x402-* na lista Allow-Expose-Headers para
+// que o JS do /try consiga ler o desafio 402 a partir de uma fetch cross-origin
+// (browsers escondem headers customizados em respostas cross-origin por default).
+
 const app = express();
+
+// CORS middleware — must come BEFORE all routes so preflight OPTIONS resolves
+// without falling into the /rpc proxy.
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-x402-Agent-Pubkey");
+  res.setHeader(
+    "Access-Control-Expose-Headers",
+    "X-x402-Status, X-x402-Payment-Destination, X-x402-Amount, X-x402-Amount-Base, X-x402-Trust-Score, X-x402-Nonce, X-x402-Nonce-TTL"
+  );
+  if (req.method === "OPTIONS") return res.status(204).end();
+  next();
+});
 
 // NB: do NOT mount express.json() globally — it consumes the request body,
 // which breaks http-proxy-middleware for /rpc (upstream times out waiting for

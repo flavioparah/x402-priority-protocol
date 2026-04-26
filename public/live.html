@@ -145,6 +145,17 @@
 </main>
 
 <script>
+  // ─── API base ─ when served from the marketing domain (rpcpriority.com),
+  // the page is static (nginx) and has no backend; route API calls to the
+  // demo shield. When served by the shield itself, use relative URLs.
+  const API_BASE = (() => {
+    const h = location.hostname;
+    if (h.startsWith("x402") && h.endsWith(".rpcpriority.com")) return "";
+    if (h === "localhost" || h === "127.0.0.1") return "";
+    return "https://x402.rpcpriority.com";
+  })();
+  const api = (path) => API_BASE + path;
+
   // ─── helpers ─────────────────────────────────────────────────────────────
   const $ = (s) => document.querySelector(s);
   const trunc = (k) => k ? k.slice(0, 4) + '…' + k.slice(-4) : '—';
@@ -159,7 +170,7 @@
 
   // ─── /info (one-shot at boot) ────────────────────────────────────────────
   let SHIELD_INFO = null;
-  fetch('/info').then(r => r.json()).then(info => {
+  fetch(api('/info')).then(r => r.json()).then(info => {
     SHIELD_INFO = info;
     const netEl = $('#network-label');
     netEl.textContent = info.network;
@@ -172,7 +183,7 @@
   // ─── /health every 2s ────────────────────────────────────────────────────
   async function tickHealth() {
     try {
-      const h = await fetch('/health').then(r => r.json());
+      const h = await fetch(api('/health')).then(r => r.json());
       const load = parseFloat(h.load);
       $('#kpi-load').textContent = (load * 100).toFixed(0) + '%';
       $('#kpi-rps').textContent = h.rps;
@@ -186,7 +197,7 @@
   let chart = null;
   async function tickStats() {
     try {
-      const s = await fetch('/stats/recent').then(r => r.json());
+      const s = await fetch(api('/stats/recent')).then(r => r.json());
 
       $('#kpi-payments').textContent = s.totals.total_payments_session;
       $('#kpi-unique-pubkeys').textContent = s.totals.unique_paying_pubkeys;
@@ -268,7 +279,7 @@
   // ─── /stats/leaderboard every 30s ────────────────────────────────────────
   async function tickLeaderboard() {
     try {
-      const s = await fetch('/stats/leaderboard').then(r => r.json());
+      const s = await fetch(api('/stats/leaderboard')).then(r => r.json());
       const tb = $('#leaderboard-body');
       if (s.leaderboard.length === 0) {
         tb.innerHTML = '<tr><td colspan="7" class="text-white/40 text-center py-6">no agents yet</td></tr>';
