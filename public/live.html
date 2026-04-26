@@ -96,6 +96,44 @@
     </div>
   </section>
 
+  <!-- QoS dispatcher panel -->
+  <section class="card-glass p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm uppercase tracking-widest text-white/60 flex items-center gap-2">
+        QoS Priority Queue <span class="live-dot"></span>
+        <span id="qos-mode-badge" class="ml-2 px-2 py-0.5 rounded text-[10px] mono uppercase tracking-widest border">—</span>
+      </h2>
+      <span class="text-xs text-white/40">paid agents jump the line under contention</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div>
+        <div class="text-xs text-white/50 uppercase tracking-widest">Queue depth</div>
+        <div class="text-2xl font-extrabold mono mt-1" id="qos-queue-depth">—</div>
+        <div class="text-[10px] text-white/40 mt-1">cap <span id="qos-max-queue">—</span></div>
+      </div>
+      <div>
+        <div class="text-xs text-white/50 uppercase tracking-widest">In flight</div>
+        <div class="text-2xl font-extrabold mono mt-1"><span id="qos-inflight">—</span><span class="text-white/40">/<span id="qos-max-inflight">—</span></span></div>
+        <div class="w-full h-1.5 bg-white/10 rounded mt-1.5 overflow-hidden"><div id="qos-util-bar" class="h-full bg-gradient-to-r from-purple-500 to-green-400 transition-all" style="width:0"></div></div>
+      </div>
+      <div>
+        <div class="text-xs text-white/50 uppercase tracking-widest">Wait p95</div>
+        <div class="text-2xl font-extrabold mono mt-1"><span id="qos-wait-p95">—</span><span class="text-white/40 text-base"> ms</span></div>
+        <div class="text-[10px] text-white/40 mt-1">p99 <span id="qos-wait-p99">—</span> ms</div>
+      </div>
+      <div>
+        <div class="text-xs text-white/50 uppercase tracking-widest">Settled</div>
+        <div class="text-2xl font-extrabold mono mt-1" id="qos-settled">—</div>
+        <div class="text-[10px] text-white/40 mt-1"><span id="qos-bypassed">—</span> bypass · <span id="qos-dispatched">—</span> queued</div>
+      </div>
+      <div>
+        <div class="text-xs text-white/50 uppercase tracking-widest">Rejected</div>
+        <div class="text-2xl font-extrabold mono mt-1 text-orange-300"><span id="qos-rejected">—</span></div>
+        <div class="text-[10px] text-white/40 mt-1"><span id="qos-rej-overflow">—</span> overflow · <span id="qos-rej-timeout">—</span> timeout</div>
+      </div>
+    </div>
+  </section>
+
   <!-- Load chart -->
   <section class="card-glass p-6">
     <div class="flex items-center justify-between mb-4">
@@ -276,6 +314,34 @@
     } catch (_) {}
   }
 
+  // ─── /stats/qos every 2s (alongside /health) ─────────────────────────────
+  async function tickQos() {
+    try {
+      const q = await fetch(api('/stats/qos')).then(r => r.json());
+      $('#qos-queue-depth').textContent = q.queue_depth;
+      $('#qos-max-queue').textContent = q.max_queue_depth;
+      $('#qos-inflight').textContent = q.in_flight;
+      $('#qos-max-inflight').textContent = q.max_inflight;
+      $('#qos-util-bar').style.width = (q.utilization * 100).toFixed(0) + '%';
+      $('#qos-wait-p95').textContent = q.wait_p95_ms;
+      $('#qos-wait-p99').textContent = q.wait_p99_ms;
+      $('#qos-settled').textContent = q.total_settled.toLocaleString();
+      $('#qos-bypassed').textContent = q.bypassed_total.toLocaleString();
+      $('#qos-dispatched').textContent = q.dispatched_total.toLocaleString();
+      const rejected = q.rejected_overflow_total + q.rejected_timeout_total;
+      $('#qos-rejected').textContent = rejected.toLocaleString();
+      $('#qos-rej-overflow').textContent = q.rejected_overflow_total;
+      $('#qos-rej-timeout').textContent = q.rejected_timeout_total;
+      const badge = $('#qos-mode-badge');
+      badge.textContent = q.mode;
+      badge.className = 'ml-2 px-2 py-0.5 rounded text-[10px] mono uppercase tracking-widest border ' + (
+        q.mode === 'standalone' ? 'border-purple-400/50 text-purple-300' :
+        q.mode === 'cooperative' ? 'border-green-400/50 text-green-300' :
+        'border-white/30 text-white/50'
+      );
+    } catch (_) {}
+  }
+
   // ─── /stats/leaderboard every 30s ────────────────────────────────────────
   async function tickLeaderboard() {
     try {
@@ -302,8 +368,9 @@
   }
 
   // ─── boot + intervals ────────────────────────────────────────────────────
-  tickHealth(); tickStats(); tickLeaderboard();
+  tickHealth(); tickQos(); tickStats(); tickLeaderboard();
   setInterval(tickHealth, 2000);
+  setInterval(tickQos, 2000);
   setInterval(tickStats, 5000);
   setInterval(tickLeaderboard, 30000);
 </script>

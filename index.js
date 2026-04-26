@@ -57,6 +57,24 @@ const CONFIG = {
   // based on the caller's claim, without on-chain verification. Exists so
   // tests and benchmarks don't need to transact on Solana. Off by default.
   TRUST_DEPOSITS: process.env.ESCROW_TRUST_DEPOSITS === "1" || process.env.ESCROW_TRUST_DEPOSITS === "true",
+
+  // ─── QoS Path A: standalone priority queue + rate-limited dispatcher ────────
+  // Independent of operator adoption (cooperative QoS lives in a separate
+  // header-based protocol; see docs/TRUST-SCORE-RFC-DRAFT.md companion spec).
+  //
+  // Behavior:
+  //   - Below QOS_BYPASS_THRESHOLD utilization: fast-path, no queueing.
+  //   - Above threshold: requests inserted in a priority queue, ordered by
+  //     `effectiveScore = (verifiedAmount + verifiedTrustScore * 100) + ageMs/50`.
+  //     Aging boost prevents starvation of low-priority requests under sustained load.
+  //   - Cap on concurrent in-flight upstream requests prevents saturating the node.
+  //   - Backpressure: queue length > QOS_MAX_QUEUE_DEPTH → 503; per-request
+  //     waiting > QOS_QUEUE_TIMEOUT_MS → 504.
+  QOS_MAX_INFLIGHT: parseInt(process.env.QOS_MAX_INFLIGHT || "100"),
+  QOS_MAX_QUEUE_DEPTH: parseInt(process.env.QOS_MAX_QUEUE_DEPTH || "1000"),
+  QOS_QUEUE_TIMEOUT_MS: parseInt(process.env.QOS_QUEUE_TIMEOUT_MS || "10000"),
+  QOS_BYPASS_THRESHOLD: parseFloat(process.env.QOS_BYPASS_THRESHOLD || "0.5"),
+  QOS_MODE: process.env.QOS_MODE || "standalone",  // "standalone" | "cooperative" | "off"
 };
 
 // ─── Estado em memória (substitua por Redis em produção) ──────────────────────
@@ -141,6 +159,133 @@ const challengeLog = [];
 const paymentLog = [];
 /** @type {Array<{ts:number, load:number, rps:number}>} */
 const loadHistory = [];
+
+// ─── QoS Path A — standalone priority queue + dispatcher ──────────────────────
+// Each entry: { req, res, next, score, enqueuedAt, timeoutId }
+/** @type {Array<{req:any, res:any, next:Function, score:number, enqueuedAt:number, timeoutId:any}>} */
+const qosQueue = [];
+let qosInFlight = 0;
+const qosStats = {
+  dispatched_total: 0,
+  bypassed_total: 0,
+  rejected_overflow_total: 0,
+  rejected_timeout_total: 0,
+  wait_samples: [],  // last 200 wait times in ms (only for queued requests)
+};
+
+function qosBaseScore(req) {
+  // Score from the verified payment if present; fallback 0 (free pass — back of queue).
+  const v = req.x402Verified;
+  if (!v) return 0;
+  return (v.amount || 0) + (v.score || 0) * 100;
+}
+
+function qosEffectiveScore(entry) {
+  // Aging boost: +1 every 50ms. Prevents starvation of older entries under sustained pressure.
+  return entry.score + (Date.now() - entry.enqueuedAt) / 50;
+}
+
+function qosOnSlotFree() {
+  // Pop highest-effective-score entry (linear scan; queue is small).
+  while (qosInFlight < CONFIG.QOS_MAX_INFLIGHT && qosQueue.length > 0) {
+    let bestIdx = 0;
+    let bestScore = qosEffectiveScore(qosQueue[0]);
+    for (let i = 1; i < qosQueue.length; i++) {
+      const s = qosEffectiveScore(qosQueue[i]);
+      if (s > bestScore) { bestScore = s; bestIdx = i; }
+    }
+    const entry = qosQueue.splice(bestIdx, 1)[0];
+    if (entry.timeoutId) clearTimeout(entry.timeoutId);
+
+    const waitMs = Date.now() - entry.enqueuedAt;
+    qosStats.wait_samples.push(waitMs);
+    if (qosStats.wait_samples.length > 200) qosStats.wait_samples.shift();
+
+    qosInFlight++;
+    qosStats.dispatched_total++;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      qosInFlight--;
+      qosOnSlotFree();
+    };
+    entry.res.once("finish", release);
+    entry.res.once("close", release);
+    try { entry.next(); } catch (e) { release(); throw e; }
+  }
+}
+
+function qosMiddleware(req, res, next) {
+  if (CONFIG.QOS_MODE === "off") return next();
+
+  // Cooperative mode: don't queue locally; forward priority hint to operator.
+  // (Reference implementation; activates when operator partner integrates.)
+  if (CONFIG.QOS_MODE === "cooperative") {
+    req.headers["x-priority-score"] = String(qosBaseScore(req));
+    req.headers["x-qos-spec-version"] = "1";
+    return next();
+  }
+
+  // Standalone mode: bypass when low contention (preserves the 8.7ms p95).
+  if (qosInFlight < CONFIG.QOS_MAX_INFLIGHT * CONFIG.QOS_BYPASS_THRESHOLD) {
+    qosStats.bypassed_total++;
+    qosInFlight++;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      qosInFlight--;
+      qosOnSlotFree();
+    };
+    res.once("finish", release);
+    res.once("close", release);
+    return next();
+  }
+
+  // High contention: queue with overflow protection.
+  if (qosQueue.length >= CONFIG.QOS_MAX_QUEUE_DEPTH) {
+    qosStats.rejected_overflow_total++;
+    return res.status(503).json({
+      error: "QoS queue full",
+      code: 503,
+      queue_depth: qosQueue.length,
+      retry_after_seconds: 1,
+    });
+  }
+
+  const entry = {
+    req, res, next,
+    score: qosBaseScore(req),
+    enqueuedAt: Date.now(),
+    timeoutId: null,
+  };
+  qosQueue.push(entry);
+
+  entry.timeoutId = setTimeout(() => {
+    const idx = qosQueue.indexOf(entry);
+    if (idx >= 0) {
+      qosQueue.splice(idx, 1);
+      qosStats.rejected_timeout_total++;
+      if (!res.headersSent) {
+        res.status(504).json({
+          error: "QoS queue timeout",
+          code: 504,
+          waited_ms: Date.now() - entry.enqueuedAt,
+        });
+      }
+    }
+  }, CONFIG.QOS_QUEUE_TIMEOUT_MS);
+
+  // Try to drain immediately (in case there's already capacity).
+  qosOnSlotFree();
+}
+
+function qosPercentile(sorted, q) {
+  if (sorted.length === 0) return 0;
+  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * q));
+  return sorted[idx];
+}
 
 function pruneRequestTimestamps(now = Date.now()) {
   const cutoff = now - CONFIG.LOAD_WINDOW_MS;
@@ -606,6 +751,32 @@ app.get("/stats/recent", (req, res) => {
   });
 });
 
+// QoS dispatcher state — for the /live dashboard QoS card.
+app.get("/stats/qos", (req, res) => {
+  const sorted = [...qosStats.wait_samples].sort((a, b) => a - b);
+  const total_settled = qosStats.dispatched_total + qosStats.bypassed_total;
+  const utilization = qosInFlight / Math.max(1, CONFIG.QOS_MAX_INFLIGHT);
+  res.json({
+    mode: CONFIG.QOS_MODE,
+    queue_depth: qosQueue.length,
+    in_flight: qosInFlight,
+    max_inflight: CONFIG.QOS_MAX_INFLIGHT,
+    max_queue_depth: CONFIG.QOS_MAX_QUEUE_DEPTH,
+    queue_timeout_ms: CONFIG.QOS_QUEUE_TIMEOUT_MS,
+    utilization: parseFloat(utilization.toFixed(3)),
+    bypass_threshold: CONFIG.QOS_BYPASS_THRESHOLD,
+    dispatched_total: qosStats.dispatched_total,
+    bypassed_total: qosStats.bypassed_total,
+    total_settled,
+    rejected_overflow_total: qosStats.rejected_overflow_total,
+    rejected_timeout_total: qosStats.rejected_timeout_total,
+    wait_p50_ms: qosPercentile(sorted, 0.5),
+    wait_p95_ms: qosPercentile(sorted, 0.95),
+    wait_p99_ms: qosPercentile(sorted, 0.99),
+    wait_samples_count: sorted.length,
+  });
+});
+
 // Top 10 by Trust-Score for the leaderboard widget.
 app.get("/stats/leaderboard", (req, res) => {
   const top = [...reputation.entries()]
@@ -646,6 +817,7 @@ const upstreamAgent = upstreamIsHttps
 app.use(
   "/rpc",
   x402Shield,
+  qosMiddleware,
   createProxyMiddleware({
     target: CONFIG.REAL_RPC_URL,
     changeOrigin: true,
