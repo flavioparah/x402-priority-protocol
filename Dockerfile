@@ -12,6 +12,9 @@ RUN npm ci --omit=dev
 # ship with the source for humans, not with the container.
 COPY index.js ./
 
+# Persistence layer (lib/store.js — InMemoryStore + RedisStore).
+COPY lib/ ./lib/
+
 # Public dashboard pages (/live, /try, /explorer + landing page).
 # Served by Express via express.static('public').
 COPY public/ ./public/
