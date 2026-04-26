@@ -239,7 +239,7 @@ Termos técnicos usados em respostas estão definidos em [`GLOSSARIO.md`](./GLOS
 | Pessoa | Responsabilidade primária |
 |---|---|
 | **Flávio (CEO)** | Outreach a operadores, fechamento de pilotos, fundraising |
-| **João (CTO)** | Spec, Trust-Score backend, qualidade técnica das integrações |
+| **João (CTO)** | Spec, Trust-Score backend, qualidade técnica das integrações, autor + maintainer dos RFCs x402-priority + x402-trust-score + x402-qos-cooperative |
 | **Felipe (DPO)** | Compliance, legal de contratos B2B, governança do RFC aberto |
 
 **Decisão crítica em consenso:** ativação do Plano B é decisão dos três fundadores em M+3 (gate comprimido). Ativação do Plano C (aquisição) é decisão dos três fundadores a qualquer momento.
@@ -300,3 +300,73 @@ Três cenários ativam **modo sprint** — todos os recursos canalizados para fe
 ---
 
 **Próxima revisão deste documento:** M+1 (após primeiro outreach completo) ou no caso de mudança material no contexto (concorrente lança produto similar, Solana publica RFC nativo, Colosseum classifica em finalistas).
+
+---
+
+## 12. Tier expansion — de "RPC priority middleware" para "trust layer for AI agents"
+
+> **Princípio de framing:** expandir a narrativa conforme a execução confirma a tese, não vender o Tier 4 hoje.
+
+### Tiers em uma tabela
+
+| Tier | Capacidade | Audiência VC | Ticket pitch |
+|---|---|---|---|
+| 1 (hoje) | Single-operator pricing discount | Pré-seed | US$ 150-300k |
+| 2 (M+6) | Cross-operator reputation, sybil/fraud signals | Seed expansão | US$ 1-3M |
+| 3 (M+12-24) | Trust-Score-as-a-Service (lending, insurance, marketplace) | Series A | US$ 5-15M |
+| 4 (M+24+) | Universal AI agent passport cross-chain | Series B+ | US$ 25-50M+ |
+
+### Diagrama das camadas
+
+```text
+Tier 4  Universal AI agent passport cross-chain
+   |
+Tier 3  Trust-Score-as-a-Service
+   |
+Tier 2  Cross-operator reputation oracle
+   |
+Tier 1  Single-operator pricing discount
+```
+
+### Pitch evolution
+
+- **Tier 1, pré-seed:** vendemos o desconto por prioridade e a redução de spam no RPC.
+- **Tier 2, seed expansão:** vendemos reputação cross-operator, antifraude e sinais de sybil.
+- **Tier 3, Series A:** vendemos score de agente para lending, insurance e marketplace.
+- **Tier 4, Series B+:** vendemos identidade e reputação portátil cross-chain.
+
+### Leitura estratégica
+
+O produto já começou em Tier 1 porque é onde o cliente paga mais rápido e onde a dor é concreta. A visão, porém, é maior: a mesma infraestrutura vira a camada de confiança da economia de agentes IA na Solana e, depois, fora dela. O erro seria vender Tier 4 antes de provar Tier 1, 2 e 3 com dados.
+
+---
+
+## 13. QoS dual-track — standalone production + cooperative spec
+
+### Path A: standalone
+
+- Fila de prioridade + dispatcher rate-limited dentro do shield.
+- Implementação interna, sem dependência de adoção externa.
+- Ship em aproximadamente 2 semanas.
+- Deploy nos 3 shields de produção.
+
+### Path B: cooperative
+
+- RFC spec + interface flag-based pronta para integrar com o stack do operador parceiro.
+- Spec ready-to-ship.
+- Operador parceiro integra em 2-3 dias quando aceitar piloto.
+
+### Por que os dois
+
+- Path A evita dependência de terceiros e valida valor em produção.
+- Path B acelera negociação do Plano A porque reduz atrito de integração.
+- Os dois juntos criam prova técnica e prova comercial ao mesmo tempo.
+
+### Sequência de execução
+
+- **Semana 1-2:** Path A em produção.
+- **Semana 3:** Path B com spec, switch e reference implementation.
+
+### Conexão com Redis
+
+O passo natural de evolução é sair da fila em memória para `ZADD` em Redis Sorted Set quando a migração exigir coordenação mais forte entre múltiplos workers ou instâncias. Isso mantém a semântica de prioridade sem reescrever a política de despacho.

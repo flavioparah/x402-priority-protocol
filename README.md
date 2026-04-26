@@ -1,6 +1,10 @@
 # x402-shield
 
-**HTTP 402 priority gate for Solana RPC nodes.** Turn spam defense into revenue. Give paying agents a fast lane without IP whitelists or API keys.
+**HTTP 402 priority gate for Solana RPC nodes** — entry point to the
+**Trust Layer for AI agents on Solana**. Turn spam defense into revenue;
+build cross-operator reputation that compounds with every paid request.
+
+> *"It's not an error — it's an automated economic negotiation."*
 
 > *"It's not an error — it's an automated economic negotiation."*
 

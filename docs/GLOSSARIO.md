@@ -304,6 +304,27 @@ Implementação de teste com cliente, geralmente curta (30–90 dias) e com term
 
 **Implicação tática:** o moat **não depende de Jito não construir**. Depende de termos **3+ operadores integrados antes** de qualquer concorrente decidir competir. Nesse ponto, eles preferem comprar a construir.
 
+### Agent credit score
+Equivalente do "credit score" de pessoa física, mas pra agentes AI. Score baseado em histórico de pagamentos, Trust-Score acumulado e padrões comportamentais. Conceito Tier 3 do nosso roadmap — vender o score pra plataformas de lending DeFi (Solend, MarginFi, Kamino) que poderiam usar como sinal pra empréstimo subcolateralizado a agentes top-tier.
+
+### Cooperative QoS
+Modelo de Quality of Service onde o shield envia "priority hint" no header (`X-Priority-Score`) e o operador do nó RPC implementa fila prioritária no próprio stack. Requer integração do operador parceiro (mais lenta, mais profunda). Oposto: Standalone QoS.
+
+### KYC-light
+Sinal de "behavior history" usado como complemento — não substituto — à KYC tradicional. Trust-Score com histórico de meses/anos de pagamentos limpos é proxy de "agente legítimo, não funding ilícito". Útil pra operadores em jurisdições com MiCA/GDPR que querem sinal extra de qualidade do cliente sem fazer KYC formal.
+
+### QoS scheduler
+Quality of Service scheduler — fila ordenada por prioridade (preço, score) que decide a ordem de despache de requisições. Diferente de gating (passa/bloqueia binário). Em mercados com escassez (Ethereum gas, Solana RPC sob carga), QoS = "mercado eficiente"; gating = "exclusão econômica".
+
+### Standalone QoS
+Modelo onde o próprio shield mantém a fila prioritária internamente, antes de despachar pro upstream. Não depende de adoção do operador. Adiciona latência sob alta contenção mas garante ordem por preço. Oposto: Cooperative QoS.
+
+### Tier (Tier 1/2/3/4)
+Estágios da expansão estratégica do produto. Tier 1 = single-operator pricing discount (hoje). Tier 2 = cross-operator reputation oracle (Plano A maduro). Tier 3 = Trust-Score-as-a-Service (lending/insurance/marketplace). Tier 4 = universal AI agent passport cross-chain. Cada Tier tem audiência VC e ticket de captação distintos.
+
+### Universal AI agent passport
+Visão Tier 4: mesma chave Ed25519 (formato Solana) acumula Trust-Score cross-chain. Agente verificado em Solana traz reputação pra Base, Ethereum, Sui, Aptos, NEAR — qualquer chain compatível com Ed25519 ou que aceite atestados via bridge. Identidade reusável da economia de agentes AI.
+
 ### Public Goods (categoria do Colosseum)
 Categoria do hackathon Colosseum dedicada a projetos cuja maior contribuição é abrir infraestrutura comum pro ecossistema, em vez de capturar valor sozinho. **Estamos nos posicionando aqui** porque o spec x402-priority aberto vira infra de toda Solana.
 

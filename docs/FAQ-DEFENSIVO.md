@@ -590,7 +590,48 @@ Se Jito ou Helius announce produto similar com tração visível em qualquer mom
 
 ---
 
-### D.6 Quão crítica é a janela do x402? O que muda se Solana Foundation publicar RFC nativo amanhã?
+### D.6 Qual a visão de longo prazo? Onde isso vai parar?
+
+**Resposta curta:** RPC priority é o caso de uso de entrada (Tier 1). A visão é virar a **camada de confiança da economia de agentes IA** — o "Equifax dos agentes AI" — expandindo via lending, insurance, marketplaces e, por fim, identidade cross-chain.
+
+**Resposta longa:** a expansão acontece em quatro Tiers.
+
+- **Tier 1:** desconto por prioridade para um operador, onde já estamos hoje.
+- **Tier 2:** dashboards cross-operator de reputação, sybil e fraude, usados por múltiplos operadores.
+- **Tier 3:** Trust-Score-as-a-Service para lending e marketplace. Ex.: Solend, MarginFi ou Kamino usando score para empréstimo subcolateralizado; MCPay ou Latinum usando score como gating de acesso.
+- **Tier 4:** passaporte universal cross-chain. A mesma chave Ed25519 acumula reputação fora da Solana, trazendo identidade reutilizável para Base, Ethereum, Sui, Aptos e NEAR quando a ponte ou o atestado fizer sentido.
+
+**Honestidade comercial:** vendemos Tier 1 hoje, mencionamos Tier 2-4 como roadmap visível e executamos com Redis + spec + cross-op nas próximas 8-9 semanas. Não over-promise.
+
+---
+
+### D.7 Trust-Score é só uma feature ou pode ser produto?
+
+**Resposta curta:** é o produto inteiro. RPC priority é o caso de uso onde a gente vende primeiro.
+
+**Resposta longa:** a Trust-Score desempenha simultaneamente sete papéis.
+
+1. Pricing primitive hoje.
+2. Reputation oracle no Plano A.
+3. Anti-abuse signal contra sybil, fraude e churn cross-op.
+4. Network effect engine, porque mais operadores aumentam o valor da rede.
+5. Switching cost generator, porque operador integrado passa a depender do dataset.
+6. Standard authority, porque quem escreve e mantém RFC vira referência.
+7. Trust layer da economia de agentes.
+
+Paralelo útil: Delta Air Lines vale US$ 25B. SkyMiles foi avaliado em US$ 26B em 2020. Em alguns negócios, o programa de fidelidade vale mais que a operação principal. A Trust-Score pode seguir a mesma lógica e valer mais que a operação de RPC priority.
+
+---
+
+### D.8 E QoS? Vocês fazem prioridade real ou só gating?
+
+**Resposta curta:** hoje é gating; em 2-3 semanas entregamos QoS standalone com priority queue interna em produção; em paralelo, o spec cooperativo deixa pronta a integração com operador parceiro.
+
+**Resposta longa:** o dual-track resolve dois problemas diferentes. O standalone QoS prova o valor empiricamente sem depender de ninguém. O cooperative QoS é o caminho mais forte estrategicamente, porque entra dentro do stack do operador e cria aderência maior, mas não pode travar a execução. Em outras palavras: primeiro mostramos que a política de prioridade funciona sozinhos, depois levamos a mesma semântica para o operador que topar integrar.
+
+---
+
+### D.9 Quão crítica é a janela do x402? O que muda se Solana Foundation publicar RFC nativo amanhã?
 
 **Resposta:** se acontecer amanhã, viramos os candidatos óbvios pra implementar a referência — porque já temos 6+ meses de produção e medições.
 
