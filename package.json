@@ -12,7 +12,9 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node test/smoke.js",
-    "test:smoke": "node test/smoke.js"
+    "test:smoke": "node test/smoke.js",
+    "test:cooperative-qos": "npm run build && node test/cooperative-qos.test.js",
+    "operator:reference": "node examples/operator-qos-reference.js"
   },
   "dependencies": {
     "@solana/web3.js": "^1.91.0",

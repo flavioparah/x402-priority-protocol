@@ -170,6 +170,12 @@ Reputation ledger per pubkey. Agents hint their pubkey via `X-x402-Agent-Pubkey`
 **Week 3 — Moat**
 Open-source protocol spec and reference implementations. Build a network of RPC operator partners (Helius, Triton, Jito) for whom this is a drop-in revenue layer.
 
+**Week 4+ — QoS Path A (shipped)**
+Standalone priority queue + rate-limited dispatcher inside the Shield. Higher-paying / higher-Trust-Score requests jump the line under contention. Bypasses the queue when load is low — preserves the 8.7 ms p95 overhead. See `qosMiddleware` in `index.js`. Live metrics at `/stats/qos`, visualized in `/live` dashboard.
+
+**Week 4+ — QoS Path B (spec ready)**
+Cooperative QoS subprotocol — Shield forwards `X-Priority-Score` + `X-QoS-Spec-Version` headers to the operator's RPC stack so operator's own scheduler can honor priority directly. Spec in [`docs/QOS-COOPERATIVE-SPEC.md`](./docs/QOS-COOPERATIVE-SPEC.md). Operator-side reference implementation in [`examples/operator-qos-reference.js`](./examples/operator-qos-reference.js) (~80 lines). Integration test: `npm run test:cooperative-qos`. Activates with `QOS_MODE=cooperative` once an operator partner integrates (~3 days of operator work).
+
 ---
 
 ## KPIs
