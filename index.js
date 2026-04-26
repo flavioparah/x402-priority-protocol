@@ -58,6 +58,12 @@ const CONFIG = {
   // tests and benchmarks don't need to transact on Solana. Off by default.
   TRUST_DEPOSITS: process.env.ESCROW_TRUST_DEPOSITS === "1" || process.env.ESCROW_TRUST_DEPOSITS === "true",
 
+  // Operator identity used to tag attestations for cross-operator detection
+  // (sybil/fraud signals in lib/detection.js). Defaults to "self" — when a
+  // 2nd operator joins the broker, each sets a unique OPERATOR_ID and
+  // distinctOperators(attestations).size >= 2 unlocks cross-op signals.
+  OPERATOR_ID: process.env.OPERATOR_ID || "self",
+
   // ─── QoS Path A: standalone priority queue + rate-limited dispatcher ────────
   // Independent of operator adoption (cooperative QoS lives in a separate
   // header-based protocol; see docs/TRUST-SCORE-RFC-DRAFT.md companion spec).
@@ -88,6 +94,10 @@ const ipCounters = new Map();
 // to Redis when REDIS_URL is set. See lib/store.js for both implementations.
 const { createStore } = require("./lib/store");
 const store = createStore();
+
+// Sybil / fraud / churn detection over the per-pubkey attestation log.
+// Signals are computed lazily at /reputation/:pubkey query time.
+const { computeRisk } = require("./lib/detection");
 
 /**
  * Lazily-initialized Solana Connection used to verify deposit transactions.
@@ -388,8 +398,17 @@ async function verifyDepositTx(signature) {
 async function recordPayment(pubkeyB58, amount) {
   const updated = await store.recordPayment(pubkeyB58, amount);
   const score = Math.min(100, updated.paidCount * 5);
-  paymentLog.push({ ts: Date.now(), pubkey: pubkeyB58, amount, score });
+  const now = Date.now();
+  paymentLog.push({ ts: now, pubkey: pubkeyB58, amount, score });
   if (paymentLog.length > 100) paymentLog.shift();
+  // Per-pubkey attestation log — feeds the sybil/fraud detection engine.
+  // Tagged with our operator_id so cross-op signals activate when the broker
+  // sees attestations from another operator with a different OPERATOR_ID.
+  await store.pushAttestation(pubkeyB58, {
+    ts: now,
+    amount,
+    operator_id: CONFIG.OPERATOR_ID,
+  });
 }
 
 /** Verifica se o IP excedeu o limite de requisições. */
@@ -670,12 +689,16 @@ if (CONFIG.TRUST_DEPOSITS) {
   });
 }
 
-// Endpoint de consulta de reputação (Trust-Score)
+// Endpoint de consulta de reputação (Trust-Score) + risk classification
 app.get("/reputation/:pubkey", async (req, res) => {
   const pubkey = req.params.pubkey;
-  const rec = await store.getReputation(pubkey);
+  const [rec, attestations] = await Promise.all([
+    store.getReputation(pubkey),
+    store.getAttestations(pubkey, 100),
+  ]);
   const score = await getTrustScore(pubkey);
   const nextDiscountPrice = applyTrustDiscount(CONFIG.MAX_PRICE_MICRO_LAMPORTS, score);
+  const risk = computeRisk(attestations, rec);
   res.json({
     pubkey,
     trust_score: score,
@@ -685,6 +708,10 @@ app.get("/reputation/:pubkey", async (req, res) => {
     last_paid_at: rec ? rec.lastPaidAt : null,
     current_discount_percent: score / 2,
     example_price_at_max_load: nextDiscountPrice,
+    sybil_risk: risk.sybil_risk,
+    fraud_flags: risk.fraud_flags,
+    churn_pattern: risk.churn_pattern,
+    attestations_observed: attestations.length,
   });
 });
 

@@ -14,6 +14,7 @@
     "test": "npm run build && node test/smoke.js",
     "test:smoke": "node test/smoke.js",
     "test:cooperative-qos": "npm run build && node test/cooperative-qos.test.js",
+    "test:detection": "node test/detection.test.js",
     "operator:reference": "node examples/operator-qos-reference.js"
   },
   "dependencies": {
