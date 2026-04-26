@@ -42,7 +42,7 @@ services:
       - redis-devnet
     environment:
       PORT: 3000
-      REDIS_URL: redis://redis-devnet:6379
+      REDIS_URL: redis://x402-redis-devnet:6379
       REAL_RPC_URL: https://api.devnet.solana.com
       SOLANA_RPC_URL: https://api.devnet.solana.com
       PAYMENT_DESTINATION: ${PAYMENT_DESTINATION_DEVNET:-${PAYMENT_DESTINATION}}

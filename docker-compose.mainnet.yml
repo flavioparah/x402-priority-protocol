@@ -40,7 +40,7 @@ services:
       - redis-mainnet
     environment:
       PORT: 3000
-      REDIS_URL: redis://redis-mainnet:6379
+      REDIS_URL: redis://x402-redis-mainnet:6379
       REAL_RPC_URL: https://api.mainnet-beta.solana.com
       SOLANA_RPC_URL: https://api.mainnet-beta.solana.com
       PAYMENT_DESTINATION: ${PAYMENT_DESTINATION_MAINNET}
