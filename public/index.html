@@ -85,14 +85,22 @@
             </svg>
             <span>RPC <span class="text-[#14F195]">PRIORITY</span></span>
         </div>
-        <div class="hidden md:flex space-x-8 text-sm mono font-medium opacity-70">
+        <div class="hidden md:flex items-center space-x-7 text-sm mono font-medium opacity-70">
             <a href="#problem" class="hover:opacity-100 transition">Problem</a>
             <a href="#solution" class="hover:opacity-100 transition">Solution</a>
             <a href="#stats" class="hover:opacity-100 transition">Data</a>
-            <a href="#docs" class="hover:opacity-100 transition">Docs</a>
+            <span class="opacity-30">|</span>
+            <a href="/live" class="hover:opacity-100 transition flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-[#14F195] animate-pulse"></span>
+                Live
+            </a>
+            <a href="/try" class="hover:opacity-100 transition">Try it</a>
+            <a href="/explorer" class="hover:opacity-100 transition">Explorer</a>
+            <a href="https://github.com/flavioparah/x402-priority-protocol" target="_blank" rel="noopener" class="hover:opacity-100 transition">GitHub</a>
         </div>
-        <a href="#pilot" class="bg-white text-black px-5 py-2 rounded-full text-sm font-bold hover:bg-[#14F195] transition duration-300">
-            Run a Pilot
+        <a href="/live" class="bg-[#14F195] text-black px-5 py-2 rounded-full text-sm font-bold hover:shadow-[0_0_20px_rgba(20,241,149,0.5)] transition duration-300 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-black/70 animate-pulse"></span>
+            See it Live
         </a>
     </nav>
 
@@ -107,12 +115,16 @@
             We turn blockspace competition into a market.
         </p>
         <div class="flex flex-col md:flex-row justify-center items-center gap-4">
-            <button class="w-full md:w-auto px-8 py-4 rounded-xl bg-[#9945FF] font-bold text-lg hover:shadow-[0_0_20px_rgba(153,69,255,0.4)] transition">
-                Start Prioritizing Transactions
-            </button>
-            <button class="w-full md:w-auto px-8 py-4 rounded-xl card-glass mono text-sm font-bold border border-white/10 hover:bg-white/5 transition">
-                git clone rpc-priority-node
-            </button>
+            <a href="/live" class="w-full md:w-auto px-8 py-4 rounded-xl bg-[#9945FF] font-bold text-lg hover:shadow-[0_0_20px_rgba(153,69,255,0.4)] transition flex items-center justify-center gap-3">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#14F195] animate-pulse"></span>
+                See it Live →
+            </a>
+            <a href="/try" class="w-full md:w-auto px-8 py-4 rounded-xl card-glass font-bold text-lg border border-white/10 hover:bg-white/5 transition flex items-center justify-center gap-3">
+                ▶ Try a 402 challenge
+            </a>
+        </div>
+        <div class="mt-6 text-sm opacity-50 mono">
+            no install · no SDK · open in your browser
         </div>
     </header>
 
@@ -358,9 +370,9 @@
 
     <!-- CTA Section -->
     <section class="py-32 px-6 max-w-7xl mx-auto grid md:grid-cols-2 gap-8">
-        <div class="p-12 rounded-[40px] bg-black/60 backdrop-blur-md border border-[#9945FF]/20">
+        <div class="p-12 rounded-[40px] bg-black/60 backdrop-blur-md border border-[#9945FF]/20 flex flex-col">
             <h3 class="text-3xl font-bold mb-8">For Node Operators</h3>
-            <ul class="space-y-6">
+            <ul class="space-y-6 flex-1">
                 <li class="flex items-start space-x-4">
                     <div class="w-6 h-6 rounded-full bg-[#9945FF]/30 flex items-center justify-center shrink-0 mt-1">✓</div>
                     <p class="opacity-80 italic">Turn spam into recurring revenue.</p>
@@ -370,10 +382,13 @@
                     <p class="opacity-80">Deploy in 5 minutes via reverse proxy.</p>
                 </li>
             </ul>
+            <a href="/live" class="mt-8 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#9945FF]/15 border border-[#9945FF]/40 hover:bg-[#9945FF]/25 transition font-bold text-sm">
+                See revenue flowing live →
+            </a>
         </div>
-        <div class="p-12 rounded-[40px] bg-black/60 backdrop-blur-md border border-[#14F195]/20">
+        <div class="p-12 rounded-[40px] bg-black/60 backdrop-blur-md border border-[#14F195]/20 flex flex-col">
             <h3 class="text-3xl font-bold mb-8">For AI Agent Devs</h3>
-            <ul class="space-y-6">
+            <ul class="space-y-6 flex-1">
                 <li class="flex items-start space-x-4">
                     <div class="w-6 h-6 rounded-full bg-[#14F195]/30 flex items-center justify-center shrink-0 mt-1">✓</div>
                     <p class="opacity-80">Guaranteed access without API keys.</p>
@@ -383,19 +398,50 @@
                     <p class="opacity-80 italic">Pay only when execution is critical.</p>
                 </li>
             </ul>
+            <a href="/try" class="mt-8 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#14F195]/15 border border-[#14F195]/40 hover:bg-[#14F195]/25 transition font-bold text-sm">
+                Try a 402 in your browser →
+            </a>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="py-20 px-6 border-t border-white/5 max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
-        <div class="mono text-sm opacity-40">
-            © 2026 RPC PRIORITY PROTOCOL
+    <footer class="py-20 px-6 border-t border-white/5 max-w-7xl mx-auto">
+        <div class="grid md:grid-cols-4 gap-10 mb-12">
+            <div>
+                <div class="mono font-bold mb-4 flex items-center gap-2">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-[#14F195]"><path d="M12 2L4 5V11C4 16.18 7.41 21.03 12 22C16.59 21.03 20 16.18 20 11V5L12 2Z" stroke="currentColor" stroke-width="2"/></svg>
+                    RPC PRIORITY
+                </div>
+                <p class="text-xs opacity-50 leading-relaxed">The programmable priority layer for agents on Solana. Open-source x402 implementation.</p>
+            </div>
+            <div>
+                <div class="mono text-xs uppercase tracking-widest opacity-40 mb-4">See it work</div>
+                <ul class="space-y-2 text-sm">
+                    <li><a href="/live" class="opacity-70 hover:opacity-100 hover:text-[#14F195] transition flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-[#14F195] animate-pulse"></span>Live dashboard</a></li>
+                    <li><a href="/try" class="opacity-70 hover:opacity-100 hover:text-[#14F195] transition">Try a 402 →</a></li>
+                    <li><a href="/explorer" class="opacity-70 hover:opacity-100 hover:text-[#14F195] transition">Reputation explorer</a></li>
+                </ul>
+            </div>
+            <div>
+                <div class="mono text-xs uppercase tracking-widest opacity-40 mb-4">Endpoints</div>
+                <ul class="space-y-2 text-sm mono">
+                    <li><a href="https://x402.rpcpriority.com/live" class="opacity-70 hover:opacity-100 hover:text-[#14F195] transition">x402.rpcpriority.com</a> <span class="opacity-40 text-[10px]">demo</span></li>
+                    <li><a href="https://x402-devnet.rpcpriority.com/live" class="opacity-70 hover:opacity-100 hover:text-[#14F195] transition">x402-devnet.rpcpriority.com</a></li>
+                    <li><a href="https://x402-mainnet.rpcpriority.com/live" class="opacity-70 hover:opacity-100 hover:text-[#14F195] transition">x402-mainnet.rpcpriority.com</a> <span class="opacity-40 text-[10px]">mainnet</span></li>
+                </ul>
+            </div>
+            <div>
+                <div class="mono text-xs uppercase tracking-widest opacity-40 mb-4">Source &amp; team</div>
+                <ul class="space-y-2 text-sm">
+                    <li><a href="https://github.com/flavioparah/x402-priority-protocol" target="_blank" rel="noopener" class="opacity-70 hover:opacity-100 hover:text-[#14F195] transition">GitHub repo</a></li>
+                    <li><a href="https://github.com/flavioparah/x402-priority-protocol#readme" target="_blank" rel="noopener" class="opacity-70 hover:opacity-100 hover:text-[#14F195] transition">README / docs</a></li>
+                    <li><a href="mailto:flavio@rpcpriority.com" class="opacity-70 hover:opacity-100 hover:text-[#14F195] transition">flavio@rpcpriority.com</a></li>
+                </ul>
+            </div>
         </div>
-        <div class="flex space-x-8 mono text-xs uppercase tracking-widest opacity-60">
-            <a href="#" class="hover:text-[#14F195]">Docs</a>
-            <a href="#" class="hover:text-[#14F195]">GitHub</a>
-            <a href="#" class="hover:text-[#14F195]">Live Endpoint</a>
-            <a href="#" class="hover:text-[#14F195]">Contact</a>
+        <div class="border-t border-white/5 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="mono text-xs opacity-40">© 2026 RPC PRIORITY PROTOCOL · Apache-2.0 · Built for Colosseum Frontier 2026</div>
+            <div class="mono text-xs opacity-40">x402 standard by Coinbase · running on Solana</div>
         </div>
     </footer>
 </body>
