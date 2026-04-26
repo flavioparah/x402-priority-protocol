@@ -173,6 +173,20 @@ const qosStats = {
 // to standalone queueing for 30 seconds (per QOS-COOPERATIVE-SPEC.md §5).
 let qosOverloadFallbackUntil = 0;
 
+// Cooperative QoS health probe state (QOS-COOPERATIVE-SPEC.md §5.3-5.4).
+// During cooperative mode we periodically OPTIONS the operator's /qos-status
+// endpoint. If unreachable for >60s we force fallback. After 3 consecutive
+// successes during a fallback window, we end the fallback early and resume
+// cooperative mode immediately.
+let qosCoopHealthConsecutiveSuccesses = 0;
+let qosCoopHealthLastSuccessAt = 0;
+let qosCoopHealthFailingSince = null;     // null = currently healthy
+let qosCoopHealthLastError = null;
+let qosCoopHealthChecks = { ok: 0, fail: 0 };
+const QOS_HEALTH_INTERVAL_MS = 30_000;
+const QOS_HEALTH_UNREACHABLE_MS = 60_000;
+const QOS_HEALTH_REPROBE_REQUIRED = 3;
+
 function qosBaseScore(req) {
   // Score from the verified payment if present; fallback 0 (free pass — back of queue).
   const v = req.x402Verified;
@@ -450,6 +464,57 @@ async function issueNonce(amount, hintedPubkey) {
 
 // Note: nonce expiration is handled by the store (Redis TTL or a sweeper
 // interval inside the in-memory implementation). No app-level sweeper here.
+
+// Cooperative QoS health probe — only runs when QOS_MODE=cooperative.
+// Implements QOS-COOPERATIVE-SPEC.md §5.3 (60s unreachable → fallback)
+// and §5.4 (3 consecutive successes → end fallback early).
+if (CONFIG.QOS_MODE === "cooperative") {
+  setInterval(async () => {
+    const url = CONFIG.REAL_RPC_URL.replace(/\/+$/, "") + "/qos-status";
+    let ok = false;
+    try {
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 5_000);
+      const resp = await fetch(url, { method: "OPTIONS", signal: ctrl.signal });
+      clearTimeout(timeout);
+      ok = resp.ok || resp.status === 200 || resp.status === 204;
+      if (!ok) qosCoopHealthLastError = `HTTP ${resp.status}`;
+    } catch (e) {
+      qosCoopHealthLastError = e.message || String(e);
+    }
+    if (ok) {
+      qosCoopHealthChecks.ok++;
+      qosCoopHealthLastSuccessAt = Date.now();
+      qosCoopHealthConsecutiveSuccesses++;
+      qosCoopHealthFailingSince = null;
+      qosCoopHealthLastError = null;
+      // §5.4: 3 consecutive successes during a fallback window → end fallback early
+      if (
+        qosCoopHealthConsecutiveSuccesses >= QOS_HEALTH_REPROBE_REQUIRED &&
+        qosOverloadFallbackUntil > Date.now()
+      ) {
+        console.log(
+          `[qos] cooperative re-probe: ${QOS_HEALTH_REPROBE_REQUIRED} consecutive OK — ending fallback early`
+        );
+        qosOverloadFallbackUntil = 0;
+      }
+    } else {
+      qosCoopHealthChecks.fail++;
+      qosCoopHealthConsecutiveSuccesses = 0;
+      if (!qosCoopHealthFailingSince) qosCoopHealthFailingSince = Date.now();
+      // §5.3: unreachable for >60s → force fallback
+      if (Date.now() - qosCoopHealthFailingSince > QOS_HEALTH_UNREACHABLE_MS) {
+        const newUntil = Date.now() + QOS_HEALTH_INTERVAL_MS * 2;
+        if (newUntil > qosOverloadFallbackUntil) {
+          qosOverloadFallbackUntil = newUntil;
+          console.warn(
+            `[qos] cooperative operator unreachable for >${QOS_HEALTH_UNREACHABLE_MS / 1000}s (${qosCoopHealthLastError}) — forcing fallback`
+          );
+        }
+      }
+    }
+  }, QOS_HEALTH_INTERVAL_MS).unref();
+}
 
 // Snapshot the current load every 60s so the dashboard can plot a 1h time series.
 setInterval(() => {
@@ -792,6 +857,18 @@ app.get("/stats/qos", (req, res) => {
     wait_samples_count: sorted.length,
     cooperative_fallback_active: now < qosOverloadFallbackUntil,
     cooperative_fallback_until: qosOverloadFallbackUntil > now ? qosOverloadFallbackUntil : null,
+    cooperative_health: {
+      enabled: CONFIG.QOS_MODE === "cooperative",
+      consecutive_successes: qosCoopHealthConsecutiveSuccesses,
+      reprobe_required: QOS_HEALTH_REPROBE_REQUIRED,
+      last_success_at: qosCoopHealthLastSuccessAt || null,
+      failing_since: qosCoopHealthFailingSince,
+      last_error: qosCoopHealthLastError,
+      probes_ok: qosCoopHealthChecks.ok,
+      probes_fail: qosCoopHealthChecks.fail,
+      check_interval_ms: QOS_HEALTH_INTERVAL_MS,
+      unreachable_threshold_ms: QOS_HEALTH_UNREACHABLE_MS,
+    },
   });
 });
 

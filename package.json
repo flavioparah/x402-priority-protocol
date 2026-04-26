@@ -15,6 +15,7 @@
     "test:smoke": "node test/smoke.js",
     "test:cooperative-qos": "npm run build && node test/cooperative-qos.test.js",
     "test:atomic": "node test/atomic-consume.test.js",
+    "test:atomic:redis": "node test/atomic-consume-redis.test.js",
     "test:detection": "node test/detection.test.js",
     "operator:reference": "node examples/operator-qos-reference.js"
   },

@@ -221,8 +221,11 @@ docker compose -f docker-compose.devnet.yml down
 - ✅ **Atomic consume** — nonce-mark + escrow-debit run in a single
   Redis Lua script (or single JS tick for in-memory mode). Two parallel
   requests with the same signed nonce: exactly one accepted, the rest
-  rejected with `nonce_already_used`. Validated by
-  `npm run test:atomic` (4/4 assertions).
+  rejected with `nonce_already_used`. Validated by:
+  - `npm run test:atomic` — 5/5 assertions in-memory mode (always runs)
+  - `npm run test:atomic:redis` — same assertions against a real Redis
+    instance, exercising the Lua-script path. Requires `REDIS_URL`
+    env var pointing at a reachable Redis.
 - ✅ **Per-pubkey attestation log + sybil/fraud detection** — every paid
   request appends to `x402:attestations:<pubkey>` (LIST, max 100). 5
   detection signals exposed via `/reputation/:pubkey` (`sybil_risk`,

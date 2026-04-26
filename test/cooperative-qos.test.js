@@ -184,6 +184,22 @@ async function main() {
       typeof stats.cooperative_fallback_until === "number" && stats.cooperative_fallback_until > Date.now()
     );
 
+    // ─── Assertion 6: health-probe scaffolding is exposed (spec §5.3-5.4) ──
+    assert(
+      "/stats/qos.cooperative_health.enabled === true in cooperative mode",
+      stats.cooperative_health && stats.cooperative_health.enabled === true
+    );
+    assert(
+      "/stats/qos.cooperative_health exposes reprobe_required=3 (spec §5.4)",
+      stats.cooperative_health.reprobe_required === 3
+    );
+    assert(
+      "/stats/qos.cooperative_health exposes counters",
+      typeof stats.cooperative_health.probes_ok === "number" &&
+        typeof stats.cooperative_health.probes_fail === "number" &&
+        typeof stats.cooperative_health.consecutive_successes === "number"
+    );
+
     console.log(`\n${assertionCount}/${assertionCount} assertions passed.\n`);
   } finally {
     op.server.close();
