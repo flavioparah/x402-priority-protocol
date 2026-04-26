@@ -3,7 +3,11 @@ services:
     image: redis:7-alpine
     container_name: x402-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # volatile-lru only evicts keys with TTL — in our layout that's just the
+    # 30s nonces (x402:nonce:<id>). Escrow / reputation / used-signatures
+    # have no TTL and are immune to eviction. allkeys-lru would silently
+    # discard them under memory pressure (= lost balances, broken anti-replay).
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy volatile-lru
     volumes:
       - x402-redis-data:/data
     networks:

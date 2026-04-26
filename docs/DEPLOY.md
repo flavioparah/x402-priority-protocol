@@ -202,8 +202,51 @@ docker compose -f docker-compose.devnet.yml down
 
 ---
 
-## Known things to do before mainnet-beta traffic (not before the hackathon demo)
+## Known limitations and what's already in place
 
-- **Validate deposits on-chain** — `/escrow/deposit` currently trusts the posted amount (see O-001 in `ENGINEERING.md`). For any public traffic, wire it to verify a Solana tx signature that transfers the claimed amount to `PAYMENT_DESTINATION`.
-- **Wire a real load metric** — `getRpcLoad()` returns a `Math.random()` value (O-002). Replace with a sliding window of `req/s` or with a Prometheus scrape from the upstream node's metrics.
-- **Redis-backed state** — escrow balances, nonces, and rate counters live in-memory. A restart wipes them and multiple Shield replicas can't share state.
+**Resolved (already shipped):**
+
+- ✅ **On-chain deposit verification** — `POST /escrow/deposit` fetches the
+  Solana tx via `getParsedTransaction`, verifies sender + destination +
+  amount + single-use, then credits escrow at `1 lamport = 1000 µL`.
+  See `verifyDepositTx` in `index.js`. End-to-end validated on mainnet
+  (tx `2fP8DQhy...` finalized at slot 415702360, 2026-04-25).
+- ✅ **Real load metric** — `getRpcLoad()` returns the sliding-window req/s
+  over `LOAD_WINDOW_MS` (5 s default), normalized against `MAX_RPS`.
+  `RPC_LOAD_FORCE=<0..1>` overrides for demo recording.
+- ✅ **Redis-backed state** — escrow balances, nonces, reputation, and
+  used deposit signatures persist in Redis with AOF (`lib/store.js`).
+  Each shield deploys with a sidecar Redis container; eviction policy is
+  `volatile-lru` so only the 30 s nonces can be evicted under pressure.
+- ✅ **Atomic consume** — nonce-mark + escrow-debit run in a single
+  Redis Lua script (or single JS tick for in-memory mode). Two parallel
+  requests with the same signed nonce: exactly one accepted, the rest
+  rejected with `nonce_already_used`. Validated by
+  `npm run test:atomic` (4/4 assertions).
+- ✅ **Per-pubkey attestation log + sybil/fraud detection** — every paid
+  request appends to `x402:attestations:<pubkey>` (LIST, max 100). 5
+  detection signals exposed via `/reputation/:pubkey` (`sybil_risk`,
+  `fraud_flags`, `churn_pattern`); two are active in single-op mode,
+  three activate when a 2nd operator joins with a distinct
+  `OPERATOR_ID`. See `lib/detection.js` and
+  `docs/TRUST-SCORE-RFC-DRAFT.md` §10.
+
+**Still pending for production scale (post-hackathon):**
+
+- **Multi-instance QoS coordination** — the priority queue is per-instance
+  today (`qosQueue` in `index.js`). For horizontal scaling, migrate it to
+  a shared Redis ZSET with cross-instance dispatch coordination via Pub/Sub.
+- **Multi-region Redis with replication** — single Redis sidecar per shield
+  is fine for a single-VPS deploy; multi-region needs Redis Cluster or
+  Sentinel.
+- **Prometheus scrape of upstream node** — each shield measures its own
+  throughput as a proxy for upstream load. For better accuracy, scrape
+  the upstream's `solana_rpc_*` metrics directly. Tracked as Open Issue
+  in `ENGINEERING.md`.
+- **Audit trail / compliance** — all `/attest` and `/report` calls (when
+  the broker becomes a separate service) need immutable append-only logs
+  for SOC 2 / financial-grade auditability.
+- **On-chain per-request settlement (`x402-tx`)** — currently only deposits
+  are on-chain; per-request settlement is off-chain via the escrow ledger.
+  A future `x402-tx` mode would let agents submit serialized
+  SystemProgram.transfer per request without a pre-deposit step.

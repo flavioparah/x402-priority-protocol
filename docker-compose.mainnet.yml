@@ -24,7 +24,10 @@ services:
     image: redis:7-alpine
     container_name: x402-redis-mainnet
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    # volatile-lru only evicts TTL keys (nonces); escrow / reputation /
+    # signatures are immune to memory-pressure eviction. CRITICAL on the
+    # mainnet container where escrow holds REAL SOL credits.
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy volatile-lru
     volumes:
       - x402-redis-mainnet-data:/data
     networks:

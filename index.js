@@ -169,6 +169,10 @@ const qosStats = {
   wait_samples: [],  // last 200 wait times in ms (only for queued requests)
 };
 
+// Cooperative QoS — when the operator returns X-QoS-Overload:1, we fall back
+// to standalone queueing for 30 seconds (per QOS-COOPERATIVE-SPEC.md §5).
+let qosOverloadFallbackUntil = 0;
+
 function qosBaseScore(req) {
   // Score from the verified payment if present; fallback 0 (free pass — back of queue).
   const v = req.x402Verified;
@@ -215,13 +219,16 @@ function qosOnSlotFree() {
 function qosMiddleware(req, res, next) {
   if (CONFIG.QOS_MODE === "off") return next();
 
-  // Cooperative mode: don't queue locally; forward priority hint to operator.
-  // (Reference implementation; activates when operator partner integrates.)
-  if (CONFIG.QOS_MODE === "cooperative") {
+  // Cooperative mode: forward priority hint to operator and let their stack
+  // do the queueing. Falls back to standalone behavior for 30s after the
+  // operator emits X-QoS-Overload:1 (per QOS-COOPERATIVE-SPEC.md §5).
+  if (CONFIG.QOS_MODE === "cooperative" && Date.now() >= qosOverloadFallbackUntil) {
     req.headers["x-priority-score"] = String(qosBaseScore(req));
     req.headers["x-qos-spec-version"] = "1";
     return next();
   }
+  // If QOS_MODE === "cooperative" AND we're inside the fallback window,
+  // fall through to the standalone code path below.
 
   // Standalone mode: bypass when low contention (preserves the 8.7ms p95).
   if (qosInFlight < CONFIG.QOS_MAX_INFLIGHT * CONFIG.QOS_BYPASS_THRESHOLD) {
@@ -489,29 +496,30 @@ async function verifyX402Authorization(authHeader) {
     if (pubkey !== pubkeyB58) return { ok: false, reason: "Pubkey mismatch" };
     if (destination !== CONFIG.PAYMENT_DESTINATION) return { ok: false, reason: "Wrong destination" };
 
-    // Valida o nonce
-    const nonceData = await store.getNonce(nonce);
-    if (!nonceData) return { ok: false, reason: "Unknown or expired nonce" };
-    if (nonceData.used) return { ok: false, reason: "Nonce already used (replay detected)" };
-    if (Date.now() > nonceData.expiresAt) return { ok: false, reason: "Nonce expired" };
-    if (amount < nonceData.amount) return { ok: false, reason: `Insufficient payment: need ${nonceData.amount}, got ${amount}` };
-
-    // If this challenge was discounted via a Trust-Score hint, the signer
-    // must be the same pubkey that was hinted. Otherwise the discount is
-    // spoofable (see issueNonce docstring).
-    if (nonceData.hintedPubkey && nonceData.hintedPubkey !== pubkeyB58) {
-      return { ok: false, reason: "Signer pubkey does not match the hinted pubkey for this challenge" };
+    // Atomic consume: validates nonce existence, used flag, amount,
+    // hintedPubkey match, and escrow balance — and marks nonce used + debits
+    // escrow — all in one server-side operation (Redis Lua, or single
+    // synchronous JS tick for in-memory). This is what closes the
+    // double-spend race where two concurrent requests with the same signed
+    // nonce could both observe used:false before either marks it true.
+    const consume = await store.consumeNonceAndDebit(nonce, pubkeyB58, amount);
+    if (!consume.ok) {
+      // Map machine reason codes to friendlier messages for response/logs.
+      const friendly = {
+        nonce_not_found: "Unknown or expired nonce",
+        nonce_already_used: "Nonce already used (replay detected)",
+        nonce_expired: "Nonce expired",
+        insufficient_payment: `Insufficient payment for nonce`,
+        pubkey_hint_mismatch: "Signer pubkey does not match the hinted pubkey for this challenge",
+        insufficient_balance: `Insufficient escrow balance: ${consume.balance} < ${amount}`,
+      };
+      return { ok: false, reason: friendly[consume.reason] || consume.reason };
     }
 
-    // Verifica saldo no escrow
-    const balance = await store.getEscrow(pubkeyB58);
-    if (balance < amount) return { ok: false, reason: `Insufficient escrow balance: ${balance} < ${amount}` };
-
-    // Marca nonce como usado e debita saldo
-    await store.markNonceUsed(nonce);
-    await store.incrEscrow(pubkeyB58, -amount);
-
-    // Credit reputation so subsequent challenges for this pubkey are cheaper
+    // Credit reputation so subsequent challenges for this pubkey are cheaper.
+    // Done after the atomic consume — if recordPayment fails, the debit
+    // already happened (acceptable: rep is best-effort metadata, debit is the
+    // money-critical op).
     await recordPayment(pubkeyB58, amount);
 
     const score = await getTrustScore(pubkeyB58);
@@ -763,6 +771,7 @@ app.get("/stats/qos", (req, res) => {
   const sorted = [...qosStats.wait_samples].sort((a, b) => a - b);
   const total_settled = qosStats.dispatched_total + qosStats.bypassed_total;
   const utilization = qosInFlight / Math.max(1, CONFIG.QOS_MAX_INFLIGHT);
+  const now = Date.now();
   res.json({
     mode: CONFIG.QOS_MODE,
     queue_depth: qosQueue.length,
@@ -781,6 +790,8 @@ app.get("/stats/qos", (req, res) => {
     wait_p95_ms: qosPercentile(sorted, 0.95),
     wait_p99_ms: qosPercentile(sorted, 0.99),
     wait_samples_count: sorted.length,
+    cooperative_fallback_active: now < qosOverloadFallbackUntil,
+    cooperative_fallback_until: qosOverloadFallbackUntil > now ? qosOverloadFallbackUntil : null,
   });
 });
 
@@ -828,17 +839,32 @@ app.use(
     changeOrigin: true,
     pathRewrite: { "^/rpc": "" },
     agent: upstreamAgent,
-    on: {
-      proxyReq: (proxyReq, req) => {
-        // Remove o cabeçalho x402 antes de encaminhar ao RPC real
-        proxyReq.removeHeader("authorization");
-        if (req.x402Verified) {
-          proxyReq.setHeader("X-x402-Verified-Pubkey", req.x402Verified.pubkey);
-        }
-      },
-      error: (err, req, res) => {
+    // http-proxy-middleware v2.x uses top-level onProxyReq / onProxyRes /
+    // onError callbacks. The v3 nested `on: { proxyReq, error }` shape is
+    // silently ignored on v2 (which is what's installed via package.json
+    // ^2.0.6). This file was previously using the v3 shape — the
+    // Authorization header was leaking to the upstream Solana RPC and the
+    // custom error path was inert.
+    onProxyReq: (proxyReq, req) => {
+      proxyReq.removeHeader("authorization");
+      if (req.x402Verified) {
+        proxyReq.setHeader("X-x402-Verified-Pubkey", req.x402Verified.pubkey);
+      }
+    },
+    onProxyRes: (proxyRes, req) => {
+      // Cooperative QoS — listen for X-QoS-Overload from the operator's
+      // upstream stack and trigger 30s fallback to standalone queueing.
+      if (CONFIG.QOS_MODE === "cooperative" && proxyRes.headers["x-qos-overload"] === "1") {
+        qosOverloadFallbackUntil = Date.now() + 30_000;
+        console.warn(
+          `[qos] cooperative operator returned X-QoS-Overload:1 — falling back to standalone queue for 30s`
+        );
+      }
+    },
+    onError: (err, req, res) => {
+      if (!res.headersSent) {
         res.status(502).json({ error: "RPC upstream error", details: err.message });
-      },
+      }
     },
   })
 );

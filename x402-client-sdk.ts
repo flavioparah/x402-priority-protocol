@@ -29,11 +29,16 @@ export interface X402ProviderConfig extends ConnectionConfig {
   priorityBudget?: number;
 
   /**
-   * Estratégia de liquidação:
-   * - "offchain" (MVP): assina mensagem Ed25519 off-chain contra saldo pré-depositado
-   * - "onchain": envia SystemProgram.transfer real (maior latência)
+   * Estratégia de liquidação. Hoje o Shield só suporta "offchain":
+   * o cliente pré-deposita SOL via /escrow/deposit e cada requisição é
+   * assinada off-chain contra esse saldo.
+   *
+   * Modo "onchain" (SystemProgram.transfer por requisição) foi prototipado
+   * mas removido da API pública porque o Shield server ainda não verifica
+   * `Authorization: x402-tx <serialized-tx>`. Voltará quando o spec
+   * `x402-tx` estiver implementado.
    */
-  settlementMode?: "offchain" | "onchain";
+  settlementMode?: "offchain";
 
   /** Callback chamado antes de pagar — retorne false para cancelar */
   onChallenge?: (challenge: X402Challenge) => boolean | Promise<boolean>;
@@ -214,7 +219,10 @@ export class X402Provider extends Connection {
    * Header: "x402 <sig_bs58>.<pubkey_bs58>.<msg_bs58>"
    */
   private async _payPriority(challenge: X402Challenge): Promise<string> {
-    if (this.config.settlementMode === "onchain") {
+    // Defensive: legacy callers may still pass settlementMode="onchain" via
+    // an `as any` cast or stale config object — keep the branch as a hard
+    // fail with a clear error rather than silently downgrading to offchain.
+    if ((this.config.settlementMode as string) === "onchain") {
       return this._payPriorityOnChain(challenge);
     }
     return this._payPriorityOffChain(challenge);
@@ -239,16 +247,20 @@ export class X402Provider extends Connection {
     return `x402 ${sigB58}.${pubkeyB58}.${msgB58}`;
   }
 
+  /**
+   * @deprecated On-chain per-request settlement is not wired into the Shield
+   * (only the deposit path is on-chain — see /escrow/deposit). This method
+   * is kept as a defensive throw in case external callers reach it via
+   * older code paths. Removed from the public type in `X402ProviderConfig`;
+   * `settlementMode` only accepts `"offchain"`.
+   *
+   * Will be reinstated once the Shield supports `Authorization: x402-tx ...`
+   * with serialized SystemProgram.transfer verification server-side.
+   */
   private async _payPriorityOnChain(_challenge: X402Challenge): Promise<string> {
-    // TODO(week-2): on-chain settlement is not wired into the Shield yet.
-    // The current index.js server only verifies "x402 <sig>.<pubkey>.<msg>"
-    // (off-chain signature). Supporting "x402-tx <serialized>" requires
-    // server-side work: either simulate the SystemProgram.transfer, or
-    // require the caller to have already landed the tx and submit the sig
-    // with the signed transfer recipt.
     throw new Error(
-      "x402: on-chain settlement not yet supported by the Shield. " +
-      "Use settlementMode: 'offchain' for the MVP."
+      "x402: on-chain per-request settlement is not supported by the Shield. " +
+      "Use settlementMode: 'offchain' (the only supported mode today)."
     );
   }
 

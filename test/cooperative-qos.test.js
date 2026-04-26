@@ -168,6 +168,21 @@ async function main() {
     }
     // The operator should have recorded another forwarded request
     assert("operator received the overload-triggering request", op.captured.length > before);
+    assert("shield client surfaced the overload (503 or 'overload' text)", overloaded);
+
+    // ─── Assertion 5: shield entered cooperative-fallback window ──────────
+    // After receiving X-QoS-Overload:1, the shield's onProxyRes hook should
+    // have set cooperative_fallback_until = now + 30s. Give it a tick to apply.
+    await sleep(100);
+    const stats = await fetch(`http://127.0.0.1:${SHIELD_PORT}/stats/qos`).then((r) => r.json());
+    assert(
+      "/stats/qos reports cooperative_fallback_active=true",
+      stats.cooperative_fallback_active === true
+    );
+    assert(
+      "/stats/qos.cooperative_fallback_until is in the future",
+      typeof stats.cooperative_fallback_until === "number" && stats.cooperative_fallback_until > Date.now()
+    );
 
     console.log(`\n${assertionCount}/${assertionCount} assertions passed.\n`);
   } finally {

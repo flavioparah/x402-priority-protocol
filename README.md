@@ -78,7 +78,7 @@ const connection = new X402Provider(
   Keypair.fromSecretKey(/* agent's secret key */),
   {
     priorityBudget: 10_000,      // max µ-lamports the agent will pay per request
-    settlementMode: 'offchain',  // or 'onchain' for SystemProgram.transfer
+    settlementMode: 'offchain',  // only mode supported today; on-chain TBD
     onChallenge: (c) => c.amount_micro_lamports < 5_000, // approve/veto per-request
   }
 );
