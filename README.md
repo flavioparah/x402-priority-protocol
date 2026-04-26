@@ -176,6 +176,9 @@ Standalone priority queue + rate-limited dispatcher inside the Shield. Higher-pa
 **Week 4+ — QoS Path B (spec ready)**
 Cooperative QoS subprotocol — Shield forwards `X-Priority-Score` + `X-QoS-Spec-Version` headers to the operator's RPC stack so operator's own scheduler can honor priority directly. Spec in [`docs/QOS-COOPERATIVE-SPEC.md`](./docs/QOS-COOPERATIVE-SPEC.md). Operator-side reference implementation in [`examples/operator-qos-reference.js`](./examples/operator-qos-reference.js) (~80 lines). Integration test: `npm run test:cooperative-qos`. Activates with `QOS_MODE=cooperative` once an operator partner integrates (~3 days of operator work).
 
+**Week 4+ — Trust-Score subprotocol (spec ready)**
+Cross-provider reputation layer that lets RPC operators apply data-driven discounts to known agents without coordinating with each other directly — a neutral broker holds the reputation. Spec in [`docs/TRUST-SCORE-RFC-DRAFT.md`](./docs/TRUST-SCORE-RFC-DRAFT.md): data model, HTTP API (`/reputation/:pubkey`, `/attest`, `/report`, `/info`), score formula with cross-provider bonus, sybil/fraud detection signal taxonomy, federation outline. Current `index.js` is the reference broker (single-provider colocated, in-memory). Production broker will live in a separate `trust-score-broker` repository.
+
 ---
 
 ## KPIs
