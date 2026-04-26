@@ -267,6 +267,43 @@ Estratégia de como chegar até o cliente: canal de venda, mensagem, preço, par
 ### Pilot / Piloto
 Implementação de teste com cliente, geralmente curta (30–90 dias) e com termos suaves (sem licença fixa, ou revenue share só). Objetivo: gerar case study sem assustar o cliente. **Nosso Plano A propõe piloto 70/30 a favor do operador, sem fixed fee.**
 
+### Harmonic.gg
+**O que é:** marketplace aberto de construção de blocos para a blockchain Solana. Validadores rodam um cliente "drop-in" que agrega propostas de bloco de múltiplos builders independentes, otimizando a receita do validador e reduzindo exposição a sandwich attacks.
+
+**Por que aparece nas nossas docs:** o consultor do Colosseum citou Harmonic como exemplo de "infraestrutura neutra na Solana". Importante esclarecer: **Harmonic não é concorrente nosso.** Eles operam na **camada de produção de bloco** (concorrente do Jito Block Engine), enquanto nós operamos na **camada de RPC**, um andar acima. Mesmo princípio (neutralidade), camada diferente.
+
+### Neutral broker
+**O que é:** ator que fica entre concorrentes, não favorece nenhum, e por isso é confiado por todos. Termo do mundo de pagamentos e finanças, popularizado por empresas como Visa, Plaid, Equifax e DTCC.
+
+**Como aplicamos:** o RPC Priority Protocol é o broker neutro **entre operadores Solana** (Helius, Triton, Jito, etc.). Helius não confia dados de cliente à Jito (concorrente direto), mas pode confiar em nós (não somos operador). Essa neutralidade **não pode ser construída por um operador existente** — é o moat estrutural mais importante do Plano A.
+
+**Paralelos diretos:** Visa entre bancos. Plaid entre bancos e apps fintech. Equifax entre credores. DTCC entre corretoras.
+
+### Metcalfe's law
+**O que é:** lei empírica de redes formulada por Robert Metcalfe em 1980 (originalmente sobre redes de telecomunicação). Estabelece que o **valor de uma rede cresce proporcionalmente ao quadrado do número de participantes** (≈ N²), porque cada novo nó aumenta o valor para todos os anteriores.
+
+**Por que importa para nós:** justifica matematicamente o moat do Trust-Score. Com 1 operador na rede, valor = 1². Com 5 operadores, valor = 25. Concorrente que tenta lançar Trust-Score próprio começa em N=1 enquanto nós já estamos em N=5 — vantagem **25× maior** que se contássemos só operadores.
+
+**Limite na prática:** Metcalfe puro (N²) é otimista. Na prática vale algo entre N×log(N) e N². Mesmo na versão conservadora, vantagem é não-linear.
+
+### Sybil attack
+**O que é:** tipo de ataque em sistemas distribuídos onde um único agente cria múltiplas identidades falsas para ganhar influência desproporcional. Nome vem do livro "Sybil" (1973), sobre múltiplas personalidades.
+
+**Como aparece no nosso domínio:** um atacante poderia tentar criar 100 pubkeys novas, depositar SOL pequeno em cada, e fazer requisições "como se fosse 100 agentes legítimos". 
+
+**Como nosso Trust-Score detecta:** cross-operator. Pubkey criada há horas que aparece em **múltiplos operadores** numa janela curta dispara `sybilRisk` flag. Operador único nunca consegue detectar — só nós, porque vemos a rede inteira. É um dos aggregates não-replicáveis sem broker neutro.
+
+### Acquisition exit
+**O que é:** caminho de saída de uma startup via fusão ou aquisição (M&A). Alternativa ao IPO. No mundo de tech, mais de 90% das saídas bem-sucedidas são por aquisição, não IPO.
+
+**No nosso caso (Plano C):** se Jito ou Helius decidirem competir, nosso valor de saída via aquisição depende de quantos operadores integrados temos na rede. Estimativas:
+- 0 operadores: US$ 0 (eles constroem do zero)
+- 1-2 operadores: US$ 1-3M (acquihire — só time)
+- **3-5 operadores: US$ 5-30M (estratégica — rede neutra com efeito de rede)**
+- 5+ operadores + RFC autoria: US$ 30-100M (infra crítica)
+
+**Implicação tática:** o moat **não depende de Jito não construir**. Depende de termos **3+ operadores integrados antes** de qualquer concorrente decidir competir. Nesse ponto, eles preferem comprar a construir.
+
 ### Public Goods (categoria do Colosseum)
 Categoria do hackathon Colosseum dedicada a projetos cuja maior contribuição é abrir infraestrutura comum pro ecossistema, em vez de capturar valor sozinho. **Estamos nos posicionando aqui** porque o spec x402-priority aberto vira infra de toda Solana.
 

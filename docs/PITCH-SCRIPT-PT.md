@@ -216,6 +216,7 @@ curl -X POST https://x402.rpcpriority.com/rpc \
 
 | Pergunta provável | Resposta de bolso (15 segundos) |
 |---|---|
+| "Jito poderia fazer isso em 6 meses?" | "Código em 6 meses, sim. Mas não é código que importa — **rede neutra de operadores não é código, é estrutural**. Jito é concorrente direto de Helius e Triton; eles não compartilham dados de cliente com Jito. Mesmo se Jito shippar amanhã, vira só 'Jito Score' fechado, próprio. Mercado de **broker neutro** continua aberto e é exatamente onde a gente joga. E se eles realmente quiserem entrar, prefere comprar a gente (Plano C) a construir do zero." |
 | "Por que Helius não constrói isso?" | "Pra Helius, isso canibaliza receita atual. Pra nós, é o produto. Eles vão preferir licenciar — depois que tivermos prova com tier 2." |
 | "O que impede um clone em 3 meses?" | "Código não defende, dado defende. Trust-Score cross-operador é nosso moat. Helius é o último que convence Triton e Jito a entrar numa rede compartilhada." |
 | "Vocês competem com Jito Bundles?" | "Não. Jito é leilão dentro do bloco. Nós somos leilão antes do bloco. Inclusive, searcher de Jito é cliente nosso — ele precisa de RPC rápido pra montar o bundle." |
