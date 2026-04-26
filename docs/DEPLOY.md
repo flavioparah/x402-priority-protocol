@@ -1,6 +1,6 @@
 # Deploy — x402-shield on VPS (kvm4)
 
-Target: `ssh kvm4` → `/root/x402`, behind Traefik with TLS on `x402.assistent.top`.
+Target: `ssh kvm4` → `/root/x402`, behind Traefik with TLS on `x402.rpcpriority.com`.
 
 This matches the Vokano / amiginvisivel pattern already running on this VPS: `portainer_default` external Docker network + Traefik labels + Let's Encrypt via `leresolver`.
 
@@ -11,7 +11,7 @@ This matches the Vokano / amiginvisivel pattern already running on this VPS: `po
 - Docker + Docker Compose installed.
 - `portainer_default` network exists (`docker network ls | grep portainer`). Traefik joins this network.
 - Traefik is running with `entrypoints=websecure` on `:443` and `certresolver=leresolver` pointing at Let's Encrypt.
-- DNS record `x402.assistent.top` → the VPS public IP.
+- DNS record `x402.rpcpriority.com` → the VPS public IP.
 
 ## Files that go to the server
 
@@ -49,7 +49,7 @@ docker compose up -d --build
 
 # 5. Check it's up
 docker compose logs -f --tail=50 x402-shield
-curl -s https://x402.assistent.top/health | jq
+curl -s https://x402.rpcpriority.com/health | jq
 ```
 
 Expected `/health` output:
@@ -74,10 +74,10 @@ The in-memory state (escrow, nonces, rate counters) is lost on restart. This is 
 
 ```bash
 # Healthy?
-curl -i https://x402.assistent.top/health
+curl -i https://x402.rpcpriority.com/health
 
 # Trigger the 402 path from any client
-curl -i -X POST https://x402.assistent.top/rpc \
+curl -i -X POST https://x402.rpcpriority.com/rpc \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'
 
@@ -89,7 +89,7 @@ To exercise the full handshake against the deployed Shield, run the demo
 script with `SHIELD_URL` pointing at the VPS:
 
 ```bash
-SHIELD_URL=https://x402.assistent.top node demo.js
+SHIELD_URL=https://x402.rpcpriority.com node demo.js
 ```
 
 ## Rollback
@@ -111,6 +111,94 @@ docker compose down
 # to wipe built images:
 docker compose down --rmi local
 ```
+
+---
+
+## Devnet companion deployment (`x402-devnet.rpcpriority.com`)
+
+A second Shield runs alongside the mainnet container to demonstrate the **on-chain payment verification path** without spending real SOL. It points at Solana devnet and has `ESCROW_TRUST_DEPOSITS` turned **off**, so every payment is verified via `getParsedTransaction`.
+
+### Required prep (one-time)
+
+1. **DNS** — add an A record `x402-devnet.rpcpriority.com` → VPS public IP (same IP as `x402.rpcpriority.com`). Wait ~5 min for propagation.
+
+2. **Wallet for devnet payments** — set `PAYMENT_DESTINATION_DEVNET` in `/root/x402/.env`. Can be the **same** Solana pubkey used for mainnet (Solana addresses are universal across clusters); devnet SOL just won't show up in mainnet explorers.
+
+   ```bash
+   echo "PAYMENT_DESTINATION_DEVNET=YourSolWalletHere" >> /root/x402/.env
+   ```
+
+### Deploy
+
+```bash
+ssh kvm4
+cd /root/x402
+git pull
+
+# Bring up the devnet container (uses docker-compose.devnet.yml)
+docker compose -f docker-compose.devnet.yml up -d --build
+
+# Both containers are now running
+docker ps | grep x402
+# x402-shield          → x402.rpcpriority.com           (mainnet, trust-deposit ON)
+# x402-shield-devnet   → x402-devnet.rpcpriority.com    (devnet, on-chain verify only)
+```
+
+Traefik will issue a fresh Let's Encrypt cert for the new hostname on the first request (~30 s). If you see "404 page not found" right after `up -d`, wait a moment and retry — Traefik is still negotiating the cert.
+
+### Verify devnet deployment
+
+```bash
+# Healthcheck
+curl -s https://x402-devnet.rpcpriority.com/health | jq
+
+# Should respond 402 (RPC_LOAD_FORCE=0.9 is the default)
+curl -i -X POST https://x402-devnet.rpcpriority.com/rpc \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'
+```
+
+### Run the on-chain demo end-to-end
+
+From your laptop:
+
+```bash
+SHIELD_URL=https://x402-devnet.rpcpriority.com \
+SOLANA_RPC_URL=https://api.devnet.solana.com \
+node examples/deposit-with-tx.js
+```
+
+This script:
+1. Generates a fresh Ed25519 keypair
+2. Requests an airdrop from devnet (1 SOL — may rate-limit, see fallback below)
+3. Sends `SystemProgram.transfer` to `PAYMENT_DESTINATION_DEVNET`
+4. Posts the `tx_signature` to `POST /escrow/deposit`
+5. Shield calls `getParsedTransaction` against `api.devnet.solana.com`, validates the transfer, credits escrow
+6. Issues a paid RPC request and verifies the response
+
+If the airdrop returns HTTP 429, set `AGENT_SECRET_KEY` in env to use a pre-funded keypair instead:
+
+```bash
+AGENT_SECRET_KEY="[1,2,3,...]" \
+SHIELD_URL=https://x402-devnet.rpcpriority.com \
+SOLANA_RPC_URL=https://api.devnet.solana.com \
+node examples/deposit-with-tx.js
+```
+
+### Bringing it down
+
+```bash
+ssh kvm4
+cd /root/x402
+docker compose -f docker-compose.devnet.yml down
+# mainnet container untouched
+```
+
+### Why two deployments instead of one with a flag
+
+- The mainnet shield is the headline demo (fast, trusted-deposit, 22-req Trust-Score progression). Don't risk breaking it by reconfiguring.
+- The devnet shield proves the on-chain path is real, not vapor. Two containers, two hostnames, two narratives — neither compromises the other.
+- Trust-Score state is in-memory per container, so a devnet restart never affects mainnet reputation data.
 
 ---
 

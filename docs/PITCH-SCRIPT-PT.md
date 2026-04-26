@@ -137,7 +137,7 @@
 **"Vou rodar agora, ao vivo:"**
 
 ```bash
-curl -X POST https://x402.assistent.top/rpc \
+curl -X POST https://x402.rpcpriority.com/rpc \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'
 ```
@@ -229,7 +229,7 @@ curl -X POST https://x402.assistent.top/rpc \
 ## 🎬 Notas de produção (logística)
 
 - **Antes da apresentação:**
-  - Abrir aba com `x402.assistent.top` pronta no terminal/celular
+  - Abrir aba com `x402.rpcpriority.com` pronta no terminal/celular
   - Testar `curl` na rede do local (wifi do hotel, do hackathon)
   - Plano B se internet falhar: screenshot de resposta 402 pré-tirada + GIF do Trust-Score subindo
   - Imprimir uma cópia de [`ESTRATEGIA.md`](./ESTRATEGIA.md) e [`FAQ-DEFENSIVO.md`](./FAQ-DEFENSIVO.md) — se o consultor cavar, mostrar página específica
@@ -257,7 +257,7 @@ curl -X POST https://x402.assistent.top/rpc \
 
 Caso encontre alguém num corredor:
 
-> "RPC Priority Protocol. A gente faz o spam que sobrecarrega os nós RPC da Solana virar receita recorrente pro operador. Ao invés de bloquear por IP — que pune agente IA legítimo — a gente cobra micro-pagamento por requisição usando o padrão x402 da Coinbase. Cliente fiel ganha desconto automático: até 50% off via reputação. **Já está rodando em produção, com cert válido, em** `x402.assistent.top` **— oito vírgula sete milissegundos de overhead, vinte e seis por cento de economia média medida.** Pré-seed aberta. Conversamos?"
+> "RPC Priority Protocol. A gente faz o spam que sobrecarrega os nós RPC da Solana virar receita recorrente pro operador. Ao invés de bloquear por IP — que pune agente IA legítimo — a gente cobra micro-pagamento por requisição usando o padrão x402 da Coinbase. Cliente fiel ganha desconto automático: até 50% off via reputação. **Já está rodando em produção, com cert válido, em** `x402.rpcpriority.com` **— oito vírgula sete milissegundos de overhead, vinte e seis por cento de economia média medida.** Pré-seed aberta. Conversamos?"
 
 **60 segundos cravados.** Decorar.
 

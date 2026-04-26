@@ -13,7 +13,7 @@
 > A camada de prioridade paga para a economia de agentes na Solana.
 
 **Time:** Flávio Furtado (CEO) · João Romeiro (CTO) · Felipe Cardoso (DPO)
-**Rodando vivo:** `https://x402.assistent.top` — código em `github.com/flavioparah/x402-priority-protocol`
+**Rodando vivo:** `https://x402.rpcpriority.com` — código em `github.com/flavioparah/x402-priority-protocol`
 
 ---
 
@@ -58,10 +58,10 @@ O trilho é o **x402** — padrão HTTP aberto da Coinbase, 2024-2025. A impleme
 
 - **8,7 ms** de overhead do protocolo (p95). Meta do pitch era < 50 ms. **Batemos por 6×.**
 - **26% de economia média** em 22 requisições consecutivas, com o Trust-Score saindo de 0 → 100 de reputação. Demo pública reproduzível.
-- **HTTPS válido + cert Let's Encrypt** em `https://x402.assistent.top`. Qualquer juiz, investidor ou operador pode auditar agora.
+- **HTTPS válido + cert Let's Encrypt** em `https://x402.rpcpriority.com`. Qualquer juiz, investidor ou operador pode auditar agora.
 
 ```
-curl -X POST https://x402.assistent.top/rpc \
+curl -X POST https://x402.rpcpriority.com/rpc \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'
 HTTP/1.1 402 Payment Required

@@ -24,7 +24,7 @@ services:
       - portainer_default
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.x402-shield.rule=Host(`x402.assistent.top`)"
+      - "traefik.http.routers.x402-shield.rule=Host(`x402.rpcpriority.com`) || Host(`x402.assistent.top`)"
       - "traefik.http.routers.x402-shield.entrypoints=websecure"
       - "traefik.http.routers.x402-shield.tls.certresolver=leresolver"
       - "traefik.http.services.x402-shield.loadbalancer.server.port=3000"

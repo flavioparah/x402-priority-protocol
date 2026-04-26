@@ -22,7 +22,7 @@
 
 **Em uma frase:** transforma spam em receita para o operador e em acesso prioritário para o agente que paga.
 
-**Site:** `rpcpriority.com`. **Demo:** `x402.assistent.top`.
+**Site:** `rpcpriority.com`. **Demo:** `x402.rpcpriority.com`.
 
 ---
 

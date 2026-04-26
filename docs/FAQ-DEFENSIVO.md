@@ -117,11 +117,53 @@ Aliás, **MCPay e Latinum são clientes potenciais nossos** — quando um servid
 
 ---
 
+### A.8 ⭐ Consultor disse que Jito poderia fazer isso em 6 meses. E?
+
+**Resposta curta:** Jito pode shippar **código** em 6 meses, sim. Mas o produto não é código — é **rede neutra de operadores compartilhando reputação**, e Jito **não pode** ser neutro porque é concorrente direto de Helius e Triton.
+
+**Resposta longa:**
+
+Vamos separar o que é verdade do que é confusão.
+
+**Verdadeiro:**
+- ✅ Jito tem time de engenharia forte (constrói Block Engine, ShredStream, etc.)
+- ✅ Jito tem capital ($jito token + treasury)
+- ✅ Jito tem relacionamento com searchers (clientes premium do nosso Plano B)
+- ✅ Em 6 meses, com foco, eles shippariam um x402 + escrow + sistema de pontuação básico
+
+**O que é confusão na crítica:**
+
+1. **Jito não tem produto similar HOJE.** Verifiquei: jito.wtf, docs.jito.wtf, jito.network. Produtos atuais são Block Engine (bundles MEV), ShredStream, JitoSOL, Jito-Solana validator client e Jito-RPC com plano fixo enterprise. **Nenhum** menciona x402, pay-per-request RPC ou reputação cross-operador. Não há roadmap público nessa direção.
+
+2. **6 meses assume que Jito decidiu construir e começa amanhã, em sprint full-time.** Roadmap visível deles é restaking, JitoSOL, ShredStream — RPC priority não está no horizonte declarado.
+
+3. **O argumento mais importante:** mesmo se Jito **shippar amanhã**, o produto deles vira **"Jito Score"** — fechado, próprio, igual à API key da Helius hoje. **Helius e Triton NÃO vão entregar dados de cliente para Jito.** São concorrentes diretos no mercado de RPC. Jito vira mais um operador isolado com sistema de reputação interno.
+
+**O moat real não é speed-to-market — é neutralidade.** Funciona como Visa entre bancos: nenhum banco grande consegue substituir Visa porque os outros bancos não confiam em rede operada por concorrente direto. Mesma dinâmica aqui.
+
+**Tabela de defesas concretas:**
+
+| Defesa | Como funciona | Quanto tempo Jito leva pra neutralizar |
+|---|---|---|
+| Dataset cross-operador | 120 GB de eventos comportamentais em 12 meses, vindos de N operadores | **Anos** — Jito teria que conseguir N operadores compartilhando dados, o que não acontece |
+| Aggregates não-replicáveis | Métricas (sybilRisk, churnPattern, fraudAlert) que exigem visão multi-op | **Impossível** sem ser broker neutro |
+| Switching cost de operador integrado | Cada operador integrou SDK + treinou suporte + montou contabilidade | 6+ meses por operador |
+| Standard authority no RFC | Se sermos autores do x402-priority RFC, Jito implementando vira "fork" que fragmenta o ecossistema | Político, não técnico — anos pra resolver |
+| Tração comprovada | 3 operadores integrados em M+3 = ativo de aquisição (US$ 5-30M range) | Vira **incentivo pra Jito comprar, não construir** |
+
+**Frase âncora:** "**Código em 6 meses é trivial. Rede neutra de operadores não é código — é estrutural.**"
+
+**Resposta tática:** essa crítica do consultor é exatamente porque devemos **comprimir nosso timeline.** Mover gate de M+6 → M+3, fazer outreach a 15 operadores em vez de 5 nas primeiras 4 semanas. Lock-in com 3 operadores antes de Jito decidir competir mata o caso pra eles construírem (vira mais barato comprar).
+
+---
+
 ## B. Tecnologia e produto
 
-### B.1 Como funciona o Trust-Score tecnicamente?
+### B.1 Como funciona o Trust-Score tecnicamente? E por que é o moat?
 
-**Resposta:**
+**Resposta — em 4 camadas (do simples ao defensivo):**
+
+#### Camada 1 — Mecânica básica
 
 1. Cada agente é identificado por uma chave pública Ed25519 (pubkey da carteira Solana).
 2. A cada pagamento bem-sucedido, o operador notifica o backend Trust-Score: "pubkey X pagou Y lamports".
@@ -132,7 +174,68 @@ Aliás, **MCPay e Latinum são clientes potenciais nossos** — quando um servid
 
 **Por que 200 e não 100 no denominador?** Porque queremos que o score 100 dê 50% off (não 100% off). Se fosse `1 - score/100`, score 100 daria preço zero — agente fiel viraria DDoS gratuito.
 
-**Por que isso é defensível?** Porque os dados acumulados (qual pubkey pagou quantas vezes, em quais operadores) **só existem no nosso backend**. Operador novo entra com score zero pra todo agente. Operador que já está na rede começa com histórico.
+#### Camada 2 — O que efetivamente é guardado (o dataset)
+
+O algoritmo é trivial. **O dataset é o ativo.** Cada evento de pagamento gera uma linha:
+
+```
+{
+  pubkey: "5yNGbq...QzHa9k",          # identidade universal cross-chain
+  operator_id: "helius-tier1",         # qual operador atendeu
+  timestamp: 1714065432,               # quando
+  amount_lamports: 40200,              # valor pago
+  rpc_method: "getProgramAccounts",    # tipo de chamada
+  load_at_request: 0.82,               # carga do nó no momento
+  score_before: 45,                    # estado da reputação
+  ip_country: "BR",                    # geo (anonimizado)
+  signature: "0x4f...",                # prova criptográfica do pagamento
+  on_chain_tx: "5xVk...j8Pa"           # tx on-chain (se modo escrow)
+}
+```
+
+**Volume estimado:** se 1% dos bilhões de req/mês da Solana virarem 402 priorizados, são ~10M de eventos/mês. Em 12 meses: **120 milhões de eventos, ~120 GB de dataset comportamental único**, não replicável de forma nenhuma sem ter sido o broker neutro que estava lá quando aconteceu.
+
+#### Camada 3 — Os aggregates que vendemos (os derivados não-replicáveis)
+
+O dataset bruto não é o produto. O produto são **derivados**:
+
+| Métrica | O que diz | Operador único consegue calcular sozinho? |
+|---|---|---|
+| `score(pubkey)` | "Reputação geral" | ✅ Sim — não é o nosso moat |
+| `crossOpScore(pubkey) = log₂(operadores_distintos) × paidCount` | "Reputação ponderada por difusão na rede" | ❌ Só nós |
+| `loyaltyScore(pubkey, op) = paidCount[op] / totalPaidCount` | "Quão fiel este agente é a este operador específico" | ❌ Só nós |
+| `churnPattern(pubkey)` | "Este agente migra de operador toda hora? Sinal de price shopping" | ❌ Só nós |
+| `sybilRisk(pubkey)` | "Pubkey criado há 2 dias paga em 5 operadores diferentes simultaneamente — é sybil ataque coordenado?" | ❌ Só nós |
+| `fraudAlert(pubkey)` | "Spammou em 3 operadores nas últimas 24h — bloquear preventivamente" | ❌ Só nós |
+
+**Os 5 últimos não podem ser calculados por operador único, por definição.** Eles exigem visão **cross-operador**, que só existe se houver um broker neutro.
+
+#### Camada 4 — A matemática do moat (efeito de rede tipo Metcalfe)
+
+**Cenário A — Nós com N operadores na rede:**
+- Valor do score para cada operador ∝ N (efeito de rede)
+- Cada operador novo aumenta valor para os N-1 anteriores
+- **Valor total ∝ N²**
+
+**Cenário B — Concorrente (Jito) tenta lançar Trust-Score próprio:**
+- Começa com 1 operador (Jito-RPC)
+- Helius/Triton **não vão** entregar dados de cliente pra Jito (concorrente direto)
+- Ficam presos com N=1 enquanto nós escalamos para N=5
+- **Valor relativo: 1² vs. 5² = 25× pior**
+
+Não é teórico. É literalmente como Visa derrotou bancos individuais. Cada banco tinha rede interna; nenhum conseguiu virar Visa porque os outros bancos não confiavam.
+
+**Paralelos diretos no mundo real (todos extremamente defensáveis):**
+
+| Empresa | Camada | "Operadores" | "Clientes" |
+|---|---|---|---|
+| **Visa** | Pagamentos | Bancos | Lojistas |
+| **Plaid** | Open banking | Bancos | Apps fintech |
+| **Equifax** | Crédito | Credores | Tomadores |
+| **DTCC** | Settlement | Corretoras | Clientes finais |
+| **Nós** | RPC priority | Operadores Solana | Agentes IA |
+
+Característica comum: infraestrutura "feia", não excitante pra leigo, mas extremamente defensável. **Visa nunca virou banco; Plaid nunca virou fintech.** Eles vivem da neutralidade. É exatamente nossa posição.
 
 ---
 
@@ -253,7 +356,7 @@ await conn.getSlot();
 
 **Depois:**
 ```typescript
-const conn = new X402Provider("https://x402.assistent.top", { keypair });
+const conn = new X402Provider("https://x402.rpcpriority.com", { keypair });
 await conn.getSlot();
 ```
 
@@ -378,6 +481,35 @@ Tudo invisível pro código de aplicação.
 
 ---
 
+### C.9 ⭐ Como vocês defendem se Jito (ou qualquer operador grande) decidir copiar?
+
+**Resposta curta:** quatro ângulos de defesa. Nenhum é "speed-to-market" — são todos estruturais.
+
+**Ângulo 1 — Dataset:** 120 GB de eventos comportamentais em 12 meses, vindos de N operadores. Concorrente teria que ter sido broker neutro durante esse tempo. Não dá pra back-fill.
+
+**Ângulo 2 — Aggregates não-replicáveis:** métricas como `crossOpScore`, `sybilRisk`, `fraudAlert` exigem visão multi-operador. **Operador único nunca consegue calcular**, por definição.
+
+**Ângulo 3 — Switching cost:** cada operador integrado investiu meses de engenharia + treino de suporte + montagem de contabilidade. Sair custa pra ele tanto quanto entrar custou.
+
+**Ângulo 4 — Standard authority:** se sermos os autores do RFC do x402-priority, qualquer concorrente implementando vira fragmentação de ecossistema. Politicamente caro de resolver.
+
+**Cenário de aquisição (Plano C explícito):**
+
+Se Jito ou Helius announce produto similar com tração visível em qualquer momento até M+12, **nosso valor de saída via aquisição é exatamente o que protege contra o cenário "copiar e matar":**
+
+| Estado | Valor de aquisição estimado |
+|---|---|
+| 0 operadores integrados | US$ 0 (eles constroem) |
+| 1-2 operadores integrados | US$ 1-3M (acquihire) |
+| 3-5 operadores integrados | **US$ 5-30M (estratégica)** |
+| 5+ operadores + RFC autoria | US$ 30-100M (infra crítica) |
+
+**Implicação:** o moat **não depende de Jito não construir**. O moat depende de termos **3+ operadores integrados antes de Jito decidir construir**. M+3 com 3 operadores é o lock estratégico.
+
+**Frase âncora:** "Não competimos com Jito por código. Competimos por **neutralidade**, e essa eles não podem ter."
+
+---
+
 ### C.8 Como vocês demonstram que o desconto Trust-Score é honesto e não inflado?
 
 **Resposta:** logs públicos e auditável.
@@ -450,7 +582,7 @@ Tudo invisível pro código de aplicação.
 
 1. **Infraestrutura, não app:** spec aberto x402-priority vira referência do ecossistema. Beneficia todos os operadores e todos os agentes — não só clientes nossos.
 
-2. **MVP shippado, não POC:** está rodando ao vivo em `x402.assistent.top` com cert válido. Qualquer juiz testa com `curl` em 10 segundos. Não estamos pedindo financiamento pra construir; estamos pedindo financiamento pra escalar o que já funciona.
+2. **MVP shippado, não POC:** está rodando ao vivo em `x402.rpcpriority.com` com cert válido. Qualquer juiz testa com `curl` em 10 segundos. Não estamos pedindo financiamento pra construir; estamos pedindo financiamento pra escalar o que já funciona.
 
 3. **Time entrega:** semana 2 (Trust-Score) embarcada adiantada. Semana 3 (open-source) em andamento. Não ficamos pra trás de marco nenhum até agora.
 

@@ -82,7 +82,7 @@ Se Plano A não fechar contrato até M+6, viramos nós mesmos um operador de nó
 
 ---
 
-## 4. Análise de barreiras à cópia (moats)
+## 4. Análise de barreiras à cópia (moats) — 6 camadas
 
 | Ativo | É o moat? | Quão difícil de copiar | Por quê |
 |---|---|---|---|
@@ -93,6 +93,66 @@ Se Plano A não fechar contrato até M+6, viramos nós mesmos um operador de nó
 | **Relacionamentos com operadores** | ✅ Sim (Plano A) | Alto | Contratos B2B criam switching cost real (integração, contabilidade, suporte). |
 | **Marca / reconhecimento** | 🟡 Parcial | Médio | Frágil sem case study. Forte com 2-3 referências de peso. |
 | **Operacional (rodar RPC)** | ❌ Não (Plano B) | Médio | Helius/Triton fazem isso 10× melhor que jamais faremos. |
+
+### As 6 camadas do moat técnico (detalhamento)
+
+#### Camada 1 — Dataset bruto
+
+A cada evento de pagamento, gravamos: `{pubkey, operator_id, timestamp, amount_lamports, rpc_method, load_at_request, score_before, ip_country, signature, on_chain_tx}`.
+
+**Volume estimado:** se 1% das req/mês da Solana virarem 402, são ~10M de eventos/mês = **120 GB de dataset comportamental em 12 meses**, não replicável sem ter sido o broker neutro durante o período.
+
+#### Camada 2 — Aggregates não-replicáveis sem visão cross-operador
+
+| Métrica | Operador único calcula sozinho? |
+|---|---|
+| `score(pubkey)` | ✅ Sim (não é o moat) |
+| `crossOpScore = log₂(operadores_distintos) × paidCount` | ❌ Só nós |
+| `loyaltyScore(pubkey, op) = paidCount[op] / totalPaidCount` | ❌ Só nós |
+| `churnPattern(pubkey)` | ❌ Só nós |
+| `sybilRisk(pubkey)` (mesmo pubkey em N operadores em janela curta) | ❌ Só nós |
+| `fraudAlert(pubkey)` (spam multi-operador em 24h) | ❌ Só nós |
+
+#### Camada 3 — Math do efeito de rede (Metcalfe-like)
+
+- Nossa rede com N operadores: **valor total ∝ N²**
+- Concorrente (Jito) com 1 operador (próprio): **valor ∝ 1²**
+- Em N=5, vantagem relativa = **25×**
+- Helius/Triton **não vão** entregar dados de cliente pra Jito (concorrente direto). Jito fica preso em N=1.
+
+#### Camada 4 — Switching cost de operador integrado
+
+- Cada operador investiu meses em integração SDK + treino de suporte + montagem contábil
+- Sair custa **tanto quanto entrou**
+- Ainda perde acesso ao histórico de Trust-Score que ajudou a construir
+
+#### Camada 5 — Standard authority (RFC)
+
+- Autores do *x402-priority subprotocol* RFC controlam evolução
+- Concorrente que implementar precisa pedir interop ou fragmentar ecossistema (politicamente caro)
+- Como Coinbase com x402, ou Anthropic com MCP
+
+#### Camada 6 — Riscos do moat (honesto)
+
+| Risco | Probabilidade | Mitigação |
+|---|---|---|
+| 2+ operadores grandes saem simultaneamente | Baixa | Contratos anuais com penalidade |
+| Regulação força data localization | Média | Multi-region + dados anonimizados |
+| Concorrente faz M&A pra forçar switch | Baixa-Média | Acquisition-protection (Plano C) |
+| Hack do DB Trust-Score | Baixa | Audit logs + dados anonimizados |
+| RPC vira commodity total | Baixa-Média | Pivot para fraud-detection-as-a-service |
+
+### Paralelos no mundo real (todos extremamente defensáveis)
+
+| Empresa | Camada | "Operadores" | "Clientes" |
+|---|---|---|---|
+| **Visa** | Pagamentos | Bancos | Lojistas |
+| **Plaid** | Open banking | Bancos | Apps fintech |
+| **Equifax** | Crédito | Credores | Tomadores |
+| **DTCC** | Settlement | Corretoras | Clientes finais |
+| **Nós** | RPC priority | Operadores Solana | Agentes IA |
+
+Característica comum: infraestrutura "feia", não excitante pra leigo, **extremamente defensável**. Visa nunca virou banco; Plaid nunca virou fintech. Vivem da **neutralidade**.
 
 **Insight central:** **código é commodity, dados são moat.** Devemos abrir o spec e o server (gera adoção), mas guardar o **Trust-Score backend** centralizado. É o único pedaço onde temos vantagem composta com o tempo.
 
@@ -112,21 +172,32 @@ Se Plano A não fechar contrato até M+6, viramos nós mesmos um operador de nó
 
 ---
 
-## 6. Sequência tática — próximos 90 dias
+## 6. Sequência tática — próximos 90 dias (timeline COMPRIMIDO)
+
+> **Mudança pós-consultor (2026-04-25):** consultor do Colosseum apontou risco de Jito construir produto similar em 6 meses. Resposta: **comprimir gate de M+6 → M+3**. Lock-in com 3+ operadores antes que qualquer concorrente decida competir muda o cálculo deles de "construir" para "comprar". Detalhes da defesa em [`FAQ-DEFENSIVO.md` A.8](./FAQ-DEFENSIVO.md).
 
 ```
 M+0  ████████████████████████████  Hoje (2026-04-25)
-M+1  ━━ Spec v0.1 publicado + RFC em processo
+M+1  ━━ Spec v0.1 publicado + RFC em processo (autoridade no padrão)
      ━━ Pitch video gravado e publicado
-     ━━ Outreach a 5 operadores tier 2/3 (BR + LATAM)
-M+2  ━━ Primeiro piloto fechado (revenue share 70/30, sem fixed fee)
-     ━━ Trust-Score backend isolado em service próprio
-M+3  ━━ Case study publicado (latência + receita do piloto)
-     ━━ Outreach formal a Helius/Triton/Jito
-M+6  ━━ GATE: contrato pago fechado?
-       ├── SIM  → Plano A continua, levantar pré-seed
-       └── NÃO  → Ativar Plano B, virar operador próprio em nicho
+     ━━ Outreach a 15 operadores tier 2/3 (BR + LATAM + Europa) ← 3× o número anterior
+     ━━ Devnet companion deployment ao vivo (x402-devnet.rpcpriority.com)
+M+2  ━━ 2+ pilotos fechados (revenue share 70/30, sem fixed fee, 90 dias)
+     ━━ Trust-Score backend isolado em serviço próprio
+     ━━ Case study #1 publicado (latência + receita do primeiro piloto)
+M+3  ━━ GATE COMPRIMIDO: 3+ operadores integrados?
+       ├── SIM  → Plano A continua, levantar pré-seed (US$ 150-300k)
+       │           Outreach formal a Helius/Triton/Jito com case study consolidado
+       └── NÃO  → Ativar Plano B (operador próprio nicho)
+M+6  ━━ Marco secundário: 5+ operadores OU primeiro contrato pago de tier 1
+M+12 ━━ MRR US$ 50-200k OU pivô material (Plano C)
 ```
+
+**Por que M+3 e não M+6:**
+- Cada mês sem operador integrado = mês a mais de exposição a Jito/Helius decidirem competir
+- Trust-Score com 3+ operadores cria efeito de rede mensurável (saímos de N=1 para N²=9 em valor relativo)
+- Switching cost de operador integrado começa a se acumular — quanto mais cedo, melhor
+- 3 operadores em piloto = ativo de aquisição da ordem de US$ 5-30M (Plano C)
 
 ---
 
@@ -171,7 +242,60 @@ Termos técnicos usados em respostas estão definidos em [`GLOSSARIO.md`](./GLOS
 | **João (CTO)** | Spec, Trust-Score backend, qualidade técnica das integrações |
 | **Felipe (DPO)** | Compliance, legal de contratos B2B, governança do RFC aberto |
 
-**Decisão crítica em consenso:** ativação do Plano B é decisão dos três fundadores em M+6. Não é decisão unilateral.
+**Decisão crítica em consenso:** ativação do Plano B é decisão dos três fundadores em M+3 (gate comprimido). Ativação do Plano C (aquisição) é decisão dos três fundadores a qualquer momento.
+
+---
+
+## 10. Sinais de aceleração (modo sprint imediato)
+
+Três cenários ativam **modo sprint** — todos os recursos canalizados para fechar operadores rapidamente, sem se preocupar com receita imediata:
+
+| Sinal | O que faz | Resposta |
+|---|---|---|
+| **Jito anuncia produto similar** | Janela de oportunidade fecha | Acelerar pra 5 operadores em 60 dias, contatar Jito sobre acquisition |
+| **Helius adquire concorrente** ou levanta nova rodada com tese parecida | Eles podem comprar nosso espaço | Outreach intensivo a Triton/Jito pra fechar antes |
+| **Solana Foundation publica RFC nativo de RPC priority** | Comoditização ameaça | Posicionar como implementação de referência + pivot de Trust-Score para reputation oracle |
+
+---
+
+## 11. Plano C — Saída via aquisição
+
+> **Quando ativamos:** se Jito ou Helius anunciar produto similar com tração visível em qualquer momento até M+12, ou se MRR ficar abaixo de US$ 30k mesmo com 3+ operadores em M+9.
+>
+> **Por que faz sentido:** o moat não depende de Jito/Helius **não construírem**. O moat depende de termos **3+ operadores integrados antes de qualquer concorrente decidir competir**. Nesse ponto, o cálculo deles muda de "construir" para "comprar".
+
+### Valor de aquisição estimado por estágio
+
+| Estado | Valor estimado | Argumento |
+|---|---|---|
+| 0 operadores integrados | US$ 0 (eles constroem) | Sem ativo defensável |
+| 1-2 operadores integrados | US$ 1-3M (acquihire) | Time + spec, mas sem rede |
+| **3-5 operadores integrados + Trust-Score data** | **US$ 5-30M (estratégica)** | Rede neutra com efeito de rede + dataset cross-op |
+| 5+ operadores + RFC autoria | US$ 30-100M (infra crítica) | Padrão de fato + relacionamentos B2B |
+
+### Compradores prováveis e fit estratégico
+
+| Comprador | Por que comprariam | Probabilidade |
+|---|---|---|
+| **Jito Labs** | Adicionar camada de RPC priority ao stack (eles têm bundles + ShredStream + RPC). Trust-Score complementa o que eles já fazem com searchers. | Alta se decidirem entrar nesse mercado |
+| **Helius** | Eliminar disrupção do modelo de plano fixo, absorver o "broker neutro" antes que vire concorrente. | Média — eles preferem comprar feature antes que feature comprometa pricing |
+| **Triton** | Reativo à movimentação de Helius/Jito. Ângulo defensivo. | Média |
+| **Coinbase / Base** | x402 é deles. Comprar o player que está validando a tese deles na Solana é defensível. | Baixa-Média (não focam em Solana hoje) |
+| **a16z crypto / Multicoin (acqui-bridge)** | Bundle com outra investida. | Baixa |
+
+### Ações para preservar valor de aquisição
+
+1. **Contratos exclusivos com operadores** — não dual-license. Operador escolhe nós ou outro.
+2. **Dataset proprietário** — Trust-Score backend totalmente fechado, audit logs internos.
+3. **Marca registrada** — `RPC Priority Protocol` como trademark, domínio `rpcpriority.com` com proteção de marca.
+4. **Time travado em vesting + contratos B2B** — comprador valoriza retenção de equipe + clientes ativos.
+5. **Documentação operacional limpa** — diligência rápida = aquisição rápida = valor maior.
+
+### Divisão dos founders em cenário de aquisição
+
+- Vesting de 4 anos com 1 ano de cliff (já em vigor)
+- Em caso de aquisição antes de M+24, **acceleration de 50% do remaining vesting** — padrão Silicon Valley
+- Decisão de aceitar oferta requer consenso dos 3 fundadores (mesmo que valor "alto")
 
 ---
 

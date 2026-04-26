@@ -33,7 +33,7 @@ Imagine uma rodovia pública que fica engarrafada todo dia. A defesa de hoje é 
 
 - **Overhead do protocolo: 8,7 ms (p95)** sobre uma chamada normal. Meta do nosso próprio pitch era < 50 ms — batemos por 6×.
 - **Economia real para cliente fiel: até 50%** de desconto automático via Trust-Score. Medido em produção contra o domínio público: 22 requisições, **26% de economia média** conforme a reputação acumulou.
-- **Rodando vivo na internet:** `https://x402.assistent.top` — HTTPS válido, certificado Let's Encrypt, auditável por qualquer pessoa. Código aberto em `github.com/flavioparah/x402-priority-protocol`.
+- **Rodando vivo na internet:** `https://x402.rpcpriority.com` — HTTPS válido, certificado Let's Encrypt, auditável por qualquer pessoa. Código aberto em `github.com/flavioparah/x402-priority-protocol`.
 
 ## Mercado e momento
 

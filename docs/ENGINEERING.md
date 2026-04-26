@@ -192,7 +192,7 @@ Fixes **O-004**. Added `https.Agent({ keepAlive: true, maxSockets: 64, keepAlive
 
 #### D-009 — Production deploy via Docker + Traefik on `portainer_default`
 
-Matches the existing VPS pattern (Vokano, amiginvisivel). Service name `x402-shield`, domain `x402.assistent.top`, TLS via Let's Encrypt `leresolver`, network `portainer_default` external.
+Matches the existing VPS pattern (Vokano, amiginvisivel). Service name `x402-shield`, domain `x402.rpcpriority.com`, TLS via Let's Encrypt `leresolver`, network `portainer_default` external.
 
 **Why:** The VPS already runs Traefik + Portainer in this configuration. Bolting on a new service is one compose file. A non-Docker deployment (systemd unit + nginx) would cost us an hour for zero upside.
 
