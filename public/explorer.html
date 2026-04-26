@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reputation Explorer — RPC Priority Protocol</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #ededed; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .gradient-text { background: linear-gradient(135deg, #9945FF 0%, #14F195 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .gradient-bg { background: linear-gradient(135deg, #9945FF 0%, #14F195 100%); }
+  .card-glass { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); border-radius: 16px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #14F195; box-shadow: 0 0 8px #14F195; animation: pulse 1.5s ease-in-out infinite; display: inline-block; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+  .gauge-ring { transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 1s ease-out; }
+  .reveal { animation: fadeUp 0.4s ease-out; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+  table th, table td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="border-b border-white/10">
+  <div class="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-lg font-extrabold gradient-text mono tracking-tight">RPC PRIORITY</a>
+      <span class="text-white/30">·</span>
+      <span class="text-sm text-white/60 uppercase tracking-widest">Reputation Explorer</span>
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <a href="/live" class="text-xs text-white/60 hover:text-white border border-white/20 rounded-full px-3 py-1 flex items-center gap-2"><span class="live-dot"></span> Live</a>
+      <a href="/try" class="text-xs text-white/60 hover:text-white border border-white/20 rounded-full px-3 py-1">Try it →</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-6 py-12 space-y-8">
+
+  <section>
+    <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">Look up any agent's <span class="gradient-text">Trust-Score</span></h1>
+    <p class="mt-4 text-white/60 max-w-2xl">Every Solana pubkey that has ever paid this Shield has a reputation record. Score grows 5 points per payment up to 100, which unlocks 50% off on every future request. Paste any pubkey to inspect.</p>
+  </section>
+
+  <section class="card-glass p-6">
+    <form id="lookup-form" class="flex gap-3 flex-wrap">
+      <input id="pubkey-input" type="text" placeholder="Solana pubkey (base58)..." class="flex-1 min-w-[300px] bg-black/40 border border-white/15 rounded-full px-5 py-3 mono text-sm focus:outline-none focus:border-purple-500" autocomplete="off">
+      <button type="submit" class="gradient-bg text-black font-bold px-6 py-3 rounded-full text-sm">Look up</button>
+    </form>
+    <div class="mt-3 text-xs text-white/40 mono">try the test agent: <button id="example-btn" class="underline hover:text-white">G8KyXwxRAHdEBEZ1RhaDHopNv7FRdEAw7b6EddaDY6pG</button></div>
+  </section>
+
+  <section id="result" class="hidden"></section>
+
+  <section class="card-glass p-6 overflow-x-auto">
+    <h2 class="text-sm uppercase tracking-widest text-white/60 mb-4">Top 10 Agents — Trust-Score Leaderboard</h2>
+    <table class="w-full text-sm">
+      <thead><tr class="text-white/50 text-xs uppercase tracking-widest">
+        <th class="text-left">#</th>
+        <th class="text-left">Pubkey</th>
+        <th class="text-right">Score</th>
+        <th class="text-right">Paid count</th>
+        <th class="text-right">Total Paid</th>
+        <th class="text-right">Discount</th>
+      </tr></thead>
+      <tbody id="leaderboard-body"><tr><td colspan="6" class="text-white/40 text-center py-6">loading…</td></tr></tbody>
+    </table>
+  </section>
+
+  <footer class="text-center text-xs text-white/30 pt-8 pb-4">
+    Built for the Colosseum Frontier Hackathon 2026 ·
+    <a href="https://github.com/flavioparah/x402-priority-protocol" class="text-white/50 hover:text-white">github</a>
+  </footer>
+</main>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+  const trunc = (k) => k ? k.slice(0, 4) + '…' + k.slice(-4) : '—';
+  const fmtSol = (ul) => (ul / 1_000_000_000).toFixed(6);
+
+  let SHIELD_INFO = null;
+  fetch('/info').then(r => r.json()).then(info => SHIELD_INFO = info);
+  const explorerUrl = (pk) => `https://explorer.solana.com/address/${pk}${SHIELD_INFO?.network==='devnet'?'?cluster=devnet':''}`;
+
+  function ago(ts) {
+    if (!ts) return 'never';
+    const s = (Date.now() - ts) / 1000;
+    if (s < 60) return Math.floor(s) + 's ago';
+    if (s < 3600) return Math.floor(s/60) + 'm ago';
+    if (s < 86400) return Math.floor(s/3600) + 'h ago';
+    return Math.floor(s/86400) + 'd ago';
+  }
+
+  function renderResult(rec) {
+    const score = rec.trust_score || 0;
+    const paidCount = rec.paid_count || 0;
+    const discount = (score / 2).toFixed(1);
+    const totalUL = rec.total_paid_micro_lamports || 0;
+    const samplePrice = rec.example_price_at_max_load || 50000;
+    const samplePriceWithoutDiscount = 50000;
+    const savings = samplePriceWithoutDiscount - samplePrice;
+
+    const ringDashOffset = 251.3 * (1 - score / 100);  // r=40 → 2*pi*r ≈ 251.3
+    const status = score === 0 ? 'New agent' : score < 50 ? 'Building reputation' : score < 100 ? 'Trusted agent' : 'Maximum trust';
+    const statusColor = score === 0 ? 'text-white/50' : score < 50 ? 'text-orange-300' : score < 100 ? 'text-purple-300' : 'text-green-300';
+
+    const html = `
+      <div class="card-glass p-6 reveal">
+        <div class="flex items-start gap-2 mb-4">
+          <div class="text-xs uppercase tracking-widest text-white/50 flex-1">Reputation record</div>
+          <span class="${statusColor} text-xs font-bold uppercase tracking-widest">${status}</span>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-8 items-start">
+          <!-- gauge -->
+          <div class="flex-shrink-0">
+            <svg width="180" height="180" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
+              <circle class="gauge-ring" cx="50" cy="50" r="40" fill="none" stroke="url(#g-rep)" stroke-width="8" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="${ringDashOffset}"/>
+              <defs><linearGradient id="g-rep" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9945FF"/><stop offset="100%" stop-color="#14F195"/></linearGradient></defs>
+              <text x="50" y="48" text-anchor="middle" font-size="22" font-weight="800" fill="#fff" font-family="Inter, sans-serif">${score}</text>
+              <text x="50" y="62" text-anchor="middle" font-size="6" fill="#888" font-family="Inter, sans-serif" letter-spacing="1.5">TRUST SCORE</text>
+            </svg>
+          </div>
+
+          <!-- stats -->
+          <div class="flex-1 grid grid-cols-2 gap-x-6 gap-y-3 mono text-sm w-full">
+            <div>
+              <div class="text-xs text-white/50 uppercase tracking-widest">Pubkey</div>
+              <a target="_blank" href="${explorerUrl(rec.pubkey)}" class="text-white hover:underline break-all text-xs">${rec.pubkey}</a>
+            </div>
+            <div>
+              <div class="text-xs text-white/50 uppercase tracking-widest">Discount</div>
+              <div class="text-green-300 text-xl font-bold">−${discount}%</div>
+            </div>
+            <div>
+              <div class="text-xs text-white/50 uppercase tracking-widest">Paid count</div>
+              <div class="text-white">${paidCount}</div>
+            </div>
+            <div>
+              <div class="text-xs text-white/50 uppercase tracking-widest">Total paid</div>
+              <div class="text-white">${totalUL.toLocaleString()} µL</div>
+              <div class="text-white/50 text-xs">${fmtSol(totalUL)} SOL</div>
+            </div>
+            <div>
+              <div class="text-xs text-white/50 uppercase tracking-widest">First seen</div>
+              <div class="text-white">${ago(rec.first_paid_at)}</div>
+            </div>
+            <div>
+              <div class="text-xs text-white/50 uppercase tracking-widest">Last seen</div>
+              <div class="text-white">${ago(rec.last_paid_at)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-white/10 text-sm">
+          ${score === 0
+            ? '<p class="text-white/60">This pubkey has no payment history yet. Pay one challenge to start accumulating reputation; each payment adds 5 points.</p>'
+            : `<p class="text-white/70">At full load, this pubkey would pay <span class="mono text-purple-300">${samplePrice.toLocaleString()} µL</span> instead of <span class="mono text-white/70 line-through">${samplePriceWithoutDiscount.toLocaleString()} µL</span> — savings: <span class="mono text-green-300">${savings.toLocaleString()} µL</span> per request (${discount}%).</p>`}
+        </div>
+      </div>`;
+    const el = $('#result');
+    el.innerHTML = html;
+    el.classList.remove('hidden');
+  }
+
+  $('#lookup-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const pubkey = $('#pubkey-input').value.trim();
+    if (!pubkey) return;
+    try {
+      const rec = await fetch('/reputation/' + encodeURIComponent(pubkey)).then(r => r.json());
+      renderResult(rec);
+    } catch (err) {
+      $('#result').innerHTML = `<div class="card-glass p-4 reveal text-red-300 text-sm">Lookup failed: ${err.message}</div>`;
+      $('#result').classList.remove('hidden');
+    }
+  };
+
+  $('#example-btn').onclick = () => {
+    $('#pubkey-input').value = 'G8KyXwxRAHdEBEZ1RhaDHopNv7FRdEAw7b6EddaDY6pG';
+    $('#lookup-form').dispatchEvent(new Event('submit'));
+  };
+
+  // Leaderboard (same as /live)
+  async function loadLeaderboard() {
+    try {
+      const s = await fetch('/stats/leaderboard').then(r => r.json());
+      const tb = $('#leaderboard-body');
+      if (!s.leaderboard || s.leaderboard.length === 0) {
+        tb.innerHTML = '<tr><td colspan="6" class="text-white/40 text-center py-6">no agents yet</td></tr>';
+        return;
+      }
+      tb.innerHTML = s.leaderboard.map((a, i) => {
+        const discount = (a.trust_score / 2).toFixed(1);
+        const rankColor = i === 0 ? 'text-yellow-300' : i === 1 ? 'text-white/80' : i === 2 ? 'text-orange-300' : 'text-white/50';
+        return `<tr class="hover:bg-white/5 cursor-pointer" data-pubkey="${a.pubkey}">
+          <td class="${rankColor} mono">#${i+1}</td>
+          <td class="mono"><span class="text-white/85">${trunc(a.pubkey)}</span></td>
+          <td class="text-right mono"><span class="px-2 py-0.5 bg-purple-500/15 border border-purple-500/30 rounded text-purple-300 text-xs">${a.trust_score}</span></td>
+          <td class="text-right mono">${a.paid_count}</td>
+          <td class="text-right mono">${a.total_paid_micro_lamports.toLocaleString()} µL</td>
+          <td class="text-right mono text-green-300">−${discount}%</td>
+        </tr>`;
+      }).join('');
+      // Click row to look up
+      tb.querySelectorAll('tr[data-pubkey]').forEach(tr => {
+        tr.onclick = () => {
+          $('#pubkey-input').value = tr.dataset.pubkey;
+          $('#lookup-form').dispatchEvent(new Event('submit'));
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+      });
+    } catch (_) {}
+  }
+  loadLeaderboard();
+  setInterval(loadLeaderboard, 30000);
+</script>
+
+</body>
+</html>

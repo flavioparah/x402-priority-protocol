@@ -131,6 +131,17 @@ const reputation = new Map();
  */
 const requestTimestamps = [];
 
+/**
+ * Sliding-window stats exposed via /stats/* for the public dashboards.
+ * In-memory only (lost on restart). Cap to keep RAM bounded.
+ */
+/** @type {Array<{ts:number, pubkeyHint:string|null, basePrice:number, finalPrice:number, load:number}>} */
+const challengeLog = [];
+/** @type {Array<{ts:number, pubkey:string, amount:number, score:number}>} */
+const paymentLog = [];
+/** @type {Array<{ts:number, load:number, rps:number}>} */
+const loadHistory = [];
+
 function pruneRequestTimestamps(now = Date.now()) {
   const cutoff = now - CONFIG.LOAD_WINDOW_MS;
   while (requestTimestamps.length > 0 && requestTimestamps[0] < cutoff) {
@@ -252,6 +263,9 @@ function recordPayment(pubkeyB58, amount) {
   rec.lastPaidAt = now;
   rec.totalPaid += amount;
   reputation.set(pubkeyB58, rec);
+
+  paymentLog.push({ ts: now, pubkey: pubkeyB58, amount, score: getTrustScore(pubkeyB58) });
+  if (paymentLog.length > 100) paymentLog.shift();
 }
 
 /** Verifica se o IP excedeu o limite de requisições. */
@@ -293,6 +307,17 @@ function pruneExpiredNonces() {
   }
 }
 setInterval(pruneExpiredNonces, CONFIG.NONCE_TTL_MS);
+
+// Snapshot the current load every 60s so the dashboard can plot a 1h time series.
+setInterval(() => {
+  pruneRequestTimestamps();
+  loadHistory.push({
+    ts: Date.now(),
+    load: parseFloat(getRpcLoad().toFixed(3)),
+    rps: parseFloat((requestTimestamps.length / (CONFIG.LOAD_WINDOW_MS / 1000)).toFixed(2)),
+  });
+  if (loadHistory.length > 60) loadHistory.shift();
+}, 60_000);
 
 // ─── Verificação de assinatura (MVP off-chain) ────────────────────────────────
 
@@ -391,6 +416,15 @@ function x402Shield(req, res, next) {
   const basePrice = calcDynamicPrice(load);
   const amount = applyTrustDiscount(basePrice, trustScore);
   const nonce = issueNonce(amount, hintedPubkey);
+
+  challengeLog.push({
+    ts: Date.now(),
+    pubkeyHint: hintedPubkey || null,
+    basePrice,
+    finalPrice: amount,
+    load: parseFloat(load.toFixed(3)),
+  });
+  if (challengeLog.length > 100) challengeLog.shift();
 
   console.log(`[x402] ⚡ Challenging ${ip} — load: ${(load * 100).toFixed(1)}%, base: ${basePrice} µL, trust: ${trustScore}, final: ${amount} µL`);
 
@@ -514,6 +548,65 @@ app.get("/escrow/balance/:pubkey", (req, res) => {
   const balance = escrowBalances.get(req.params.pubkey) || 0;
   res.json({ pubkey: req.params.pubkey, balance_micro_lamports: balance });
 });
+
+// ─── Stats / dashboard endpoints ──────────────────────────────────────────────
+
+// Static metadata about this Shield deployment (consumed by /live, /try, /explorer pages).
+app.get("/info", (req, res) => {
+  const upstream = CONFIG.REAL_RPC_URL;
+  const network = upstream.includes("mainnet") ? "mainnet" : upstream.includes("devnet") ? "devnet" : "unknown";
+  res.json({
+    operator_pubkey: CONFIG.PAYMENT_DESTINATION,
+    network,
+    upstream_rpc: upstream,
+    base_price_micro_lamports: CONFIG.BASE_PRICE_MICRO_LAMPORTS,
+    max_price_micro_lamports: CONFIG.MAX_PRICE_MICRO_LAMPORTS,
+    threshold: CONFIG.RPC_LOAD_THRESHOLD,
+    nonce_ttl_seconds: CONFIG.NONCE_TTL_MS / 1000,
+    trusted_deposits_enabled: CONFIG.TRUST_DEPOSITS,
+  });
+});
+
+// Recent activity for the live dashboard.
+app.get("/stats/recent", (req, res) => {
+  const totalPaidMicroLamports = [...reputation.values()].reduce((s, r) => s + r.totalPaid, 0);
+  res.json({
+    payments: paymentLog.slice(-20).reverse(),
+    challenges: challengeLog.slice(-20).reverse(),
+    load_history: loadHistory.slice(-30),
+    totals: {
+      total_challenges_issued_session: challengeLog.length,
+      total_payments_session: paymentLog.length,
+      total_paid_micro_lamports: totalPaidMicroLamports,
+      unique_paying_pubkeys: reputation.size,
+    },
+  });
+});
+
+// Top 10 by Trust-Score for the leaderboard widget.
+app.get("/stats/leaderboard", (req, res) => {
+  const top = [...reputation.entries()]
+    .map(([pubkey, rec]) => ({
+      pubkey,
+      trust_score: getTrustScore(pubkey),
+      paid_count: rec.paidCount,
+      total_paid_micro_lamports: rec.totalPaid,
+      last_paid_at: rec.lastPaidAt,
+    }))
+    .sort((a, b) => b.trust_score - a.trust_score || b.paid_count - a.paid_count)
+    .slice(0, 10);
+  res.json({ leaderboard: top, generated_at: Date.now() });
+});
+
+// ─── Public dashboard pages ──────────────────────────────────────────────────
+// Static serving + explicit routes for the 3 dashboards (/live, /try, /explorer).
+// Mounted BEFORE the /rpc proxy so static assets aren't intercepted by the
+// catch-all proxy. The landing page (public/index.html) is auto-served at /.
+const path = require("path");
+app.use(express.static(path.join(__dirname, "public"), { extensions: ["html"] }));
+app.get("/live", (_req, res) => res.sendFile(path.join(__dirname, "public", "live.html")));
+app.get("/try", (_req, res) => res.sendFile(path.join(__dirname, "public", "try.html")));
+app.get("/explorer", (_req, res) => res.sendFile(path.join(__dirname, "public", "explorer.html")));
 
 // ─── Proxy RPC (protegido pelo Shield) ───────────────────────────────────────
 

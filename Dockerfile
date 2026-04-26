@@ -12,6 +12,10 @@ RUN npm ci --omit=dev
 # ship with the source for humans, not with the container.
 COPY index.js ./
 
+# Public dashboard pages (/live, /try, /explorer + landing page).
+# Served by Express via express.static('public').
+COPY public/ ./public/
+
 EXPOSE 3000
 
 CMD ["node", "index.js"]

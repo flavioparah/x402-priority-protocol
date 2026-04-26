@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Try it — RPC Priority Protocol</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #ededed; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .gradient-text { background: linear-gradient(135deg, #9945FF 0%, #14F195 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .gradient-bg { background: linear-gradient(135deg, #9945FF 0%, #14F195 100%); }
+  .card-glass { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); border-radius: 16px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #14F195; box-shadow: 0 0 8px #14F195; animation: pulse 1.5s ease-in-out infinite; display: inline-block; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+  .reveal { animation: fadeUp 0.5s ease-out; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+  .badge-402 { background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); }
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="border-b border-white/10">
+  <div class="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-lg font-extrabold gradient-text mono tracking-tight">RPC PRIORITY</a>
+      <span class="text-white/30">·</span>
+      <span class="text-sm text-white/60 uppercase tracking-widest">Try it</span>
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <a href="/live" class="text-xs text-white/60 hover:text-white border border-white/20 rounded-full px-3 py-1 flex items-center gap-2"><span class="live-dot"></span> Live</a>
+      <a href="/explorer" class="text-xs text-white/60 hover:text-white border border-white/20 rounded-full px-3 py-1">Explorer</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-6 py-12 space-y-8">
+
+  <!-- Hero -->
+  <section>
+    <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">Try the <span class="gradient-text">402 challenge</span> from your browser</h1>
+    <p class="mt-4 text-white/60 max-w-2xl">No install, no SDK. Click the button — your browser sends a JSON-RPC request to this Shield, the Shield is forced under load (demo mode), it responds with HTTP 402 and a signed challenge. Inspect the headers below to see exactly what an agent would receive.</p>
+  </section>
+
+  <!-- Curl preview (read-only) -->
+  <section class="card-glass p-6">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs uppercase tracking-widest text-white/50">Equivalent in curl</span>
+      <button id="copy-curl" class="text-xs text-white/60 hover:text-white border border-white/20 rounded-full px-3 py-1">Copy</button>
+    </div>
+<pre class="mono text-xs leading-relaxed text-white/80 overflow-x-auto"><span class="text-green-400">curl</span> -i -X POST <span id="curl-host" class="text-purple-300">https://x402.rpcpriority.com</span>/rpc \
+  -H <span class="text-yellow-300">'Content-Type: application/json'</span> \
+  -d <span class="text-yellow-300">'{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'</span></pre>
+  </section>
+
+  <!-- Big CTA -->
+  <section class="text-center">
+    <button id="fire-btn" class="gradient-bg text-black font-bold px-8 py-4 rounded-full text-lg shadow-lg shadow-purple-500/20 hover:scale-105 transition">
+      <span id="fire-label">▶ Send the request</span>
+    </button>
+    <p class="mt-2 text-xs text-white/40 mono">browser → fetch('/rpc', POST)</p>
+  </section>
+
+  <!-- Result panel -->
+  <section id="result-panel" class="hidden space-y-5">
+    <div class="reveal">
+      <div class="flex items-center gap-3 mb-2">
+        <span id="status-badge" class="badge-402 text-white text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">402 Payment Required</span>
+        <span id="status-detail" class="text-sm text-white/60">— this is the expected response under load</span>
+      </div>
+      <p class="text-sm text-white/70 max-w-2xl">The Shield issued a signed economic challenge. An x402-aware agent would now sign the payload with its Ed25519 keypair and retry — see <a class="underline hover:text-white" href="/live">/live</a> to watch this happen with real agents.</p>
+    </div>
+
+    <div class="card-glass p-6 reveal">
+      <h2 class="text-sm uppercase tracking-widest text-white/60 mb-4">x402 challenge headers (decoded)</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm mono">
+          <thead><tr class="text-white/50 text-xs uppercase tracking-widest"><th class="text-left py-2">Header</th><th class="text-left py-2">Value</th><th class="text-left py-2">What it means</th></tr></thead>
+          <tbody id="headers-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <details class="card-glass p-4 reveal">
+      <summary class="cursor-pointer text-sm text-white/60">Raw response body (JSON)</summary>
+      <pre class="mt-3 text-xs text-white/70 mono overflow-x-auto" id="body-raw"></pre>
+    </details>
+
+    <div class="reveal text-center pt-4">
+      <a href="/live" class="text-sm text-white/60 hover:text-white border border-white/20 rounded-full px-4 py-2 inline-flex items-center gap-2"><span class="live-dot"></span> Watch the Trust-Score economy in action →</a>
+    </div>
+  </section>
+
+  <footer class="text-center text-xs text-white/30 pt-8 pb-4">
+    Built for the Colosseum Frontier Hackathon 2026 ·
+    <a href="https://github.com/flavioparah/x402-priority-protocol" class="text-white/50 hover:text-white">github</a>
+  </footer>
+</main>
+
+<script>
+  const HEADER_EXPLAIN = {
+    'x-x402-status':              { en: 'Status of the negotiation — "challenged" means: pay to proceed.' },
+    'x-x402-payment-destination': { en: 'Solana wallet pubkey of the operator. Where the payment lands on-chain.' },
+    'x-x402-amount':              { en: 'Price in micro-lamports (1 lamport = 1000 µL = ~$1.5×10⁻⁷ at SOL=$150).' },
+    'x-x402-amount-base':         { en: 'The base price BEFORE Trust-Score discount. Compare to "amount" to see your discount.' },
+    'x-x402-trust-score':         { en: 'Your reputation 0–100. Send X-x402-Agent-Pubkey to claim a discount up to 50%.' },
+    'x-x402-nonce':               { en: 'Single-use 16-byte challenge ID. Bound to your hinted pubkey if you sent one.' },
+    'x-x402-nonce-ttl':           { en: 'Seconds until the nonce expires. Sign and submit fast.' },
+  };
+
+  const CURL_HOST = location.protocol + '//' + location.host;
+  document.getElementById('curl-host').textContent = CURL_HOST;
+  document.getElementById('copy-curl').onclick = () => {
+    const cmd = `curl -i -X POST ${CURL_HOST}/rpc -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'`;
+    navigator.clipboard.writeText(cmd);
+    const btn = document.getElementById('copy-curl');
+    btn.textContent = 'Copied ✓';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  };
+
+  document.getElementById('fire-btn').onclick = async () => {
+    const btn = document.getElementById('fire-btn');
+    const label = document.getElementById('fire-label');
+    btn.disabled = true;
+    label.textContent = '⌛ Calling…';
+    try {
+      const resp = await fetch('/rpc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getHealth', params: [] })
+      });
+
+      const headers = {};
+      resp.headers.forEach((v, k) => headers[k.toLowerCase()] = v);
+      const text = await resp.text();
+      let bodyDisplay;
+      try { bodyDisplay = JSON.stringify(JSON.parse(text), null, 2); } catch { bodyDisplay = text; }
+
+      // Render
+      document.getElementById('status-badge').textContent = `${resp.status} ${resp.statusText || ''}`.trim();
+      if (resp.status !== 402) {
+        document.getElementById('status-detail').textContent = `— actual: ${resp.status}. Shield not under load? Look at /health.`;
+      }
+      document.getElementById('body-raw').textContent = bodyDisplay;
+
+      const tbody = document.getElementById('headers-body');
+      tbody.innerHTML = '';
+      Object.keys(HEADER_EXPLAIN).forEach(name => {
+        if (headers[name]) {
+          const row = document.createElement('tr');
+          row.className = 'border-t border-white/5';
+          row.innerHTML = `
+            <td class="py-2 text-white/80 mono align-top text-xs">${name}</td>
+            <td class="py-2 align-top break-all"><span class="bg-white/5 rounded px-2 py-0.5 text-purple-300 mono text-xs">${headers[name]}</span></td>
+            <td class="py-2 text-white/60 align-top text-xs max-w-xs">${HEADER_EXPLAIN[name].en}</td>`;
+          tbody.appendChild(row);
+        }
+      });
+
+      document.getElementById('result-panel').classList.remove('hidden');
+      label.textContent = '↻ Run again';
+    } catch (e) {
+      label.textContent = '✗ Failed — try again';
+      console.error(e);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+</script>
+
+</body>
+</html>
