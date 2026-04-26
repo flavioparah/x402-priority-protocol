@@ -82,19 +82,12 @@ const CONFIG = {
 /** @type {Map<string, { count: number, resetAt: number }>} */
 const ipCounters = new Map();
 
-/** @type {Map<string, { amount: number, destination: string, expiresAt: number, used: boolean }>} */
-const nonceStore = new Map();
-
-/** @type {Map<string, number>} escrow balance per pubkey (in µL = lamports × 1000) */
-const escrowBalances = new Map();
-
-/**
- * Anti-double-spend: every Solana tx signature that already credited escrow
- * is recorded here. Replays are rejected.
- *
- * @type {Set<string>}
- */
-const usedDepositSignatures = new Set();
+// ─── Persistence layer ────────────────────────────────────────────────────────
+// The four critical state pieces (escrow, nonces, reputation, deposit
+// signatures) live in a Store abstraction. In-memory by default; switches
+// to Redis when REDIS_URL is set. See lib/store.js for both implementations.
+const { createStore } = require("./lib/store");
+const store = createStore();
 
 /**
  * Lazily-initialized Solana Connection used to verify deposit transactions.
@@ -116,19 +109,12 @@ function getSolanaConnection() {
  */
 const MICRO_LAMPORTS_PER_LAMPORT = 1000;
 
-/**
- * Trust-Score ledger (Week-2 feature): tracks every successful payment
- * per pubkey. Score grows linearly with paid-count up to 100.
- *
- * The discount a scored agent receives on a 402 challenge is applied BEFORE
- * the client signs, so the signed amount matches the discounted price. We
- * then require the signer's pubkey to equal the hinted pubkey (set via the
- * X-x402-Agent-Pubkey request header) — otherwise Alice could claim Bob's
- * score, get his price, then sign with her own key.
- *
- * @type {Map<string, { paidCount: number, firstPaidAt: number, lastPaidAt: number, totalPaid: number }>}
- */
-const reputation = new Map();
+// Trust-Score ledger lives in `store` (see lib/store.js). The discount a
+// scored agent receives on a 402 challenge is applied BEFORE the client
+// signs, so the signed amount matches the discounted price. We then require
+// the signer's pubkey to equal the hinted pubkey (set via the
+// X-x402-Agent-Pubkey request header) — otherwise Alice could claim Bob's
+// score, get his price, then sign with her own key.
 
 // ─── Funções auxiliares ───────────────────────────────────────────────────────
 
@@ -314,8 +300,8 @@ function calcDynamicPrice(load) {
 }
 
 /** Trust-Score for a pubkey: 0..100, saturating at 20 successful payments. */
-function getTrustScore(pubkeyB58) {
-  const rec = reputation.get(pubkeyB58);
+async function getTrustScore(pubkeyB58) {
+  const rec = await store.getReputation(pubkeyB58);
   if (!rec) return 0;
   return Math.min(100, rec.paidCount * 5);
 }
@@ -339,7 +325,7 @@ async function verifyDepositTx(signature) {
   if (!signature || typeof signature !== "string") {
     return { ok: false, reason: "signature (base58 string) required" };
   }
-  if (usedDepositSignatures.has(signature)) {
+  if (await store.hasSignature(signature)) {
     return { ok: false, reason: "signature already used for a deposit" };
   }
 
@@ -384,32 +370,25 @@ async function verifyDepositTx(signature) {
   const microLamports = crediting.lamports * MICRO_LAMPORTS_PER_LAMPORT;
 
   // Mark before mutating state — if we crash mid-update, at least no double credit.
-  usedDepositSignatures.add(signature);
-
-  const prior = escrowBalances.get(crediting.source) || 0;
-  escrowBalances.set(crediting.source, prior + microLamports);
+  await store.addSignature(signature);
+  const newBalance = await store.incrEscrow(crediting.source, microLamports);
 
   return {
     ok: true,
     pubkey: crediting.source,
     lamports: crediting.lamports,
     micro_lamports: microLamports,
-    balance: prior + microLamports,
+    balance: newBalance,
     signature,
     slot: tx.slot,
   };
 }
 
 /** Record a successful payment against a pubkey's reputation. */
-function recordPayment(pubkeyB58, amount) {
-  const now = Date.now();
-  const rec = reputation.get(pubkeyB58) || { paidCount: 0, firstPaidAt: now, lastPaidAt: now, totalPaid: 0 };
-  rec.paidCount += 1;
-  rec.lastPaidAt = now;
-  rec.totalPaid += amount;
-  reputation.set(pubkeyB58, rec);
-
-  paymentLog.push({ ts: now, pubkey: pubkeyB58, amount, score: getTrustScore(pubkeyB58) });
+async function recordPayment(pubkeyB58, amount) {
+  const updated = await store.recordPayment(pubkeyB58, amount);
+  const score = Math.min(100, updated.paidCount * 5);
+  paymentLog.push({ ts: Date.now(), pubkey: pubkeyB58, amount, score });
   if (paymentLog.length > 100) paymentLog.shift();
 }
 
@@ -432,26 +411,19 @@ function isRateLimited(ip) {
  * spoofable (Alice claims Bob's score, pays at Bob's price, signs with
  * her own key; see recordPayment/verify below).
  */
-function issueNonce(amount, hintedPubkey) {
+async function issueNonce(amount, hintedPubkey) {
   const nonce = crypto.randomBytes(16).toString("hex");
-  nonceStore.set(nonce, {
+  await store.setNonce(nonce, {
     amount,
     destination: CONFIG.PAYMENT_DESTINATION,
-    expiresAt: Date.now() + CONFIG.NONCE_TTL_MS,
     used: false,
     hintedPubkey: hintedPubkey || null,
-  });
+  }, CONFIG.NONCE_TTL_MS);
   return nonce;
 }
 
-/** Limpa nonces expirados periodicamente. */
-function pruneExpiredNonces() {
-  const now = Date.now();
-  for (const [nonce, data] of nonceStore) {
-    if (data.expiresAt < now) nonceStore.delete(nonce);
-  }
-}
-setInterval(pruneExpiredNonces, CONFIG.NONCE_TTL_MS);
+// Note: nonce expiration is handled by the store (Redis TTL or a sweeper
+// interval inside the in-memory implementation). No app-level sweeper here.
 
 // Snapshot the current load every 60s so the dashboard can plot a 1h time series.
 setInterval(() => {
@@ -474,7 +446,7 @@ setInterval(() => {
  *
  * Formato esperado: "x402 <base58(signature)>.<base58(pubkey)>.<base58(message)>"
  */
-function verifyX402Authorization(authHeader) {
+async function verifyX402Authorization(authHeader) {
   if (!authHeader || !authHeader.startsWith("x402 ")) return { ok: false, reason: "Missing x402 header" };
 
   try {
@@ -499,7 +471,7 @@ function verifyX402Authorization(authHeader) {
     if (destination !== CONFIG.PAYMENT_DESTINATION) return { ok: false, reason: "Wrong destination" };
 
     // Valida o nonce
-    const nonceData = nonceStore.get(nonce);
+    const nonceData = await store.getNonce(nonce);
     if (!nonceData) return { ok: false, reason: "Unknown or expired nonce" };
     if (nonceData.used) return { ok: false, reason: "Nonce already used (replay detected)" };
     if (Date.now() > nonceData.expiresAt) return { ok: false, reason: "Nonce expired" };
@@ -512,18 +484,19 @@ function verifyX402Authorization(authHeader) {
       return { ok: false, reason: "Signer pubkey does not match the hinted pubkey for this challenge" };
     }
 
-    // Verifica saldo no escrow (MVP)
-    const balance = escrowBalances.get(pubkeyB58) || 0;
+    // Verifica saldo no escrow
+    const balance = await store.getEscrow(pubkeyB58);
     if (balance < amount) return { ok: false, reason: `Insufficient escrow balance: ${balance} < ${amount}` };
 
     // Marca nonce como usado e debita saldo
-    nonceData.used = true;
-    escrowBalances.set(pubkeyB58, balance - amount);
+    await store.markNonceUsed(nonce);
+    await store.incrEscrow(pubkeyB58, -amount);
 
     // Credit reputation so subsequent challenges for this pubkey are cheaper
-    recordPayment(pubkeyB58, amount);
+    await recordPayment(pubkeyB58, amount);
 
-    return { ok: true, pubkey: pubkeyB58, amount, nonce, score: getTrustScore(pubkeyB58) };
+    const score = await getTrustScore(pubkeyB58);
+    return { ok: true, pubkey: pubkeyB58, amount, nonce, score };
   } catch (err) {
     return { ok: false, reason: `Verification error: ${err.message}` };
   }
@@ -531,7 +504,7 @@ function verifyX402Authorization(authHeader) {
 
 // ─── Middleware principal: x402 Rate Limiter + Challenger ─────────────────────
 
-function x402Shield(req, res, next) {
+async function x402Shield(req, res, next) {
   recordRequest();
   const ip = req.ip || req.socket.remoteAddress;
   const load = getRpcLoad();
@@ -542,7 +515,7 @@ function x402Shield(req, res, next) {
   // Verifica se o agente já enviou uma prova de pagamento válida
   const authHeader = req.headers["authorization"];
   if (authHeader) {
-    const result = verifyX402Authorization(authHeader);
+    const result = await verifyX402Authorization(authHeader);
     if (result.ok) {
       console.log(`[x402] ✓ Payment accepted from ${result.pubkey} (${result.amount} µL, nonce: ${result.nonce}, trust=${result.score})`);
       req.x402Verified = result;
@@ -557,10 +530,10 @@ function x402Shield(req, res, next) {
   // is cosmetic until the signer actually proves ownership in step 2 — see
   // nonceData.hintedPubkey check inside verifyX402Authorization.
   const hintedPubkey = req.headers["x-x402-agent-pubkey"] || null;
-  const trustScore = hintedPubkey ? getTrustScore(hintedPubkey) : 0;
+  const trustScore = hintedPubkey ? await getTrustScore(hintedPubkey) : 0;
   const basePrice = calcDynamicPrice(load);
   const amount = applyTrustDiscount(basePrice, trustScore);
-  const nonce = issueNonce(amount, hintedPubkey);
+  const nonce = await issueNonce(amount, hintedPubkey);
 
   challengeLog.push({
     ts: Date.now(),
@@ -630,9 +603,13 @@ app.use((req, res, next) => {
 // a body that was already parsed and discarded). Apply per-route instead.
 
 // Health check (sem 402)
-app.get("/health", (req, res) => {
+app.get("/health", async (req, res) => {
   pruneRequestTimestamps();
   const rps = requestTimestamps.length / (CONFIG.LOAD_WINDOW_MS / 1000);
+  const [nonces_active, escrow_accounts] = await Promise.all([
+    store.nonceCount(),
+    store.escrowAccountCount(),
+  ]);
   res.json({
     status: "ok",
     load: getRpcLoad().toFixed(2),
@@ -640,8 +617,9 @@ app.get("/health", (req, res) => {
     max_rps: CONFIG.MAX_RPS,
     load_forced: CONFIG.RPC_LOAD_FORCE !== null,
     threshold: CONFIG.RPC_LOAD_THRESHOLD,
-    nonces_active: nonceStore.size,
-    escrow_accounts: escrowBalances.size,
+    nonces_active,
+    escrow_accounts,
+    store_backend: store.backend,
   });
 });
 
@@ -682,22 +660,21 @@ app.post("/escrow/deposit", express.json(), async (req, res) => {
 // Solana for every deposit is prohibitive. NEVER enable in production.
 if (CONFIG.TRUST_DEPOSITS) {
   console.warn("[escrow] ⚠️  ESCROW_TRUST_DEPOSITS=1 — /escrow/deposit-trusted mounted. Demo/test only.");
-  app.post("/escrow/deposit-trusted", express.json(), (req, res) => {
+  app.post("/escrow/deposit-trusted", express.json(), async (req, res) => {
     const { pubkey, amount_micro_lamports } = req.body || {};
     if (!pubkey || !amount_micro_lamports) {
       return res.status(400).json({ error: "pubkey and amount_micro_lamports required" });
     }
-    const current = escrowBalances.get(pubkey) || 0;
-    escrowBalances.set(pubkey, current + amount_micro_lamports);
-    return res.json({ pubkey, balance: escrowBalances.get(pubkey), trusted: true });
+    const newBalance = await store.incrEscrow(pubkey, amount_micro_lamports);
+    return res.json({ pubkey, balance: newBalance, trusted: true });
   });
 }
 
 // Endpoint de consulta de reputação (Trust-Score)
-app.get("/reputation/:pubkey", (req, res) => {
+app.get("/reputation/:pubkey", async (req, res) => {
   const pubkey = req.params.pubkey;
-  const rec = reputation.get(pubkey);
-  const score = getTrustScore(pubkey);
+  const rec = await store.getReputation(pubkey);
+  const score = await getTrustScore(pubkey);
   const nextDiscountPrice = applyTrustDiscount(CONFIG.MAX_PRICE_MICRO_LAMPORTS, score);
   res.json({
     pubkey,
@@ -712,8 +689,8 @@ app.get("/reputation/:pubkey", (req, res) => {
 });
 
 // Endpoint de consulta de saldo
-app.get("/escrow/balance/:pubkey", (req, res) => {
-  const balance = escrowBalances.get(req.params.pubkey) || 0;
+app.get("/escrow/balance/:pubkey", async (req, res) => {
+  const balance = await store.getEscrow(req.params.pubkey);
   res.json({ pubkey: req.params.pubkey, balance_micro_lamports: balance });
 });
 
@@ -736,8 +713,11 @@ app.get("/info", (req, res) => {
 });
 
 // Recent activity for the live dashboard.
-app.get("/stats/recent", (req, res) => {
-  const totalPaidMicroLamports = [...reputation.values()].reduce((s, r) => s + r.totalPaid, 0);
+app.get("/stats/recent", async (req, res) => {
+  const [totalPaidMicroLamports, unique_paying_pubkeys] = await Promise.all([
+    store.getTotalPaidVolume(),
+    store.uniquePayingPubkeys(),
+  ]);
   res.json({
     payments: paymentLog.slice(-20).reverse(),
     challenges: challengeLog.slice(-20).reverse(),
@@ -746,7 +726,7 @@ app.get("/stats/recent", (req, res) => {
       total_challenges_issued_session: challengeLog.length,
       total_payments_session: paymentLog.length,
       total_paid_micro_lamports: totalPaidMicroLamports,
-      unique_paying_pubkeys: reputation.size,
+      unique_paying_pubkeys,
     },
   });
 });
@@ -778,17 +758,15 @@ app.get("/stats/qos", (req, res) => {
 });
 
 // Top 10 by Trust-Score for the leaderboard widget.
-app.get("/stats/leaderboard", (req, res) => {
-  const top = [...reputation.entries()]
-    .map(([pubkey, rec]) => ({
-      pubkey,
-      trust_score: getTrustScore(pubkey),
-      paid_count: rec.paidCount,
-      total_paid_micro_lamports: rec.totalPaid,
-      last_paid_at: rec.lastPaidAt,
-    }))
-    .sort((a, b) => b.trust_score - a.trust_score || b.paid_count - a.paid_count)
-    .slice(0, 10);
+app.get("/stats/leaderboard", async (req, res) => {
+  const raw = await store.getLeaderboard(10);
+  const top = raw.map((r) => ({
+    pubkey: r.pubkey,
+    trust_score: Math.min(100, r.paidCount * 5),
+    paid_count: r.paidCount,
+    total_paid_micro_lamports: r.totalPaid,
+    last_paid_at: r.lastPaidAt,
+  }));
   res.json({ leaderboard: top, generated_at: Date.now() });
 });
 

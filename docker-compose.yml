@@ -1,12 +1,25 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: x402-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - x402-redis-data:/data
+    networks:
+      - portainer_default
+
   x402-shield:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: x402-shield
     restart: unless-stopped
+    depends_on:
+      - redis
     environment:
       PORT: 3000
+      REDIS_URL: redis://redis:6379
       REAL_RPC_URL: ${REAL_RPC_URL:-https://api.mainnet-beta.solana.com}
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
       PAYMENT_DESTINATION: ${PAYMENT_DESTINATION}
@@ -32,3 +45,6 @@ services:
 networks:
   portainer_default:
     external: true
+
+volumes:
+  x402-redis-data:

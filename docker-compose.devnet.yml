@@ -22,14 +22,27 @@
 #   BASE_PRICE / MAX_PRICE       - pricing band (µ-lamports)
 
 services:
+  redis-devnet:
+    image: redis:7-alpine
+    container_name: x402-redis-devnet
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - x402-redis-devnet-data:/data
+    networks:
+      - portainer_default
+
   x402-shield-devnet:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: x402-shield-devnet
     restart: unless-stopped
+    depends_on:
+      - redis-devnet
     environment:
       PORT: 3000
+      REDIS_URL: redis://redis-devnet:6379
       REAL_RPC_URL: https://api.devnet.solana.com
       SOLANA_RPC_URL: https://api.devnet.solana.com
       PAYMENT_DESTINATION: ${PAYMENT_DESTINATION_DEVNET:-${PAYMENT_DESTINATION}}
@@ -56,3 +69,6 @@ services:
 networks:
   portainer_default:
     external: true
+
+volumes:
+  x402-redis-devnet-data:
