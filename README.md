@@ -161,23 +161,48 @@ All configurable via env vars (see `index.js`):
 
 ## Roadmap
 
-**Week 1 — MVP (shipped)**
-Off-chain escrow, Ed25519 signed nonces, dynamic pricing, proxy pass-through.
+### Shipped
 
-**Week 2 — Trust Score (shipped)**
-Reputation ledger per pubkey. Agents hint their pubkey via `X-x402-Agent-Pubkey` on the request; the Shield looks up the score (0..100, one point per 5¢ of reputation × 5 points per paid request, saturating at 20 payments) and discounts the challenge up to 50 %. The signer pubkey must match the hint, so the discount is not spoofable. Progression visible via `npm run demo:trust` — 22 requests, score 0→100, average savings 25 %. `GET /reputation/:pubkey` inspects any agent's record.
+| Sprint | Deliverable |
+|---|---|
+| Sem 1 — MVP | Off-chain escrow, Ed25519 signed nonces, dynamic pricing, proxy pass-through |
+| Sem 2 — Trust-Score | Reputation ledger per pubkey, score 0–100, up to 50% off via discount, hint-bound to signer pubkey. Progression: `npm run demo:trust` (22 reqs, 26.1% avg savings) |
+| Sem 3 — Open-source spec | [`docs/QOS-COOPERATIVE-SPEC.md`](./docs/QOS-COOPERATIVE-SPEC.md) v1.0 + [`docs/TRUST-SCORE-RFC-DRAFT.md`](./docs/TRUST-SCORE-RFC-DRAFT.md) v0.1 |
+| Sem 4-5 — QoS Path A | Standalone priority queue + rate-limited dispatcher in `qosMiddleware`. Live metrics at `/stats/qos`, dashboard at `/live`. Preserves 8.7 ms p95 |
+| Sem 4-5 — QoS Path B | Cooperative subprotocol spec + operator-side reference impl (`examples/operator-qos-reference.js`) + 30s overload fallback + 60s health-check + 3-consecutive-success re-probe (`QOS_MODE=cooperative`). Validated by `npm run test:cooperative-qos` (12/12) |
+| Sem 4-5 — Persistence | Redis-backed store (`lib/store.js`): escrow, nonces, reputation, used signatures. AOF + `volatile-lru` eviction. Restart-safe. Multi-instance ready (state shared); per-shield Redis sidecar in compose |
+| Sem 4-5 — Atomic consume | Lua-script-backed `consumeNonceAndDebit` (and synchronous JS-tick equivalent in-memory). Race-free against double-spend. Validated by `npm run test:atomic` (5/5 in-memory) and `npm run test:atomic:redis` (7/7 against real Redis) |
+| Sem 6-8 — Detection v1 | Sybil/fraud/churn signal engine ([`lib/detection.js`](./lib/detection.js), 19/19 unit tests). Per-pubkey attestation log. 5 signals from RFC §10: 2 active in single-op (`wash_payment_suspect`, `dormant_revival`), 3 pre-baked for cross-op activation when 2nd operator joins (`OPERATOR_ID` env var) |
+| Sem 8 — Hardening sweep | 6 fixes from external review: atomic concurrency, Redis eviction policy, proxy hook format, QoS cooperative fallback, SDK on-chain spec cleanup, DEPLOY.md sync |
+| Sem 9 — Outreach package | [`docs/outreach/`](./docs/outreach/) — operator pitch, email templates (EN/PT × 3 variants), 15 curated targets, CRM tracker, demo-call playbook |
 
-**Week 3 — Moat**
-Open-source protocol spec and reference implementations. Build a network of RPC operator partners (Helius, Triton, Jito) for whom this is a drop-in revenue layer.
+### Public deployments
 
-**Week 4+ — QoS Path A (shipped)**
-Standalone priority queue + rate-limited dispatcher inside the Shield. Higher-paying / higher-Trust-Score requests jump the line under contention. Bypasses the queue when load is low — preserves the 8.7 ms p95 overhead. See `qosMiddleware` in `index.js`. Live metrics at `/stats/qos`, visualized in `/live` dashboard.
+| URL | Mode | Network |
+|---|---|---|
+| https://x402.rpcpriority.com | Trusted-deposit demo (the 22-req Trust-Score progression runs here) | devnet upstream |
+| https://x402-devnet.rpcpriority.com | On-chain verified deposits | devnet |
+| https://x402-mainnet.rpcpriority.com | On-chain verified deposits | **mainnet** |
 
-**Week 4+ — QoS Path B (spec ready)**
-Cooperative QoS subprotocol — Shield forwards `X-Priority-Score` + `X-QoS-Spec-Version` headers to the operator's RPC stack so operator's own scheduler can honor priority directly. Spec in [`docs/QOS-COOPERATIVE-SPEC.md`](./docs/QOS-COOPERATIVE-SPEC.md). Operator-side reference implementation in [`examples/operator-qos-reference.js`](./examples/operator-qos-reference.js) (~80 lines). Integration test: `npm run test:cooperative-qos`. Activates with `QOS_MODE=cooperative` once an operator partner integrates (~3 days of operator work).
+### Test suite
 
-**Week 4+ — Trust-Score subprotocol (spec ready)**
-Cross-provider reputation layer that lets RPC operators apply data-driven discounts to known agents without coordinating with each other directly — a neutral broker holds the reputation. Spec in [`docs/TRUST-SCORE-RFC-DRAFT.md`](./docs/TRUST-SCORE-RFC-DRAFT.md): data model, HTTP API (`/reputation/:pubkey`, `/attest`, `/report`, `/info`), score formula with cross-provider bonus, sybil/fraud detection signal taxonomy, federation outline. Current `index.js` is the reference broker (single-provider colocated, in-memory). Production broker will live in a separate `trust-score-broker` repository.
+```
+npm run test:detection          19/19   sybil/fraud/churn signals (offline, no network)
+npm run test:atomic              5/5   atomic consume in-memory mode
+npm run test:atomic:redis        7/7   atomic consume against real Redis (requires REDIS_URL)
+npm run test:cooperative-qos    12/12  spec compliance + health-check exposure
+                                ──────
+                                43/43
+```
+
+### Pending — production scale (post-hackathon)
+
+- **Multi-instance QoS coordination** — priority queue → shared Redis ZSET + Pub/Sub for cross-instance dispatch
+- **Trust-Score broker as a separate service** — extract from `index.js` into a dedicated `trust-score-broker` repo, with Postgres audit log + operator API key registration
+- **Federation v1.1** — peer-broker gossip protocol per RFC §9
+- **Prometheus scrape of upstream** — replace self-measured load with operator's actual node metrics
+- **Cross-chain via Base / Ethereum L2** — same Ed25519 keypair, same x402 headers, different upstream
+- **`x402-tx` settlement on-chain per request** — currently only deposits are on-chain; per-request `SystemProgram.transfer` settlement reserved for future spec extension
 
 ---
 
