@@ -1,7 +1,7 @@
 services:
   redis:
     image: redis:7-alpine
-    container_name: x402-redis
+    container_name: x402-redis-test
     restart: unless-stopped
     # volatile-lru only evicts keys with TTL — in our layout that's just the
     # 30s nonces (x402:nonce:<id>). Escrow / reputation / used-signatures
@@ -9,28 +9,32 @@ services:
     # discard them under memory pressure (= lost balances, broken anti-replay).
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy volatile-lru
     volumes:
-      - x402-redis-data:/data
+      - x402-redis-test-data:/data
     networks:
       - portainer_default
 
   x402-shield:
+    # Build context is the REPO ROOT (one level up) so the image can include
+    # dashboard/public/ — the 3D management console served at "/".
+    # Adjust if you `docker compose -f gateway/docker-compose.yml ...` from root,
+    # or if you run from inside gateway/ via `cd gateway && docker compose up`.
     build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: x402-shield
+      context: ..
+      dockerfile: gateway/Dockerfile
+    container_name: x402-shield-test
     restart: unless-stopped
     depends_on:
       - redis
     environment:
       PORT: 3000
-      REDIS_URL: redis://x402-redis:6379
+      REDIS_URL: redis://x402-redis-test:6379
       REAL_RPC_URL: ${REAL_RPC_URL:-https://api.mainnet-beta.solana.com}
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
       PAYMENT_DESTINATION: ${PAYMENT_DESTINATION}
       DEPOSIT_COMMITMENT: ${DEPOSIT_COMMITMENT:-confirmed}
-      ESCROW_TRUST_DEPOSITS: ${ESCROW_TRUST_DEPOSITS:-}
+      ESCROW_TRUST_DEPOSITS: ${ESCROW_TRUST_DEPOSITS:-1}
       RPC_LOAD_THRESHOLD: ${RPC_LOAD_THRESHOLD:-0.75}
-      RPC_LOAD_FORCE: ${RPC_LOAD_FORCE:-}
+      RPC_LOAD_FORCE: ${RPC_LOAD_FORCE:-0.9}
       MAX_RPS: ${MAX_RPS:-50}
       LOAD_WINDOW_MS: ${LOAD_WINDOW_MS:-5000}
       REQUESTS_PER_IP_LIMIT: ${REQUESTS_PER_IP_LIMIT:-100}
@@ -41,14 +45,14 @@ services:
       - portainer_default
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.x402-shield.rule=Host(`x402.rpcpriority.com`) || Host(`x402.assistent.top`)"
-      - "traefik.http.routers.x402-shield.entrypoints=websecure"
-      - "traefik.http.routers.x402-shield.tls.certresolver=leresolver"
-      - "traefik.http.services.x402-shield.loadbalancer.server.port=3000"
+      - "traefik.http.routers.x402-shield-test.rule=Host(`x402-test.rpcpriority.com`)"
+      - "traefik.http.routers.x402-shield-test.entrypoints=websecure"
+      - "traefik.http.routers.x402-shield-test.tls.certresolver=leresolver"
+      - "traefik.http.services.x402-shield-test.loadbalancer.server.port=3000"
 
 networks:
   portainer_default:
     external: true
 
 volumes:
-  x402-redis-data:
+  x402-redis-test-data:

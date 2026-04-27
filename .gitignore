@@ -17,3 +17,8 @@ gateway/stress-test.js
 sender-key.json
 *.key
 *.pem
+
+# Team-internal context (pitch decks, exported chats, internal strategy,
+# patent disclosure drafts). NÃO vai pro repo público sob nenhuma hipótese.
+docs/context/
+gateway/docs/context/

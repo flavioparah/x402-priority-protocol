@@ -791,8 +791,22 @@ app.use((req, res, next) => {
 // which breaks http-proxy-middleware for /rpc (upstream times out waiting for
 // a body that was already parsed and discarded). Apply per-route instead.
 
-// Serve Dashboard from the isolated dashboard folder
-app.use("/", express.static(path.join(__dirname, "../dashboard/public")));
+// Serve the 3D management console from the isolated dashboard folder.
+// Auto-detect layout so this works in both deploy modes:
+//   - PM2 / bare-metal: gateway/ and dashboard/ are siblings → ../dashboard/public
+//   - Docker: Dockerfile copies dashboard/public/ into /app/dashboard/public/ → dashboard/public
+const fs = require("fs");
+const dashboardCandidates = [
+  path.join(__dirname, "..", "dashboard", "public"),  // PM2 / bare-metal
+  path.join(__dirname, "dashboard", "public"),         // Docker (see gateway/Dockerfile)
+];
+const dashboardPath = dashboardCandidates.find(p => fs.existsSync(p));
+if (dashboardPath) {
+  app.use("/", express.static(dashboardPath));
+  console.log(`[dashboard] serving 3D console from ${dashboardPath}`);
+} else {
+  console.warn(`[dashboard] WARNING — neither layout found. Tried:\n  - ${dashboardCandidates.join("\n  - ")}\n  Static console will not be available at "/" — falling back to legacy public/.`);
+}
 
 // Health check (no 402 required)
 app.get("/health", async (req, res) => {
