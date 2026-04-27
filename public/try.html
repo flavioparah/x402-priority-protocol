@@ -147,12 +147,14 @@
             font-family: var(--font-mono);
             font-size: 0.85rem;
             overflow-y: auto;
+            overflow-x: hidden;
             border: 1px solid rgba(255,255,255,0.05);
             color: #aaa;
             line-height: 1.5;
+            word-break: break-word;
         }
 
-        .terminal-line { margin-bottom: 4px; }
+        .terminal-line { margin-bottom: 4px; word-break: break-word; }
         .tag { font-weight: bold; margin-right: 8px; }
         .tag-info { color: var(--primary); }
         .tag-auth { color: var(--secondary); }
@@ -197,6 +199,76 @@
 
         .fade-in { animation: fadeIn 0.5s ease forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ─── Responsive — tablet (≤ 1024px) ─────────────────────────────── */
+        @media (max-width: 1024px) {
+            header { padding: 1.5rem 2rem; }
+            main {
+                grid-template-columns: 1fr;
+                padding: 2rem;
+                gap: 1.5rem;
+            }
+            /* Test Config goes ABOVE the metrics on narrow screens — user
+               came here to test, let them configure first then watch the
+               audit stream react below. */
+            .controls { order: -1; }
+            .controls .card { padding: 1.5rem; }
+        }
+
+        /* ─── Responsive — phone (≤ 640px) ───────────────────────────────── */
+        @media (max-width: 640px) {
+            header {
+                padding: 1rem 1.25rem;
+                flex-wrap: wrap;
+                gap: 0.75rem;
+            }
+            .logo { font-size: 1.15rem; letter-spacing: 1px; }
+            .logo svg { width: 20px; height: 20px; }
+            .status-badge { font-size: 0.7rem; padding: 4px 12px; }
+            main { padding: 1.25rem; gap: 1rem; }
+            .card { padding: 1.25rem; border-radius: 18px; }
+            h2 { font-size: 0.95rem; margin-bottom: 1rem; }
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.75rem;
+                margin-bottom: 1.5rem;
+            }
+            .metric-card { padding: 1rem; border-radius: 12px; }
+            .metric-label { font-size: 0.7rem; }
+            .metric-value { font-size: 1.2rem; }
+            #terminal {
+                height: 200px;
+                padding: 0.9rem;
+                font-size: 0.72rem;
+            }
+            .guide-section {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+                margin-top: 1.5rem;
+            }
+            .info-box { padding: 1.1rem; }
+            .info-box h3 { font-size: 0.85rem; }
+            .info-box p { font-size: 0.75rem; }
+            .step-item { font-size: 0.72rem; gap: 8px; }
+            .step-num { width: 16px; height: 16px; font-size: 0.6rem; }
+            input, select { padding: 9px 12px; font-size: 0.8rem; }
+            button {
+                padding: 12px;
+                font-size: 0.8rem;
+                letter-spacing: 0.5px;
+                margin-top: 6px;
+            }
+        }
+
+        /* ─── Responsive — very narrow (≤ 380px) ─────────────────────────── */
+        @media (max-width: 380px) {
+            header { padding: 0.85rem 1rem; }
+            .logo { font-size: 1rem; letter-spacing: 0.5px; }
+            .status-badge { font-size: 0.62rem; padding: 3px 10px; }
+            .metrics-grid { grid-template-columns: 1fr; }
+            main { padding: 1rem; }
+            .card { padding: 1rem; }
+        }
     </style>
 </head>
 <body>
