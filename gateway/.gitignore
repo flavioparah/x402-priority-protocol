@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+
+# Team-internal context (pitch deck, exported chats). Not for the public repo.
+docs/context/

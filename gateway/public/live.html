@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Dashboard — RPC Priority Protocol</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #ededed; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .gradient-text { background: linear-gradient(135deg, #9945FF 0%, #14F195 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .card-glass { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); border-radius: 16px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #14F195; box-shadow: 0 0 8px #14F195; animation: pulse 1.5s ease-in-out infinite; display: inline-block; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+  .gauge-ring { transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.6s ease-out; }
+  .feed-row { animation: slideIn 0.4s ease-out; }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-8px) } to { opacity: 1; transform: none } }
+  table th, table td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.05) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 4px; }
+  @keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+  .net-mainnet { color: #14F195; }
+  .net-devnet  { color: #f9a826; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="border-b border-white/10">
+  <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-lg font-extrabold gradient-text mono tracking-tight">RPC PRIORITY</a>
+      <span class="text-white/30">·</span>
+      <span class="text-sm text-white/60 uppercase tracking-widest">Live Status</span>
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <span class="live-dot"></span>
+      <span class="text-xs uppercase tracking-widest text-white/70 mono">LIVE</span>
+      <span class="text-white/30">·</span>
+      <span id="network-label" class="text-xs uppercase tracking-widest mono">—</span>
+      <a href="/try" class="text-xs text-white/60 hover:text-white border border-white/20 rounded-full px-3 py-1 ml-2">Try it →</a>
+      <a href="/explorer" class="text-xs text-white/60 hover:text-white border border-white/20 rounded-full px-3 py-1">Explorer</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-10 space-y-10">
+
+  <!-- Hero -->
+  <section>
+    <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">Live <span class="gradient-text">RPC Priority</span> activity</h1>
+    <p class="mt-3 text-white/60 max-w-2xl">Real numbers from this Shield instance, refreshed every couple seconds. Every challenge, every payment, every Trust-Score increment is happening in production right now.</p>
+    <div class="mt-4 text-xs text-white/50 mono flex flex-wrap gap-x-6 gap-y-1">
+      <span>operator <span id="operator-link" class="text-white/80">—</span></span>
+      <span>upstream <span id="upstream" class="text-white/80">—</span></span>
+      <span>threshold <span id="threshold" class="text-white/80">—</span></span>
+    </div>
+  </section>
+
+  <!-- KPI grid -->
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <!-- Load gauge -->
+    <div class="card-glass p-5">
+      <div class="text-xs text-white/50 uppercase tracking-widest">RPC Load</div>
+      <div class="flex items-center gap-4 mt-2">
+        <svg width="60" height="60" viewBox="0 0 60 60">
+          <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
+          <circle id="load-ring" class="gauge-ring" cx="30" cy="30" r="24" fill="none" stroke="url(#grad-load)" stroke-width="6" stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="150.8"/>
+          <defs><linearGradient id="grad-load" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9945FF"/><stop offset="100%" stop-color="#14F195"/></linearGradient></defs>
+        </svg>
+        <div>
+          <div class="text-3xl font-extrabold mono" id="kpi-load">—</div>
+          <div class="text-xs text-white/50">of MAX_RPS</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-glass p-5">
+      <div class="text-xs text-white/50 uppercase tracking-widest">Requests / sec</div>
+      <div class="text-3xl font-extrabold mono mt-3" id="kpi-rps">—</div>
+      <div class="text-xs text-white/50 mt-1"><span id="kpi-active-nonces">—</span> active nonces</div>
+    </div>
+
+    <div class="card-glass p-5">
+      <div class="text-xs text-white/50 uppercase tracking-widest">Payments (session)</div>
+      <div class="text-3xl font-extrabold mono mt-3" id="kpi-payments">—</div>
+      <div class="text-xs text-white/50 mt-1"><span id="kpi-unique-pubkeys">—</span> unique agents</div>
+    </div>
+
+    <div class="card-glass p-5">
+      <div class="text-xs text-white/50 uppercase tracking-widest">Volume</div>
+      <div class="text-3xl font-extrabold mono mt-3" id="kpi-volume-sol">—</div>
+      <div class="text-xs text-white/50 mt-1"><span id="kpi-volume-ul" class="mono">—</span> µL total</div>
+    </div>
+  </section>
+
+  <!-- QoS dispatcher panel -->
+  <section class="card-glass p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm uppercase tracking-widest text-white/60 flex items-center gap-2">
+        QoS Priority Queue <span class="live-dot"></span>
+        <span id="qos-mode-badge" class="ml-2 px-2 py-0.5 rounded text-[10px] mono uppercase tracking-widest border">—</span>
+      </h2>
+      <span class="text-xs text-white/40">paid agents jump the line under contention</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div>
+        <div class="text-xs text-white/50 uppercase tracking-widest">Queue depth</div>
+        <div class="text-2xl font-extrabold mono mt-1" id="qos-queue-depth">—</div>
+        <div class="text-[10px] text-white/40 mt-1">cap <span id="qos-max-queue">—</span></div>
+      </div>
+      <div>
+        <div class="text-xs text-white/50 uppercase tracking-widest">In flight</div>
+        <div class="text-2xl font-extrabold mono mt-1"><span id="qos-inflight">—</span><span class="text-white/40">/<span id="qos-max-inflight">—</span></span></div>
+        <div class="w-full h-1.5 bg-white/10 rounded mt-1.5 overflow-hidden"><div id="qos-util-bar" class="h-full bg-gradient-to-r from-purple-500 to-green-400 transition-all" style="width:0"></div></div>
+      </div>
+      <div>
+        <div class="text-xs text-white/50 uppercase tracking-widest">Wait p95</div>
+        <div class="text-2xl font-extrabold mono mt-1"><span id="qos-wait-p95">—</span><span class="text-white/40 text-base"> ms</span></div>
+        <div class="text-[10px] text-white/40 mt-1">p99 <span id="qos-wait-p99">—</span> ms</div>
+      </div>
+      <div>
+        <div class="text-xs text-white/50 uppercase tracking-widest">Settled</div>
+        <div class="text-2xl font-extrabold mono mt-1" id="qos-settled">—</div>
+        <div class="text-[10px] text-white/40 mt-1"><span id="qos-bypassed">—</span> bypass · <span id="qos-dispatched">—</span> queued</div>
+      </div>
+      <div>
+        <div class="text-xs text-white/50 uppercase tracking-widest">Rejected</div>
+        <div class="text-2xl font-extrabold mono mt-1 text-orange-300"><span id="qos-rejected">—</span></div>
+        <div class="text-[10px] text-white/40 mt-1"><span id="qos-rej-overflow">—</span> overflow · <span id="qos-rej-timeout">—</span> timeout</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Load chart -->
+  <section class="card-glass p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm uppercase tracking-widest text-white/60">Load over the last hour</h2>
+      <span class="text-xs text-white/40">snapshots every 60s</span>
+    </div>
+    <div style="height: 220px;"><canvas id="load-chart"></canvas></div>
+  </section>
+
+  <!-- Live feed -->
+  <section class="grid md:grid-cols-2 gap-6">
+    <!-- Payments feed -->
+    <div class="card-glass p-6">
+      <h2 class="text-sm uppercase tracking-widest text-white/60 mb-4 flex items-center gap-2">Recent Payments <span class="live-dot"></span></h2>
+      <div id="payments-feed" class="space-y-2 mono text-xs"><div class="skeleton h-12"></div><div class="skeleton h-12"></div><div class="skeleton h-12"></div></div>
+    </div>
+
+    <!-- Challenges feed -->
+    <div class="card-glass p-6">
+      <h2 class="text-sm uppercase tracking-widest text-white/60 mb-4 flex items-center gap-2">Recent Challenges <span class="live-dot"></span></h2>
+      <div id="challenges-feed" class="space-y-2 mono text-xs"><div class="skeleton h-12"></div><div class="skeleton h-12"></div><div class="skeleton h-12"></div></div>
+    </div>
+  </section>
+
+  <!-- Leaderboard -->
+  <section class="card-glass p-6 overflow-x-auto">
+    <h2 class="text-sm uppercase tracking-widest text-white/60 mb-4">Top 10 Agents — Trust-Score Leaderboard</h2>
+    <table class="w-full text-sm">
+      <thead><tr class="text-white/50 text-xs uppercase tracking-widest">
+        <th class="text-left">#</th>
+        <th class="text-left">Pubkey</th>
+        <th class="text-right">Trust Score</th>
+        <th class="text-right">Paid count</th>
+        <th class="text-right">Total Paid</th>
+        <th class="text-right">Discount</th>
+        <th class="text-right">Last seen</th>
+      </tr></thead>
+      <tbody id="leaderboard-body"><tr><td colspan="7" class="text-white/40 text-center py-6">loading…</td></tr></tbody>
+    </table>
+  </section>
+
+  <footer class="text-center text-xs text-white/30 pt-8 pb-4">
+    Built for the Colosseum Frontier Hackathon 2026 ·
+    <a href="https://github.com/flavioparah/x402-priority-protocol" class="text-white/50 hover:text-white">github</a> ·
+    state in memory — resets on container restart
+  </footer>
+</main>
+
+<script>
+  // ─── API base ─ when served from the marketing domain (rpcpriority.com),
+  // the page is static (nginx) and has no backend; route API calls to the
+  // demo shield. When served by the shield itself, use relative URLs.
+  const API_BASE = (() => {
+    const h = location.hostname;
+    if (h.startsWith("x402") && h.endsWith(".rpcpriority.com")) return "";
+    if (h === "localhost" || h === "127.0.0.1") return "";
+    return "https://x402.rpcpriority.com";
+  })();
+  const api = (path) => API_BASE + path;
+
+  // ─── helpers ─────────────────────────────────────────────────────────────
+  const $ = (s) => document.querySelector(s);
+  const trunc = (k) => k ? k.slice(0, 4) + '…' + k.slice(-4) : '—';
+  const ago = (ts) => {
+    const s = (Date.now() - ts) / 1000;
+    if (s < 60) return Math.floor(s) + 's ago';
+    if (s < 3600) return Math.floor(s/60) + 'm ago';
+    return Math.floor(s/3600) + 'h ago';
+  };
+  const fmtSol = (ul) => (ul / 1_000_000_000).toFixed(6); // µL → SOL (1 lamport = 1000 µL)
+  const explorerUrl = (pk, network) => `https://explorer.solana.com/address/${pk}${network==='devnet'?'?cluster=devnet':''}`;
+
+  // ─── /info (one-shot at boot) ────────────────────────────────────────────
+  let SHIELD_INFO = null;
+  fetch(api('/info')).then(r => r.json()).then(info => {
+    SHIELD_INFO = info;
+    const netEl = $('#network-label');
+    netEl.textContent = info.network;
+    netEl.classList.add(info.network === 'mainnet' ? 'net-mainnet' : 'net-devnet');
+    $('#operator-link').innerHTML = `<a class="hover:underline" target="_blank" href="${explorerUrl(info.operator_pubkey, info.network)}">${trunc(info.operator_pubkey)}</a>`;
+    $('#upstream').textContent = info.upstream_rpc.replace('https://', '');
+    $('#threshold').textContent = (info.threshold * 100).toFixed(0) + '%';
+  });
+
+  // ─── /health every 2s ────────────────────────────────────────────────────
+  async function tickHealth() {
+    try {
+      const h = await fetch(api('/health')).then(r => r.json());
+      const load = parseFloat(h.load);
+      $('#kpi-load').textContent = (load * 100).toFixed(0) + '%';
+      $('#kpi-rps').textContent = h.rps;
+      $('#kpi-active-nonces').textContent = h.nonces_active;
+      // SVG ring: stroke-dasharray = 2*pi*r = 150.8 (r=24)
+      $('#load-ring').setAttribute('stroke-dashoffset', String(150.8 * (1 - load)));
+    } catch (_) {}
+  }
+
+  // ─── /stats/recent every 5s ──────────────────────────────────────────────
+  let chart = null;
+  async function tickStats() {
+    try {
+      const s = await fetch(api('/stats/recent')).then(r => r.json());
+
+      $('#kpi-payments').textContent = s.totals.total_payments_session;
+      $('#kpi-unique-pubkeys').textContent = s.totals.unique_paying_pubkeys;
+      $('#kpi-volume-ul').textContent = s.totals.total_paid_micro_lamports.toLocaleString();
+      $('#kpi-volume-sol').textContent = fmtSol(s.totals.total_paid_micro_lamports) + ' SOL';
+
+      // Payment feed
+      const pf = $('#payments-feed');
+      if (s.payments.length === 0) {
+        pf.innerHTML = '<div class="text-white/40 text-center py-4 text-xs">no payments yet — run <span class="text-white/70">npm run demo:trust</span></div>';
+      } else {
+        pf.innerHTML = s.payments.map(p => `
+          <div class="feed-row flex items-center justify-between border border-white/5 rounded-lg p-2 px-3">
+            <div class="flex items-center gap-3">
+              <a target="_blank" href="${explorerUrl(p.pubkey, SHIELD_INFO?.network)}" class="hover:underline text-white/80">${trunc(p.pubkey)}</a>
+              <span class="px-2 py-0.5 bg-purple-500/15 border border-purple-500/30 rounded text-purple-300 text-[10px] mono">score ${p.score}</span>
+            </div>
+            <div class="text-right">
+              <div class="text-white/90">${p.amount.toLocaleString()} <span class="text-white/40">µL</span></div>
+              <div class="text-white/40 text-[10px]">${ago(p.ts)}</div>
+            </div>
+          </div>`).join('');
+      }
+
+      // Challenges feed
+      const cf = $('#challenges-feed');
+      if (s.challenges.length === 0) {
+        cf.innerHTML = '<div class="text-white/40 text-center py-4 text-xs">no challenges yet</div>';
+      } else {
+        cf.innerHTML = s.challenges.map(c => `
+          <div class="feed-row flex items-center justify-between border border-white/5 rounded-lg p-2 px-3">
+            <div class="flex items-center gap-3">
+              <span class="text-white/80">${c.pubkeyHint ? trunc(c.pubkeyHint) : '<span class="text-white/40">anon</span>'}</span>
+              <span class="px-2 py-0.5 bg-orange-500/15 border border-orange-500/30 rounded text-orange-300 text-[10px] mono">load ${(c.load*100).toFixed(0)}%</span>
+            </div>
+            <div class="text-right">
+              <div class="text-white/90">${c.finalPrice.toLocaleString()} <span class="text-white/40">µL</span></div>
+              <div class="text-white/40 text-[10px]">${ago(c.ts)}</div>
+            </div>
+          </div>`).join('');
+      }
+
+      // Load chart
+      const labels = s.load_history.map(p => new Date(p.ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
+      const data = s.load_history.map(p => p.load);
+      if (!chart) {
+        const ctx = document.getElementById('load-chart').getContext('2d');
+        chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels, datasets: [{
+              label: 'Load',
+              data,
+              borderColor: '#14F195',
+              backgroundColor: 'rgba(20, 241, 149, 0.10)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.35,
+              pointRadius: 0,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+              y: { min: 0, max: 1, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#888', callback: v => (v*100).toFixed(0)+'%' } },
+              x: { grid: { display: false }, ticks: { color: '#888', maxTicksLimit: 8 } }
+            },
+            plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } }
+          }
+        });
+      } else {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = data;
+        chart.update('none');
+      }
+    } catch (_) {}
+  }
+
+  // ─── /stats/qos every 2s (alongside /health) ─────────────────────────────
+  async function tickQos() {
+    try {
+      const q = await fetch(api('/stats/qos')).then(r => r.json());
+      $('#qos-queue-depth').textContent = q.queue_depth;
+      $('#qos-max-queue').textContent = q.max_queue_depth;
+      $('#qos-inflight').textContent = q.in_flight;
+      $('#qos-max-inflight').textContent = q.max_inflight;
+      $('#qos-util-bar').style.width = (q.utilization * 100).toFixed(0) + '%';
+      $('#qos-wait-p95').textContent = q.wait_p95_ms;
+      $('#qos-wait-p99').textContent = q.wait_p99_ms;
+      $('#qos-settled').textContent = q.total_settled.toLocaleString();
+      $('#qos-bypassed').textContent = q.bypassed_total.toLocaleString();
+      $('#qos-dispatched').textContent = q.dispatched_total.toLocaleString();
+      const rejected = q.rejected_overflow_total + q.rejected_timeout_total;
+      $('#qos-rejected').textContent = rejected.toLocaleString();
+      $('#qos-rej-overflow').textContent = q.rejected_overflow_total;
+      $('#qos-rej-timeout').textContent = q.rejected_timeout_total;
+      const badge = $('#qos-mode-badge');
+      badge.textContent = q.mode;
+      badge.className = 'ml-2 px-2 py-0.5 rounded text-[10px] mono uppercase tracking-widest border ' + (
+        q.mode === 'standalone' ? 'border-purple-400/50 text-purple-300' :
+        q.mode === 'cooperative' ? 'border-green-400/50 text-green-300' :
+        'border-white/30 text-white/50'
+      );
+    } catch (_) {}
+  }
+
+  // ─── /stats/leaderboard every 30s ────────────────────────────────────────
+  async function tickLeaderboard() {
+    try {
+      const s = await fetch(api('/stats/leaderboard')).then(r => r.json());
+      const tb = $('#leaderboard-body');
+      if (s.leaderboard.length === 0) {
+        tb.innerHTML = '<tr><td colspan="7" class="text-white/40 text-center py-6">no agents yet</td></tr>';
+        return;
+      }
+      tb.innerHTML = s.leaderboard.map((a, i) => {
+        const discount = (a.trust_score / 2).toFixed(1);
+        const rankColor = i === 0 ? 'text-yellow-300' : i === 1 ? 'text-white/80' : i === 2 ? 'text-orange-300' : 'text-white/50';
+        return `<tr>
+          <td class="${rankColor} mono">#${i+1}</td>
+          <td class="mono"><a target="_blank" href="${explorerUrl(a.pubkey, SHIELD_INFO?.network)}" class="hover:underline text-white/85">${trunc(a.pubkey)}</a></td>
+          <td class="text-right mono"><span class="px-2 py-0.5 bg-purple-500/15 border border-purple-500/30 rounded text-purple-300 text-xs">${a.trust_score}</span></td>
+          <td class="text-right mono">${a.paid_count}</td>
+          <td class="text-right mono">${a.total_paid_micro_lamports.toLocaleString()} µL</td>
+          <td class="text-right mono text-green-300">−${discount}%</td>
+          <td class="text-right text-white/50 text-xs">${ago(a.last_paid_at)}</td>
+        </tr>`;
+      }).join('');
+    } catch (_) {}
+  }
+
+  // ─── boot + intervals ────────────────────────────────────────────────────
+  tickHealth(); tickQos(); tickStats(); tickLeaderboard();
+  setInterval(tickHealth, 2000);
+  setInterval(tickQos, 2000);
+  setInterval(tickStats, 5000);
+  setInterval(tickLeaderboard, 30000);
+</script>
+
+</body>
+</html>

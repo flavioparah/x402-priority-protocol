@@ -1,0 +1,20 @@
+{
+  "tests": [
+    {
+      "id": "X402-1",
+      "name": "Valid proof with same body",
+      "category": "x402 Integrity",
+      "status": "PASSED",
+      "evidence": "HTTP 200",
+      "observations": ""
+    },
+    {
+      "id": "X402-2",
+      "name": "Modified body hash after signing",
+      "category": "x402 Integrity",
+      "status": "PASSED",
+      "evidence": "HTTP 402",
+      "observations": ""
+    }
+  ]
+}

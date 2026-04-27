@@ -1,0 +1,19 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.idea/
+.vscode/
+
+# Arquivos locais de teste e chaves privadas — NUNCA subir
+gateway/stress-test.js
+sender-key.json
+*.key
+*.pem

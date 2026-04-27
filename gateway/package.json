@@ -1,0 +1,38 @@
+{
+  "name": "x402-shield",
+  "version": "0.1.0",
+  "description": "HTTP 402 priority gate for Solana RPC nodes — MVP",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "demo": "node demo.js",
+    "demo:trust": "node examples/trust-progression.js",
+    "bench": "node bench.js",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node test/smoke.js",
+    "test:smoke": "node test/smoke.js",
+    "test:cooperative-qos": "npm run build && node test/cooperative-qos.test.js",
+    "test:atomic": "node test/atomic-consume.test.js",
+    "test:atomic:redis": "node test/atomic-consume-redis.test.js",
+    "test:detection": "node test/detection.test.js",
+    "operator:reference": "node examples/operator-qos-reference.js",
+    "test:security": "node scripts/run-security-tests.js",
+    "report:generate": "node scripts/generate-test-report.js"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.91.0",
+    "bs58": "^5.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^3.0.5",
+    "ioredis": "^5.10.1",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "nodemon": "^3.0.0",
+    "typescript": "^5.3.0"
+  }
+}

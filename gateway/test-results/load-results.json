@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "id": "LOAD-1",
+      "name": "Standard RPC Load",
+      "category": "Load Test",
+      "status": "PASSED",
+      "evidence": "Count: 613, Errors: 0, P95: 3ms",
+      "observations": "Successfully handled 613 requests with 0.00% error rate."
+    }
+  ]
+}
