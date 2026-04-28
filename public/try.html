@@ -200,6 +200,58 @@
         .fade-in { animation: fadeIn 0.5s ease forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* ─── Mode selector (Mainnet vs Trust-Score demo) ────────────────── */
+        .mode-selector {
+            display: flex;
+            background: var(--surface-accent);
+            border-radius: 12px;
+            padding: 4px;
+            gap: 4px;
+            margin-bottom: 6px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .mode-pill {
+            flex: 1;
+            padding: 10px 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: var(--font-main);
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.15s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 0;
+        }
+        .mode-pill:hover { color: var(--text); transform: none; box-shadow: none; }
+        .mode-pill.active {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 242, 255, 0.15);
+        }
+        .mode-note {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+            margin-bottom: 6px;
+        }
+        .mode-note .accent { color: var(--primary); font-weight: 700; }
+        .mode-note code {
+            background: rgba(0,0,0,0.4);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            color: var(--success);
+        }
+
         /* ─── Responsive — tablet (≤ 1024px) ─────────────────────────────── */
         @media (max-width: 1024px) {
             header { padding: 1.5rem 2rem; }
@@ -314,6 +366,14 @@
         <div class="controls fade-in">
             <div class="card">
                 <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Test Config</h2>
+                <div class="input-group">
+                    <label>MODE</label>
+                    <div class="mode-selector" role="tablist">
+                        <button type="button" class="mode-pill active" data-mode="mainnet">Mainnet (real)</button>
+                        <button type="button" class="mode-pill" data-mode="trust">Trust-Score demo</button>
+                    </div>
+                    <div id="mode-note" class="mode-note"></div>
+                </div>
                 <div class="input-group"><label>VPS GATEWAY URL</label><input type="text" id="gateway-url" value="https://x402-mainnet.rpcpriority.com/rpc"></div>
                 <div class="input-group" style="margin-bottom: 1rem;">
                     <label>WALLET PUBKEY</label>
@@ -331,6 +391,34 @@
     <footer>desenvolvido por <a href="https://vkxtech.com.br" target="_blank">vkxtech</a></footer>
 
     <script>
+        // ─── Mode selector (Mainnet vs Trust-Score demo) ─────────────────────
+        const MODES = {
+            mainnet: {
+                url: 'https://x402-mainnet.rpcpriority.com/rpc',
+                note: '<span class="accent">Mainnet — custo real.</span> Cada chamada gera um desafio 402 com destino real (<code>FE7UhuuW…9GgQ</code>) e upstream <code>api.mainnet-beta.solana.com</code>. Pra ver Trust-Score subir, é preciso pagar com SOL real on-chain.'
+            },
+            trust: {
+                url: 'https://x402.rpcpriority.com/rpc',
+                note: '<span class="accent">Demo de Trust-Score.</span> Depósitos confiados (sem on-chain), upstream devnet. Pra ver progressão de score 0 → 100 e 26% de economia, rode <code>SHIELD_URL=https://x402.rpcpriority.com npm run demo:trust</code> num terminal.'
+            }
+        };
+        function applyMode(mode) {
+            document.querySelectorAll('.mode-pill').forEach(b => {
+                b.classList.toggle('active', b.dataset.mode === mode);
+            });
+            document.getElementById('gateway-url').value = MODES[mode].url;
+            document.getElementById('mode-note').innerHTML = MODES[mode].note;
+            // reset audit cursor so terminal repopulates from the new shield
+            lastAuditTs = 0;
+            const term = document.getElementById('terminal');
+            term.innerHTML = '';
+            log(`Mode switched to ${mode === 'mainnet' ? 'MAINNET' : 'TRUST-SCORE DEMO'}`, 'info');
+        }
+        document.querySelectorAll('.mode-pill').forEach(btn => {
+            btn.addEventListener('click', () => applyMode(btn.dataset.mode));
+        });
+        document.getElementById('mode-note').innerHTML = MODES.mainnet.note;
+
         // ─── Three.js Background ───────────────────────────────────────────────
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
