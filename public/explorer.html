@@ -20,21 +20,65 @@
   .reveal { animation: fadeUp 0.4s ease-out; }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
   table th, table td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+
+  /* Navigation */
+  .nav-container { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem; }
+  .nav-logo { display: flex; align-items: center; gap: 0.75rem; font-size: 1.1rem; font-weight: bold; letter-spacing: -0.5px; text-decoration: none; color: inherit; }
+  .nav-links { display: flex; align-items: center; gap: 1.5rem; font-size: 0.8rem; font-weight: 500; opacity: 0.7; }
+  .nav-links a { transition: opacity 0.2s; text-decoration: none; color: inherit; }
+  .nav-links a:hover { opacity: 1; }
+  .nav-separator { opacity: 0.3; }
+  .nav-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #14F195; animation: navPulse 1.5s ease-in-out infinite; display: inline-block; }
+  @keyframes navPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+  .nav-network-dropdown { position: relative; }
+  .nav-network-btn { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .nav-network-menu { position: absolute; right: 0; top: 100%; margin-top: 0.5rem; width: 200px; background: rgba(10, 10, 10, 0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.5rem; opacity: 0; visibility: hidden; transition: all 0.2s; z-index: 100; backdrop-filter: blur(10px); }
+  .nav-network-dropdown:hover .nav-network-menu { opacity: 1; visibility: visible; }
+  .nav-network-item { display: block; padding: 0.5rem 0.75rem; text-decoration: none; color: inherit; border-radius: 4px; transition: background 0.2s; }
+  .nav-network-item:hover { background: rgba(255, 255, 255, 0.05); }
+  .nav-network-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 8px; }
+  .nav-network-label { opacity: 0.5; font-size: 0.7rem; display: block; }
+  @media (max-width: 768px) { .nav-links { display: none; } .nav-container { padding: 1rem; } }
 </style>
 </head>
 <body class="min-h-screen">
 
-<header class="border-b border-white/10">
-  <div class="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <a href="/" class="text-lg font-extrabold gradient-text mono tracking-tight">RPC PRIORITY</a>
-      <span class="text-white/30">·</span>
-      <span class="text-sm text-white/60 uppercase tracking-widest">Reputation Explorer</span>
-    </div>
-    <div class="flex items-center gap-3 text-sm">
-      <a href="/live" class="text-xs text-white/60 hover:text-white border border-white/20 rounded-full px-3 py-1 flex items-center gap-2"><span class="live-dot"></span> Live</a>
-      <a href="/try" class="text-xs text-white/60 hover:text-white border border-white/20 rounded-full px-3 py-1">Try it →</a>
-    </div>
+<header style="background: rgba(10, 10, 10, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.05); position: sticky; top: 0; z-index: 50;">
+  <div class="nav-container">
+    <a href="/" class="nav-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14F195" stroke-width="2.5">
+        <path d="M12 2L4 5V11C4 16.18 7.41 21.03 12 22C16.59 21.03 20 16.18 20 11V5L12 2Z"/>
+      </svg>
+      <span style="color: #14F195;">RPC</span> <span>PRIORITY</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/">Home</a>
+      <span class="nav-separator">|</span>
+      <a href="/live"><span class="nav-live-dot"></span> Live</a>
+      <a href="/try">Try it</a>
+      <a href="/explorer" style="opacity: 1;">Explorer</a>
+      <span class="nav-separator">|</span>
+      <div class="nav-network-dropdown">
+        <div class="nav-network-btn">
+          Network <span style="font-size: 0.6rem;">▼</span>
+        </div>
+        <div class="nav-network-menu">
+          <a href="https://api.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
+            <span class="nav-network-dot" style="background: #14F195;"></span>Mainnet
+            <span class="nav-network-label">api.rpcpriority.com · real SOL</span>
+          </a>
+          <a href="https://devnet.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
+            <span class="nav-network-dot" style="background: #f9a826;"></span>Devnet
+            <span class="nav-network-label">devnet.rpcpriority.com · testnet</span>
+          </a>
+          <a href="https://demo.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
+            <span class="nav-network-dot" style="background: #9945FF;"></span>Trust Demo
+            <span class="nav-network-label">demo.rpcpriority.com · fake deposits</span>
+          </a>
+        </div>
+      </div>
+      <a href="https://github.com/flavioparah/x402-priority-protocol" target="_blank" rel="noopener">GitHub</a>
+    </nav>
   </div>
 </header>
 
@@ -77,13 +121,16 @@
 </main>
 
 <script>
-  // ─── API base ─ when served from the marketing domain (rpcpriority.com),
-  // the page is static (nginx); route API calls to the demo shield.
+  // ─── API base ─ this static page is served by the landing nginx
+  // (rpcpriority.com / app.rpcpriority.com); route API calls to the mainnet
+  // shield by default. When the page is served by a shield container itself,
+  // use relative URLs.
   const API_BASE = (() => {
     const h = location.hostname;
-    if (h.startsWith("x402") && h.endsWith(".rpcpriority.com")) return "";
+    if (h === "api.rpcpriority.com" || h === "mainnet.rpcpriority.com") return "";
+    if (h === "devnet.rpcpriority.com" || h === "demo.rpcpriority.com") return "";
     if (h === "localhost" || h === "127.0.0.1") return "";
-    return "https://x402.rpcpriority.com";
+    return "https://api.rpcpriority.com";
   })();
   const api = (path) => API_BASE + path;
 

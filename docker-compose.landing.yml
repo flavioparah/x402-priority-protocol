@@ -1,0 +1,56 @@
+# Static site for rpcpriority.com — landing + dashboard.
+# Serves the public/ directory via nginx.
+#
+# Deploy on kvm4:
+#   docker compose -f docker-compose.landing.yml up -d --build
+#
+# Routing (all on the same nginx):
+#   https://rpcpriority.com/        -> marketing landing (index.html)
+#   https://www.rpcpriority.com/    -> 301 -> apex
+#   https://app.rpcpriority.com/    -> dashboard (try.html, live.html, explorer.html)
+#
+# Shield APIs are routed to their own containers:
+#   https://api.rpcpriority.com     -> mainnet shield (default)
+#   https://mainnet.rpcpriority.com -> mainnet shield (alias)
+#   https://devnet.rpcpriority.com  -> devnet shield
+#   https://demo.rpcpriority.com    -> trust-score demo shield
+
+services:
+  landing:
+    image: nginx:alpine
+    container_name: x402-landing
+    restart: unless-stopped
+    volumes:
+      - ./public:/usr/share/nginx/html:ro
+    networks:
+      - portainer_default
+    labels:
+      - "traefik.enable=true"
+
+      # Apex — marketing landing.
+      - "traefik.http.routers.x402-landing.rule=Host(`rpcpriority.com`)"
+      - "traefik.http.routers.x402-landing.entrypoints=websecure"
+      - "traefik.http.routers.x402-landing.tls.certresolver=leresolver"
+
+      # app.rpcpriority.com — dashboard host (try.html, live.html, explorer.html).
+      # Same nginx; separates the marketing apex from the interactive console.
+      - "traefik.http.routers.x402-app.rule=Host(`app.rpcpriority.com`)"
+      - "traefik.http.routers.x402-app.entrypoints=websecure"
+      - "traefik.http.routers.x402-app.tls.certresolver=leresolver"
+      - "traefik.http.routers.x402-app.service=x402-landing"
+
+      # www.rpcpriority.com — 301 permanent redirect to the canonical apex.
+      - "traefik.http.middlewares.www-redirect.redirectregex.regex=^https?://www\\.rpcpriority\\.com/(.*)"
+      - "traefik.http.middlewares.www-redirect.redirectregex.replacement=https://rpcpriority.com/$${1}"
+      - "traefik.http.middlewares.www-redirect.redirectregex.permanent=true"
+      - "traefik.http.routers.x402-www.rule=Host(`www.rpcpriority.com`)"
+      - "traefik.http.routers.x402-www.entrypoints=websecure"
+      - "traefik.http.routers.x402-www.tls.certresolver=leresolver"
+      - "traefik.http.routers.x402-www.middlewares=www-redirect"
+      - "traefik.http.routers.x402-www.service=x402-landing"
+
+      - "traefik.http.services.x402-landing.loadbalancer.server.port=80"
+
+networks:
+  portainer_default:
+    external: true

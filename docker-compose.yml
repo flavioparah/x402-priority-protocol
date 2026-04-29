@@ -1,3 +1,21 @@
+# x402 Shield — Trust-Score demo deployment.
+# Exposed at https://demo.rpcpriority.com.
+#
+# Trusted-deposit ON: clients can pre-fund escrow without on-chain transfers,
+# which is what the 22-request Trust-Score progression demo relies on. Used
+# for investor demos and pitch videos. Not for production payment flows —
+# use api.rpcpriority.com (mainnet) or devnet.rpcpriority.com instead.
+#
+# Deploy alongside mainnet/devnet/landing containers — they share
+# `portainer_default` and Traefik routes by Host header.
+#
+#   docker compose up -d --build
+#
+# Required env vars (set in /root/x402/.env on kvm4):
+#   PAYMENT_DESTINATION  - Solana pubkey to receive demo payments. Can match
+#                          devnet (Solana addresses are universal across
+#                          clusters).
+
 services:
   redis:
     image: redis:7-alpine
@@ -28,9 +46,11 @@ services:
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-}
       PAYMENT_DESTINATION: ${PAYMENT_DESTINATION}
       DEPOSIT_COMMITMENT: ${DEPOSIT_COMMITMENT:-confirmed}
-      ESCROW_TRUST_DEPOSITS: ${ESCROW_TRUST_DEPOSITS:-}
+      # Defining trait of the demo deployment: trusted deposits enabled so the
+      # Trust-Score progression can be shown without spending on-chain SOL.
+      ESCROW_TRUST_DEPOSITS: "1"
       RPC_LOAD_THRESHOLD: ${RPC_LOAD_THRESHOLD:-0.75}
-      RPC_LOAD_FORCE: ${RPC_LOAD_FORCE:-}
+      RPC_LOAD_FORCE: ${RPC_LOAD_FORCE:-0.9}
       MAX_RPS: ${MAX_RPS:-50}
       LOAD_WINDOW_MS: ${LOAD_WINDOW_MS:-5000}
       REQUESTS_PER_IP_LIMIT: ${REQUESTS_PER_IP_LIMIT:-100}
@@ -41,7 +61,7 @@ services:
       - portainer_default
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.x402-shield.rule=Host(`x402.rpcpriority.com`) || Host(`x402.assistent.top`)"
+      - "traefik.http.routers.x402-shield.rule=Host(`demo.rpcpriority.com`)"
       - "traefik.http.routers.x402-shield.entrypoints=websecure"
       - "traefik.http.routers.x402-shield.tls.certresolver=leresolver"
       - "traefik.http.services.x402-shield.loadbalancer.server.port=3000"

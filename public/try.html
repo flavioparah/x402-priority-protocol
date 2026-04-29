@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>x402-Shield | Management Console</title>
+    <title>RPC Priority | Management Console</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -288,6 +288,54 @@
             .metric-card { padding: 1rem; border-radius: 12px; }
             .metric-label { font-size: 0.7rem; }
             .metric-value { font-size: 1.2rem; }
+            /* Trust Score Gauge */
+            .trust-score-card {
+                background: linear-gradient(135deg, rgba(0, 242, 255, 0.05), rgba(112, 0, 255, 0.05));
+                border: 1px solid rgba(0, 242, 255, 0.2);
+            }
+            .trust-gauge-container {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 1rem;
+            }
+            .trust-gauge {
+                width: 60px;
+                height: 60px;
+                position: relative;
+            }
+            .trust-gauge svg {
+                transform: rotate(-90deg);
+            }
+            .trust-gauge-bg {
+                fill: none;
+                stroke: #2a2a3a;
+                stroke-width: 6;
+            }
+            .trust-gauge-fill {
+                fill: none;
+                stroke: #00ff88;
+                stroke-width: 6;
+                stroke-linecap: round;
+                transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease;
+            }
+            .trust-gauge-text {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 0.9rem;
+                font-weight: bold;
+                color: var(--text);
+            }
+            .trust-info {
+                flex: 1;
+            }
+            .trust-discount {
+                font-size: 0.7rem;
+                color: var(--success);
+                margin-top: 4px;
+            }
             #terminal {
                 height: 200px;
                 padding: 0.9rem;
@@ -312,6 +360,103 @@
             }
         }
 
+        /* ─── Navigation Menu ─────────────────────────────────────────────── */
+        .nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+        }
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.1rem;
+            font-weight: bold;
+            letter-spacing: -0.5px;
+        }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            opacity: 0.7;
+        }
+        .nav-links a {
+            transition: opacity 0.2s;
+            text-decoration: none;
+            color: inherit;
+        }
+        .nav-links a:hover {
+            opacity: 1;
+        }
+        .nav-separator {
+            opacity: 0.3;
+        }
+        .nav-live-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: navPulse 1.5s ease-in-out infinite;
+            display: inline-block;
+        }
+        @keyframes navPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+        .nav-network-dropdown {
+            position: relative;
+        }
+        .nav-network-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+        .nav-network-menu {
+            position: absolute;
+            right: 0;
+            top: 100%;
+            margin-top: 0.5rem;
+            width: 200px;
+            background: rgba(12, 12, 20, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.5rem;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        .nav-network-dropdown:hover .nav-network-menu {
+            opacity: 1;
+            visibility: visible;
+        }
+        .nav-network-item {
+            display: block;
+            padding: 0.5rem 0.75rem;
+            text-decoration: none;
+            color: inherit;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .nav-network-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .nav-network-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .nav-network-label {
+            opacity: 0.5;
+            font-size: 0.7rem;
+        }
+
         /* ─── Responsive — very narrow (≤ 380px) ─────────────────────────── */
         @media (max-width: 380px) {
             header { padding: 0.85rem 1rem; }
@@ -320,17 +465,54 @@
             .metrics-grid { grid-template-columns: 1fr; }
             main { padding: 1rem; }
             .card { padding: 1rem; }
+            .nav-container { padding: 1rem; }
+            .nav-links { display: none; }
+        }
+        @media (max-width: 768px) {
+            .nav-links { gap: 0.75rem; font-size: 0.75rem; }
+            .nav-container { padding: 1rem 1.5rem; }
         }
     </style>
 </head>
 <body>
     <canvas id="three-canvas"></canvas>
-    <header>
-        <div class="logo">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-            x402-SHIELD
+    <header style="background: rgba(5, 5, 8, 0.8); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.05); position: sticky; top: 0; z-index: 50;">
+        <div class="nav-container">
+            <a href="/" class="nav-logo" style="color: var(--text); text-decoration: none;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5">
+                    <path d="M12 2L4 5V11C4 16.18 7.41 21.03 12 22C16.59 21.03 20 16.18 20 11V5L12 2Z"/>
+                </svg>
+                <span style="color: var(--success);">RPC</span> <span>PRIORITY</span>
+            </a>
+            <nav class="nav-links">
+                <a href="/">Home</a>
+                <span class="nav-separator">|</span>
+                <a href="/live"><span class="nav-live-dot"></span> Live</a>
+                <a href="/try" style="opacity: 1;">Try it</a>
+                <a href="/explorer">Explorer</a>
+                <span class="nav-separator">|</span>
+                <div class="nav-network-dropdown">
+                    <div class="nav-network-btn">
+                        Network <span style="font-size: 0.6rem;">▼</span>
+                    </div>
+                    <div class="nav-network-menu">
+                        <a href="https://api.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
+                            <span class="nav-network-dot" style="background: var(--success);"></span>Mainnet
+                            <div class="nav-network-label">api.rpcpriority.com · real SOL</div>
+                        </a>
+                        <a href="https://devnet.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
+                            <span class="nav-network-dot" style="background: #f9a826;"></span>Devnet
+                            <div class="nav-network-label">devnet.rpcpriority.com · testnet</div>
+                        </a>
+                        <a href="https://demo.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
+                            <span class="nav-network-dot" style="background: #9945FF;"></span>Trust Demo
+                            <div class="nav-network-label">demo.rpcpriority.com · fake deposits</div>
+                        </a>
+                    </div>
+                </div>
+                <a href="https://github.com/flavioparah/x402-priority-protocol" target="_blank" rel="noopener">GitHub</a>
+            </nav>
         </div>
-        <div class="status-badge"><div class="status-dot"></div> SOLANA MAINNET NODE ACTIVE</div>
     </header>
 
     <main>
@@ -343,13 +525,32 @@
                 <div class="metric-card"><div class="metric-label">Escrow Bal</div><div id="balance-value" class="metric-value">0 µL</div></div>
             </div>
 
+            <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"></path></svg> Your Trust Score</h2>
+            <div class="card trust-score-card" style="margin-top: 0.8rem;">
+                <div class="trust-gauge-container">
+                    <div class="trust-gauge">
+                        <svg width="60" height="60" viewBox="0 0 60 60">
+                            <circle cx="30" cy="30" r="25" class="trust-gauge-bg"/>
+                            <circle id="trust-gauge-fill" cx="30" cy="30" r="25" class="trust-gauge-fill"
+                                stroke-dasharray="157" stroke-dashoffset="157"/>
+                        </svg>
+                        <div class="trust-gauge-text" id="trust-score-value">0</div>
+                    </div>
+                    <div class="trust-info">
+                        <div style="font-size: 0.8rem; opacity: 0.7;">Current Reputation</div>
+                        <div id="trust-tier" style="font-size: 0.95rem; font-weight: 600; color: var(--text-muted);">New Agent</div>
+                        <div id="trust-discount" class="trust-discount">No discount (0% savings)</div>
+                    </div>
+                </div>
+            </div>
+
             <h2><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg> Live Audit Stream</h2>
             <div id="terminal"></div>
 
             <div class="guide-section">
                 <div class="info-box">
                     <h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg> Layman's Overview</h3>
-                    <p>O x402-Shield protege o nó de SPAM e cobra micro-taxas (QoS) para priorizar usuários legítimos.</p>
+                    <p>O RPC Priority protege o nó de SPAM e cobra micro-taxas (QoS) para priorizar usuários legítimos.</p>
                     <div class="step-item"><span class="step-num">1</span><span><strong>Cheap</strong>: Consultas leves. <span class="tier-tag tier-cheap">LOW COST</span></span></div>
                     <div class="step-item"><span class="step-num">2</span><span><strong>Medium</strong>: Dados de contas. <span class="tier-tag tier-medium">MID COST</span></span></div>
                     <div class="step-item"><span class="step-num">3</span><span><strong>Expensive</strong>: Varreduras DoS. <span class="tier-tag tier-expensive">HIGH COST</span></span></div>
@@ -374,7 +575,7 @@
                     </div>
                     <div id="mode-note" class="mode-note"></div>
                 </div>
-                <div class="input-group"><label>VPS GATEWAY URL</label><input type="text" id="gateway-url" value="https://x402-mainnet.rpcpriority.com/rpc"></div>
+                <div class="input-group"><label>VPS GATEWAY URL</label><input type="text" id="gateway-url" value="https://api.rpcpriority.com/rpc"></div>
                 <div class="input-group" style="margin-bottom: 1rem;">
                     <label>WALLET PUBKEY</label>
                     <input type="text" id="wallet-pubkey" placeholder="Ex: 8tDt...Qg">
@@ -394,12 +595,12 @@
         // ─── Mode selector (Mainnet vs Trust-Score demo) ─────────────────────
         const MODES = {
             mainnet: {
-                url: 'https://x402-mainnet.rpcpriority.com/rpc',
+                url: 'https://api.rpcpriority.com/rpc',
                 note: '<span class="accent">Mainnet — custo real.</span> Cada chamada gera um desafio 402 com destino real (<code>FE7UhuuW…9GgQ</code>) e upstream <code>api.mainnet-beta.solana.com</code>. Pra ver Trust-Score subir, é preciso pagar com SOL real on-chain.'
             },
             trust: {
-                url: 'https://x402.rpcpriority.com/rpc',
-                note: '<span class="accent">Demo de Trust-Score.</span> Depósitos confiados (sem on-chain), upstream devnet. Pra ver progressão de score 0 → 100 e 26% de economia, rode <code>SHIELD_URL=https://x402.rpcpriority.com npm run demo:trust</code> num terminal.'
+                url: 'https://demo.rpcpriority.com/rpc',
+                note: '<span class="accent">Demo de Trust-Score.</span> Depósitos confiados (sem on-chain), upstream devnet. Pra ver progressão de score 0 → 100 e 26% de economia, rode <code>SHIELD_URL=https://demo.rpcpriority.com npm run demo:trust</code> num terminal.'
             }
         };
         function applyMode(mode) {
@@ -444,6 +645,60 @@
             term.scrollTop = term.scrollHeight;
         }
 
+        // ─── Trust Score Gauge ─────────────────────────────────────────────
+        function updateTrustGauge(score, discount) {
+            const gauge = document.getElementById('trust-gauge-fill');
+            const scoreValue = document.getElementById('trust-score-value');
+            const tierText = document.getElementById('trust-tier');
+            const discountText = document.getElementById('trust-discount');
+
+            // Animate gauge (circumference = 2 * PI * 25 ≈ 157)
+            const circumference = 157;
+            const offset = circumference - (score / 100) * circumference;
+            gauge.style.strokeDashoffset = offset;
+
+            // Color based on score
+            if (score >= 80) {
+                gauge.style.stroke = '#00ff88';
+            } else if (score >= 50) {
+                gauge.style.stroke = '#00f2ff';
+            } else if (score >= 25) {
+                gauge.style.stroke = '#ffcc00';
+            } else {
+                gauge.style.stroke = '#ff3366';
+            }
+
+            // Animate number
+            const currentScore = parseInt(scoreValue.innerText) || 0;
+            animateNumber(scoreValue, currentScore, score, 500);
+
+            // Update tier text
+            if (score >= 80) tierText.innerText = 'Trusted Agent';
+            else if (score >= 50) tierText.innerText = 'Reliable Agent';
+            else if (score >= 25) tierText.innerText = 'New Agent';
+            else tierText.innerText = 'Unverified';
+
+            // Update discount
+            if (score > 0) {
+                discountText.innerHTML = `<span style="color: #00ff88">★ ${discount.toFixed(0)}% discount</span> on priority fees`;
+            } else {
+                discountText.innerText = 'No discount (0% savings)';
+            }
+        }
+
+        function animateNumber(element, from, to, duration) {
+            const startTime = performance.now();
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                const current = Math.round(from + (to - from) * easeOut);
+                element.innerText = current;
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            requestAnimationFrame(update);
+        }
+
         // ─── Real-time Polling (Metrics + Audit) ───────────────────────────
         let lastAuditTs = 0;
         async function refreshDashboard() {
@@ -462,6 +717,14 @@
                 if (pk) {
                     const b = await (await fetch(`${base}/escrow/balance/${pk}`)).json();
                     document.getElementById('balance-value').innerText = `${b.balance_micro_lamports} µL`;
+
+                    // Trust score
+                    try {
+                        const r = await (await fetch(`${base}/reputation/${pk}`)).json();
+                        updateTrustGauge(r.trust_score, r.current_discount_percent);
+                    } catch(e) { /* reputation endpoint may not exist */ }
+                } else {
+                    updateTrustGauge(0, 0);
                 }
 
                 // Server-side audit events
@@ -488,7 +751,7 @@
 
             if (!gatewayUrl) { log('No gateway URL configured.', 'error'); return; }
 
-            log(`→ Sending ${method} to x402-Shield...`);
+            log(`→ Sending ${method} to RPC Priority...`);
             const start = Date.now();
             try {
                 const headers = { 'Content-Type': 'application/json' };
@@ -503,9 +766,15 @@
 
                 if (res.status === 402) {
                     const body = await res.json();
+                    const trustScore = body.payment?.trust_score ?? 0;
+                    const discount = (trustScore / 2).toFixed(0);
+
                     log(`← HTTP 402 — Shield issued a priority challenge in ${lat}ms`, 'auth');
                     log(`  Nonce: <span style="font-family:monospace;font-size:10px">${body.payment?.nonce ?? 'n/a'}</span>`, 'auth');
                     log(`  Cost : ${body.payment?.amount_micro_lamports ?? '?'} µL to ${body.payment?.destination?.slice(0,10)}...`, 'auth');
+                    if (trustScore > 0) {
+                        log(`  Trust Score: <span style="color:var(--success)">${trustScore}/100</span> — You save ${discount}% on priority fees!`, 'auth');
+                    }
                     log(`  To pay, sign this nonce with your wallet and include it in the Authorization header.`, 'info');
                 } else if (res.status === 200) {
                     log(`← HTTP 200 — RPC call passed through in ${lat}ms`, 'success');

@@ -1,21 +1,18 @@
-# Second deployment of the x402 Shield, pointing at Solana devnet, exposed at
-# https://x402-devnet.rpcpriority.com.
+# x402 Shield — Solana devnet deployment.
+# Exposed at https://devnet.rpcpriority.com.
 #
-# Purpose: demonstrate the FULL on-chain payment flow end-to-end without
-# spending real SOL. The mainnet deployment (docker-compose.yml) keeps the
-# trusted-deposit endpoint enabled for the 22-request Trust-Score demo; this
-# devnet deployment turns it off, forcing every payment through the
-# `getParsedTransaction` verification path.
+# Same on-chain verification flow as mainnet, but pointed at devnet so it can
+# be exercised end-to-end without spending real SOL. Trusted-deposit is OFF.
 #
-# Deploy alongside the mainnet container — they share `portainer_default` and
-# are routed by Traefik on different subdomains.
+# Deploy alongside mainnet/demo/landing containers — they share `portainer_default`
+# and Traefik routes by Host header.
 #
-#   docker-compose -f docker-compose.devnet.yml up -d --build
+#   docker compose -f docker-compose.devnet.yml up -d --build
 #
 # Required env vars (set in /root/x402/.env on kvm4):
 #   PAYMENT_DESTINATION_DEVNET   - Solana pubkey to receive devnet payments
 #                                  (can be the same address as mainnet — Solana
-#                                  addresses are universal across clusters)
+#                                  addresses are universal across clusters).
 #
 # Optional overrides (default to demo-friendly values):
 #   RPC_LOAD_FORCE_DEVNET=0.9    - force 402 on every request for demo
@@ -63,7 +60,7 @@ services:
       - portainer_default
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.x402-shield-devnet.rule=Host(`x402-devnet.rpcpriority.com`)"
+      - "traefik.http.routers.x402-shield-devnet.rule=Host(`devnet.rpcpriority.com`)"
       - "traefik.http.routers.x402-shield-devnet.entrypoints=websecure"
       - "traefik.http.routers.x402-shield-devnet.tls.certresolver=leresolver"
       - "traefik.http.services.x402-shield-devnet.loadbalancer.server.port=3000"

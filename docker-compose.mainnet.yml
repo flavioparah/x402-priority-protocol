@@ -1,23 +1,19 @@
-# Third deployment of the x402 Shield: real Solana mainnet, exposed at
-# https://x402-mainnet.rpcpriority.com.
+# x402 Shield — Solana mainnet deployment.
+# Exposed at:
+#   https://api.rpcpriority.com       (canonical default)
+#   https://mainnet.rpcpriority.com   (explicit alias)
 #
-# Purpose: a publicly-reachable URL where any investor, partner or judge
-# can run the full on-chain payment flow against REAL mainnet — proving
-# end-to-end that the protocol works on production network with real SOL.
+# Real on-chain verification (no trusted deposit shortcuts). Pay in real SOL.
 #
-# Differs from docker-compose.devnet.yml only in REAL_RPC_URL: instead of
-# devnet, this points at api.mainnet-beta.solana.com. Trust-deposit is OFF
-# (forces on-chain verification), same as devnet.
+# Deploy alongside devnet/demo/landing containers — they share `portainer_default`
+# and Traefik routes by Host header.
 #
-# Deploy alongside the other two containers — they share `portainer_default`
-# and are routed by Traefik on different subdomains.
-#
-#   docker-compose -f docker-compose.mainnet.yml up -d --build
+#   docker compose -f docker-compose.mainnet.yml up -d --build
 #
 # Required env vars (set in /root/x402/.env on kvm4):
-#   PAYMENT_DESTINATION_MAINNET  - Solana pubkey to receive REAL mainnet payments
-#                                  (must be a wallet whose private key is in a
-#                                   secure place — payments arrive in real SOL)
+#   PAYMENT_DESTINATION_MAINNET  - Solana pubkey that receives real mainnet
+#                                  payments. Private key must be in a secure
+#                                  place — funds arrive in real SOL.
 
 services:
   redis-mainnet:
@@ -62,7 +58,7 @@ services:
       - portainer_default
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.x402-shield-mainnet.rule=Host(`x402-mainnet.rpcpriority.com`)"
+      - "traefik.http.routers.x402-shield-mainnet.rule=Host(`api.rpcpriority.com`) || Host(`mainnet.rpcpriority.com`)"
       - "traefik.http.routers.x402-shield-mainnet.entrypoints=websecure"
       - "traefik.http.routers.x402-shield-mainnet.tls.certresolver=leresolver"
       - "traefik.http.services.x402-shield-mainnet.loadbalancer.server.port=3000"
