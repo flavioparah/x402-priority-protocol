@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPC Priority — Qual é o seu lado?</title>
+    <meta name="description" content="Marketplace de prioridade Solana. De um lado, agentes IA e dapps que precisam passar na frente quando a rede congestiona. Do outro, operadores de RPC que querem transformar spam em receita.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0a0a;
+            color: #ededed;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .gradient-text {
+            background: linear-gradient(90deg, #9945FF 0%, #14F195 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .card-glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        /* Vertical divider that joins the two columns visually on desktop */
+        .divider-vertical {
+            background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.1) 20%, rgba(255,255,255,0.1) 80%, transparent);
+        }
+        /* Persona card colors */
+        .persona-client {
+            border-color: rgba(20, 241, 149, 0.35);
+            box-shadow: 0 0 50px rgba(20, 241, 149, 0.06);
+        }
+        .persona-client:hover {
+            border-color: rgba(20, 241, 149, 0.7);
+            box-shadow: 0 0 80px rgba(20, 241, 149, 0.15);
+        }
+        .persona-node {
+            border-color: rgba(153, 69, 255, 0.35);
+            box-shadow: 0 0 50px rgba(153, 69, 255, 0.06);
+        }
+        .persona-node:hover {
+            border-color: rgba(153, 69, 255, 0.7);
+            box-shadow: 0 0 80px rgba(153, 69, 255, 0.15);
+        }
+        .persona-card {
+            transition: all 0.3s ease;
+        }
+        .icon-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.85rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .icon-row:last-child { border-bottom: none; }
+        .icon-row svg { flex-shrink: 0; margin-top: 2px; }
+        .row-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            opacity: 0.5;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .cta-btn {
+            transition: all 0.2s;
+        }
+        .cta-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(20, 241, 149, 0.25);
+        }
+        .cta-btn-node:hover {
+            box-shadow: 0 10px 30px rgba(153, 69, 255, 0.25);
+        }
+        @media (max-width: 768px) {
+            .compare-grid { grid-template-columns: 1fr !important; }
+            .divider-vertical { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto">
+    <a href="/" class="flex items-center gap-3 text-lg font-bold mono tracking-tight no-underline" style="color: inherit;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14F195" stroke-width="2.5">
+            <path d="M12 2L4 5V11C4 16.18 7.41 21.03 12 22C16.59 21.03 20 16.18 20 11V5L12 2Z"/>
+        </svg>
+        <span><span style="color:#14F195">RPC</span> PRIORITY</span>
+    </a>
+    <div class="hidden md:flex items-center gap-7 text-sm mono opacity-70">
+        <a href="/" class="hover:opacity-100 transition">Home</a>
+        <a href="https://app.rpcpriority.com/try" class="hover:opacity-100 transition">Try it</a>
+        <a href="https://app.rpcpriority.com/live" class="hover:opacity-100 transition">Live</a>
+        <a href="https://github.com/flavioparah/x402-priority-protocol" target="_blank" rel="noopener" class="hover:opacity-100 transition">GitHub</a>
+    </div>
+</nav>
+
+<!-- Hero -->
+<header class="px-6 pt-12 pb-16 max-w-5xl mx-auto text-center">
+    <div class="inline-block px-4 py-1 rounded-full mono text-xs uppercase tracking-widest mb-6 card-glass">
+        Marketplace de prioridade Solana
+    </div>
+    <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
+        Qual é o <span class="gradient-text">seu lado?</span>
+    </h1>
+    <p class="text-base md:text-xl opacity-70 max-w-3xl mx-auto leading-relaxed">
+        De um lado, <span class="text-[#14F195] font-semibold">agentes, bots e dapps</span> que precisam passar na frente quando a rede Solana congestiona.
+        Do outro, <span class="text-[#9945FF] font-semibold">operadores de RPC</span> que querem transformar spam em receita.
+        Conectamos os dois via <span class="mono text-white">x402</span>.
+    </p>
+</header>
+
+<!-- Comparação lado-a-lado -->
+<main class="px-6 pb-20 max-w-7xl mx-auto">
+    <div class="compare-grid grid grid-cols-2 gap-0 relative">
+        <!-- Linha divisória entre colunas (apenas desktop) -->
+        <div class="divider-vertical absolute top-0 bottom-0 w-px hidden md:block" style="left: 50%; transform: translateX(-50%);"></div>
+
+        <!-- ═══ COLUNA 1: Cliente-operador ═══ -->
+        <div class="persona-card persona-client card-glass border rounded-2xl p-7 md:p-9 m-2 md:mr-4">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: rgba(20, 241, 149, 0.12); border: 1px solid rgba(20, 241, 149, 0.4);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14F195" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"/>
+                        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="row-label">Você é</div>
+                    <h2 class="text-xl md:text-2xl font-bold">Cliente-operador</h2>
+                </div>
+            </div>
+            <p class="text-sm opacity-70 mb-7 leading-relaxed">
+                Você opera um <span class="font-semibold">bot, dapp, agente IA, indexer ou backend de wallet</span> que consome RPC Solana — e perde dinheiro quando a rede engasga.
+            </p>
+
+            <!-- Linhas comparativas -->
+            <div class="space-y-0">
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                    <div>
+                        <span class="row-label">Sua dor</span>
+                        <span class="text-sm">Tx perdida em pico, MEV escapa, mint perde slot, latência mata UX</span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14F195" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <div>
+                        <span class="row-label">O que você ganha</span>
+                        <span class="text-sm">Acesso prioritário garantido em pico. Carga baixa = passa de graça</span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14F195" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                    <div>
+                        <span class="row-label">Quanto custa</span>
+                        <span class="text-sm">~$0,001–$1/dia típico. Pague só quando a rede congestiona</span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14F195" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <div>
+                        <span class="row-label">Tempo pra integrar</span>
+                        <span class="text-sm">30 minutos. Drop-in no <span class="mono opacity-80">@solana/web3.js</span></span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14F195" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <div>
+                        <span class="row-label">Trust-Score</span>
+                        <span class="text-sm">Sobe 5 pts/pagamento até 100 → <span class="text-[#14F195] font-bold">50% off recorrente</span></span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14F195" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                    <div>
+                        <span class="row-label">Investimento inicial</span>
+                        <span class="text-sm">$0,17 (depósito de 0,001 SOL na escrow — cobre ~30 dias)</span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#14F195" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                    <div>
+                        <span class="row-label">Compatível com</span>
+                        <span class="text-sm">Qualquer SDK Solana. Qualquer linguagem. Sem vendor lock-in</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTAs Cliente -->
+            <div class="mt-8 space-y-3">
+                <a href="https://app.rpcpriority.com/try" class="cta-btn block w-full text-center bg-[#14F195] text-black font-bold py-4 rounded-xl hover:bg-[#0fd784] transition">
+                    Testar agora ao vivo →
+                </a>
+                <a href="https://api.rpcpriority.com/info" class="block w-full text-center mono text-xs opacity-60 hover:opacity-100 transition py-2">
+                    curl https://api.rpcpriority.com/info
+                </a>
+            </div>
+        </div>
+
+        <!-- ═══ COLUNA 2: Node-operador ═══ -->
+        <div class="persona-card persona-node card-glass border rounded-2xl p-7 md:p-9 m-2 md:ml-4">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: rgba(153, 69, 255, 0.12); border: 1px solid rgba(153, 69, 255, 0.4);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9945FF" stroke-width="2">
+                        <rect x="2" y="2" width="20" height="8" rx="2"/>
+                        <rect x="2" y="14" width="20" height="8" rx="2"/>
+                        <line x1="6" y1="6" x2="6.01" y2="6"/>
+                        <line x1="6" y1="18" x2="6.01" y2="18"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="row-label">Você é</div>
+                    <h2 class="text-xl md:text-2xl font-bold">Node-operador</h2>
+                </div>
+            </div>
+            <p class="text-sm opacity-70 mb-7 leading-relaxed">
+                Você opera um <span class="font-semibold">RPC Solana próprio, dedicado ou in-house</span> — validator, RPC B2B, ou nó de protocolo — e gostaria de transformar tráfego abusivo em receita.
+            </p>
+
+            <!-- Linhas comparativas -->
+            <div class="space-y-0">
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                    <div>
+                        <span class="row-label">Sua dor</span>
+                        <span class="text-sm">Spam é prejuízo. Cliente IP-rotacional dribla rate-limit. Sem como cobrar prioridade</span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9945FF" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                    <div>
+                        <span class="row-label">O que você ganha</span>
+                        <span class="text-sm">Receita nova de priority fees direto na sua carteira. Defesa que paga a conta</span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9945FF" stroke-width="2"><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/><polygon points="12 2 2 7 12 12 22 7 12 2"/></svg>
+                    <div>
+                        <span class="row-label">Quanto você paga</span>
+                        <span class="text-sm">Licença SaaS $500–$5k/mês + opcional 5% rev share. Trust-Score Premium $200–500/mês</span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9945FF" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <div>
+                        <span class="row-label">Tempo pra subir</span>
+                        <span class="text-sm">10 minutos via Docker Compose. Proxy reverso, não reescrita</span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9945FF" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <div>
+                        <span class="row-label">Cliente fiel</span>
+                        <span class="text-sm">Trust-Score automático aplica desconto. Cliente recorrente paga menos, fica mais</span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9945FF" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                    <div>
+                        <span class="row-label">Risco no piloto</span>
+                        <span class="text-sm"><span class="text-[#9945FF] font-bold">Zero por 90 dias</span>. Sem licença fixa. Só paga se a gente fizer você ganhar</span>
+                    </div>
+                </div>
+                <div class="icon-row">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9945FF" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <div>
+                        <span class="row-label">Compatível com</span>
+                        <span class="text-sm">Qualquer RPC Solana — Helius, Triton, Jito, próprio. Sua infra atual fica intacta</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTAs Node -->
+            <div class="mt-8 space-y-3">
+                <a href="mailto:flavio@rpcpriority.com?subject=Piloto%20RPC%20Priority%20-%2090%20dias%20zero-fixo&body=Olá,%0A%0AOpero%20o%20RPC%20[seu%20nome%20do%20serviço]%20com%20[volume%20típico]%20req/mês.%20Gostaria%20de%20avaliar%20o%20piloto%20de%2090%20dias%20zero-fixo.%0A%0A--%20[seu%20nome]" class="cta-btn cta-btn-node block w-full text-center bg-[#9945FF] text-white font-bold py-4 rounded-xl hover:bg-[#8338e0] transition">
+                    Reservar piloto de 90 dias →
+                </a>
+                <a href="https://github.com/flavioparah/x402-priority-protocol" target="_blank" rel="noopener" class="block w-full text-center mono text-xs opacity-60 hover:opacity-100 transition py-2">
+                    git clone (acesso mediante NDA)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Como funciona o marketplace ═══ -->
+    <section class="mt-24 max-w-4xl mx-auto">
+        <h3 class="text-center text-sm mono uppercase tracking-widest opacity-50 mb-2">Como o marketplace conecta os dois</h3>
+        <h2 class="text-center text-2xl md:text-3xl font-bold mb-12">x402 é o trilho. Trust-Score é o moat.</h2>
+
+        <div class="card-glass rounded-2xl p-6 md:p-10">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center text-center">
+                <!-- Cliente -->
+                <div>
+                    <div class="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3" style="background: rgba(20, 241, 149, 0.12); border: 2px solid rgba(20, 241, 149, 0.5);">
+                        <span class="text-2xl">🤖</span>
+                    </div>
+                    <div class="font-bold text-[#14F195]">Cliente</div>
+                    <div class="text-xs opacity-60 mt-1">paga 1–50 lamports</div>
+                    <div class="text-xs opacity-60">por request prioritário</div>
+                </div>
+                <!-- Setas + protocolo -->
+                <div class="flex flex-col items-center gap-2">
+                    <div class="opacity-30 text-2xl">→</div>
+                    <div class="card-glass rounded-lg px-4 py-2 mono text-xs">
+                        <div class="opacity-50">protocol</div>
+                        <div class="font-bold mt-1">x402 + Trust-Score</div>
+                    </div>
+                    <div class="opacity-30 text-2xl">→</div>
+                </div>
+                <!-- Operador -->
+                <div>
+                    <div class="w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3" style="background: rgba(153, 69, 255, 0.12); border: 2px solid rgba(153, 69, 255, 0.5);">
+                        <span class="text-2xl">🛡️</span>
+                    </div>
+                    <div class="font-bold text-[#9945FF]">Operador</div>
+                    <div class="text-xs opacity-60 mt-1">recebe direto</div>
+                    <div class="text-xs opacity-60">na carteira Solana</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-10 text-xs">
+                <div class="card-glass rounded-lg p-4">
+                    <div class="mono opacity-50 mb-1">01 / Discovery</div>
+                    <div>Cliente faz request RPC. Em pico, recebe <span class="mono">HTTP 402</span> com nonce e cost</div>
+                </div>
+                <div class="card-glass rounded-lg p-4">
+                    <div class="mono opacity-50 mb-1">02 / Sign &amp; Pay</div>
+                    <div>Cliente assina o nonce com chave Solana. Operator wallet recebe pagamento atomicamente</div>
+                </div>
+                <div class="card-glass rounded-lg p-4">
+                    <div class="mono opacity-50 mb-1">03 / Trust accrues</div>
+                    <div>Trust-Score sobe (+5 por pagamento). Cliente fiel ganha até 50% off automático</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ Prova ═══ -->
+    <section class="mt-24 max-w-5xl mx-auto">
+        <h3 class="text-center text-sm mono uppercase tracking-widest opacity-50 mb-12">Prova de funcionamento (números medidos)</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="card-glass rounded-xl p-5 text-center">
+                <div class="text-3xl font-extrabold gradient-text">8,7ms</div>
+                <div class="text-xs opacity-60 mt-2">Overhead p95</div>
+            </div>
+            <div class="card-glass rounded-xl p-5 text-center">
+                <div class="text-3xl font-extrabold gradient-text">50%</div>
+                <div class="text-xs opacity-60 mt-2">Desconto Trust-Score</div>
+            </div>
+            <div class="card-glass rounded-xl p-5 text-center">
+                <div class="text-3xl font-extrabold gradient-text">43/43</div>
+                <div class="text-xs opacity-60 mt-2">Testes passando</div>
+            </div>
+            <div class="card-glass rounded-xl p-5 text-center">
+                <div class="text-3xl font-extrabold gradient-text">Mainnet</div>
+                <div class="text-xs opacity-60 mt-2">Ao vivo desde 24/abr/26</div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- Footer -->
+<footer class="border-t border-white/10 py-10 px-6 mt-12">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm opacity-60">
+        <div class="mono">RPC PRIORITY · x402 priority gateway pra Solana</div>
+        <div class="flex gap-6">
+            <a href="/" class="hover:opacity-100 transition">Home</a>
+            <a href="https://app.rpcpriority.com/try" class="hover:opacity-100 transition">Try it</a>
+            <a href="https://api.rpcpriority.com/info" class="hover:opacity-100 transition">API</a>
+            <a href="https://github.com/flavioparah/x402-priority-protocol" target="_blank" rel="noopener" class="hover:opacity-100 transition">GitHub</a>
+            <a href="mailto:flavio@rpcpriority.com" class="hover:opacity-100 transition">Contato</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>
