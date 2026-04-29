@@ -583,7 +583,7 @@
                         * Seu endereço público Solana. É como o seu "PIX" para cripto. Usado para identificar seu saldo sem expor sua senha.
                     </p>
                 </div>
-                <div class="input-group"><label>RPC METHOD</label><select id="rpc-method"><option value="getHealth">getHealth</option><option value="getBalance">getBalance</option><option value="getAccountInfo">getAccountInfo</option><option value="getProgramAccounts">getProgramAccounts</option></select></div>
+                <div class="input-group"><label>RPC METHOD</label><select id="rpc-method"><option value="getHealth">getHealth — health probe</option><option value="getBalance">getBalance — needs pubkey</option><option value="getAccountInfo">getAccountInfo — needs pubkey</option><option value="getEpochInfo">getEpochInfo — current epoch</option><option value="getSlot">getSlot — latest confirmed slot</option><option value="getVersion">getVersion — RPC node version</option><option value="getRecentPrioritizationFees">getRecentPrioritizationFees — congestion proxy</option><option value="getProgramAccounts">getProgramAccounts — needs pubkey (often blocked by public RPC)</option></select></div>
                 <button id="run-test">Execute RPC Request</button>
             </div>
         </div>
@@ -743,6 +743,31 @@
         }
         setInterval(refreshDashboard, 1000);
 
+        // ─── RPC params per method ───────────────────────────────────────
+        // Methods that require a pubkey use the WALLET PUBKEY input. Empty
+        // pubkey for those methods will produce an upstream error explaining
+        // exactly what's missing — that's intentional pedagogy.
+        const SYSTEM_PROGRAM = '11111111111111111111111111111111';
+        function buildParams(method, pubkey) {
+            switch (method) {
+                case 'getHealth':
+                case 'getEpochInfo':
+                case 'getSlot':
+                case 'getVersion':
+                    return [];
+                case 'getBalance':
+                    return pubkey ? [pubkey] : [];
+                case 'getAccountInfo':
+                    return pubkey ? [pubkey, { encoding: 'base64' }] : [];
+                case 'getProgramAccounts':
+                    return [pubkey || SYSTEM_PROGRAM, { encoding: 'base64', filters: [{ dataSize: 0 }] }];
+                case 'getRecentPrioritizationFees':
+                    return pubkey ? [[pubkey]] : [];
+                default:
+                    return [];
+            }
+        }
+
         // ─── Execute RPC Request Button ─────────────────────────────────
         document.getElementById('run-test').addEventListener('click', async () => {
             const gatewayUrl = document.getElementById('gateway-url').value.trim();
@@ -751,7 +776,13 @@
 
             if (!gatewayUrl) { log('No gateway URL configured.', 'error'); return; }
 
-            log(`→ Sending ${method} to RPC Priority...`);
+            const params = buildParams(method, pubkey);
+            const needsPubkey = ['getBalance','getAccountInfo','getProgramAccounts'].includes(method);
+            if (needsPubkey && !pubkey) {
+                log(`! ${method} normally needs a pubkey — fill WALLET PUBKEY for a real result. Sending empty params anyway to show the upstream error.`, 'info');
+            }
+
+            log(`→ ${method}(${JSON.stringify(params).slice(0,80)}) → ${gatewayUrl}`);
             const start = Date.now();
             try {
                 const headers = { 'Content-Type': 'application/json' };
@@ -760,7 +791,7 @@
                 const res = await fetch(gatewayUrl, {
                     method: 'POST',
                     headers,
-                    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: [] })
+                    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params })
                 });
                 const lat = Date.now() - start;
 
