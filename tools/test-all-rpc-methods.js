@@ -21,13 +21,11 @@ if (!SECRET) { console.error("AGENT_SECRET_KEY env var required"); process.exit(
 const me = Keypair.fromSecretKey(bs58.decode(SECRET));
 const myPub = me.publicKey.toBase58();
 
-const SYSTEM_PROGRAM = "11111111111111111111111111111111";
-
+// Mirror the methods exposed in /try.html's dropdown.
 const TESTS = [
-  { label: "getHealth",                 method: "getHealth",          params: [] },
-  { label: "getBalance(agent)",         method: "getBalance",         params: [myPub] },
-  { label: "getAccountInfo(agent)",     method: "getAccountInfo",     params: [myPub, { encoding: "base64" }] },
-  { label: "getProgramAccounts(System)",method: "getProgramAccounts", params: [SYSTEM_PROGRAM, { encoding: "base64", filters: [{ dataSize: 0 }] }] },
+  { label: "getBalance(agent)", method: "getBalance",   params: [myPub] },
+  { label: "getHealth",         method: "getHealth",    params: [] },
+  { label: "getEpochInfo",      method: "getEpochInfo", params: [] },
 ];
 
 async function runOne({ label, method, params }) {
