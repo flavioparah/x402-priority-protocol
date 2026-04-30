@@ -146,28 +146,21 @@ const MICRO_LAMPORTS_PER_LAMPORT = 1000;
 const requestTimestamps = [];
 
 /**
- * Sliding-window stats exposed via /stats/* for the public dashboards.
- * In-memory only (lost on restart). Cap to keep RAM bounded.
+ * Dashboard stats are now persisted in the store backend (LIST + HASH in Redis,
+ * arrays in MemoryStore). See lib/store.js: pushPayment, pushChallenge,
+ * pushLoadSample, incrQosStat. Only wait_samples (rolling 200 ms latencies for
+ * percentile calculation) stays in-memory — purely transient.
  */
-/** @type {Array<{ts:number, pubkeyHint:string|null, basePrice:number, finalPrice:number, load:number}>} */
-const challengeLog = [];
-/** @type {Array<{ts:number, pubkey:string, amount:number, score:number}>} */
-const paymentLog = [];
-/** @type {Array<{ts:number, load:number, rps:number}>} */
-const loadHistory = [];
 
 // ─── QoS Path A — standalone priority queue + dispatcher ──────────────────────
 // Each entry: { req, res, next, score, enqueuedAt, timeoutId }
 /** @type {Array<{req:any, res:any, next:Function, score:number, enqueuedAt:number, timeoutId:any}>} */
 const qosQueue = [];
 let qosInFlight = 0;
-const qosStats = {
-  dispatched_total: 0,
-  bypassed_total: 0,
-  rejected_overflow_total: 0,
-  rejected_timeout_total: 0,
-  wait_samples: [],  // last 200 wait times in ms (only for queued requests)
-};
+// In-memory rolling window of last 200 wait times. Used only for p50/p95/p99
+// computation in /stats/qos. Counters (dispatched/bypassed/rejected_*) are
+// persisted via store.incrQosStat — survive restart.
+const qosWaitSamples = [];
 
 // Cooperative QoS — when the operator returns X-QoS-Overload:1, we fall back
 // to standalone queueing for 30 seconds (per QOS-COOPERATIVE-SPEC.md §5).
@@ -212,11 +205,11 @@ function qosOnSlotFree() {
     if (entry.timeoutId) clearTimeout(entry.timeoutId);
 
     const waitMs = Date.now() - entry.enqueuedAt;
-    qosStats.wait_samples.push(waitMs);
-    if (qosStats.wait_samples.length > 200) qosStats.wait_samples.shift();
+    qosWaitSamples.push(waitMs);
+    if (qosWaitSamples.length > 200) qosWaitSamples.shift();
 
     qosInFlight++;
-    qosStats.dispatched_total++;
+    store.incrQosStat("dispatched_total").catch(() => {});
     let released = false;
     const release = () => {
       if (released) return;
@@ -246,7 +239,7 @@ function qosMiddleware(req, res, next) {
 
   // Standalone mode: bypass when low contention (preserves the 8.7ms p95).
   if (qosInFlight < CONFIG.QOS_MAX_INFLIGHT * CONFIG.QOS_BYPASS_THRESHOLD) {
-    qosStats.bypassed_total++;
+    store.incrQosStat("bypassed_total").catch(() => {});
     qosInFlight++;
     let released = false;
     const release = () => {
@@ -262,7 +255,7 @@ function qosMiddleware(req, res, next) {
 
   // High contention: queue with overflow protection.
   if (qosQueue.length >= CONFIG.QOS_MAX_QUEUE_DEPTH) {
-    qosStats.rejected_overflow_total++;
+    store.incrQosStat("rejected_overflow_total").catch(() => {});
     return res.status(503).json({
       error: "QoS queue full",
       code: 503,
@@ -283,7 +276,7 @@ function qosMiddleware(req, res, next) {
     const idx = qosQueue.indexOf(entry);
     if (idx >= 0) {
       qosQueue.splice(idx, 1);
-      qosStats.rejected_timeout_total++;
+      store.incrQosStat("rejected_timeout_total").catch(() => {});
       if (!res.headersSent) {
         res.status(504).json({
           error: "QoS queue timeout",
@@ -420,8 +413,8 @@ async function recordPayment(pubkeyB58, amount) {
   const updated = await store.recordPayment(pubkeyB58, amount);
   const score = Math.min(100, updated.paidCount * 5);
   const now = Date.now();
-  paymentLog.push({ ts: now, pubkey: pubkeyB58, amount, score });
-  if (paymentLog.length > 100) paymentLog.shift();
+  // Persisted dashboard log + cumulative payments_total counter (Redis-backed).
+  await store.pushPayment({ ts: now, pubkey: pubkeyB58, amount, score });
   // Per-pubkey attestation log — feeds the sybil/fraud detection engine.
   // Tagged with our operator_id so cross-op signals activate when the broker
   // sees attestations from another operator with a different OPERATOR_ID.
@@ -517,14 +510,14 @@ if (CONFIG.QOS_MODE === "cooperative") {
 }
 
 // Snapshot the current load every 60s so the dashboard can plot a 1h time series.
+// Persisted in Redis (rolling 60 samples) so the chart survives container restart.
 setInterval(() => {
   pruneRequestTimestamps();
-  loadHistory.push({
+  store.pushLoadSample({
     ts: Date.now(),
     load: parseFloat(getRpcLoad().toFixed(3)),
     rps: parseFloat((requestTimestamps.length / (CONFIG.LOAD_WINDOW_MS / 1000)).toFixed(2)),
-  });
-  if (loadHistory.length > 60) loadHistory.shift();
+  }).catch((e) => console.error("[stats] pushLoadSample failed:", e.message));
 }, 60_000);
 
 // ─── Verificação de assinatura (MVP off-chain) ────────────────────────────────
@@ -627,14 +620,14 @@ async function x402Shield(req, res, next) {
   const amount = applyTrustDiscount(basePrice, trustScore);
   const nonce = await issueNonce(amount, hintedPubkey);
 
-  challengeLog.push({
+  // Persisted dashboard log + cumulative challenges_total counter (Redis-backed).
+  await store.pushChallenge({
     ts: Date.now(),
     pubkeyHint: hintedPubkey || null,
     basePrice,
     finalPrice: amount,
     load: parseFloat(load.toFixed(3)),
   });
-  if (challengeLog.length > 100) challengeLog.shift();
 
   console.log(`[x402] ⚡ Challenging ${ip} — load: ${(load * 100).toFixed(1)}%, base: ${basePrice} µL, trust: ${trustScore}, final: ${amount} µL`);
 
@@ -813,28 +806,48 @@ app.get("/info", (req, res) => {
 });
 
 // Recent activity for the live dashboard.
+// All fields below survive container restart — persisted in Redis (LIST + HASH).
 app.get("/stats/recent", async (req, res) => {
-  const [totalPaidMicroLamports, unique_paying_pubkeys] = await Promise.all([
+  const [
+    payments,
+    challenges,
+    load_history,
+    totalPaidMicroLamports,
+    unique_paying_pubkeys,
+    challengesTotal,
+    paymentsTotal,
+  ] = await Promise.all([
+    store.getRecentPayments(20),
+    store.getRecentChallenges(20),
+    store.getLoadHistory(30),
     store.getTotalPaidVolume(),
     store.uniquePayingPubkeys(),
+    store.getChallengesTotal(),
+    store.getPaymentsTotal(),
   ]);
   res.json({
-    payments: paymentLog.slice(-20).reverse(),
-    challenges: challengeLog.slice(-20).reverse(),
-    load_history: loadHistory.slice(-30),
+    payments,
+    challenges,
+    load_history,
     totals: {
-      total_challenges_issued_session: challengeLog.length,
-      total_payments_session: paymentLog.length,
+      total_challenges_issued: challengesTotal,
+      total_payments: paymentsTotal,
       total_paid_micro_lamports: totalPaidMicroLamports,
       unique_paying_pubkeys,
+      // Legacy field names kept for backward compat with existing dashboards
+      total_challenges_issued_session: challengesTotal,
+      total_payments_session: paymentsTotal,
     },
   });
 });
 
 // QoS dispatcher state — for the /live dashboard QoS card.
-app.get("/stats/qos", (req, res) => {
-  const sorted = [...qosStats.wait_samples].sort((a, b) => a - b);
-  const total_settled = qosStats.dispatched_total + qosStats.bypassed_total;
+// Cumulative counters are persisted in Redis (HASH); wait_samples stay in
+// memory as a rolling 200-sample window for percentile calculation.
+app.get("/stats/qos", async (req, res) => {
+  const sorted = [...qosWaitSamples].sort((a, b) => a - b);
+  const qosTotals = await store.getQosStats();
+  const total_settled = qosTotals.dispatched_total + qosTotals.bypassed_total;
   const utilization = qosInFlight / Math.max(1, CONFIG.QOS_MAX_INFLIGHT);
   const now = Date.now();
   res.json({
@@ -846,11 +859,11 @@ app.get("/stats/qos", (req, res) => {
     queue_timeout_ms: CONFIG.QOS_QUEUE_TIMEOUT_MS,
     utilization: parseFloat(utilization.toFixed(3)),
     bypass_threshold: CONFIG.QOS_BYPASS_THRESHOLD,
-    dispatched_total: qosStats.dispatched_total,
-    bypassed_total: qosStats.bypassed_total,
+    dispatched_total: qosTotals.dispatched_total,
+    bypassed_total: qosTotals.bypassed_total,
     total_settled,
-    rejected_overflow_total: qosStats.rejected_overflow_total,
-    rejected_timeout_total: qosStats.rejected_timeout_total,
+    rejected_overflow_total: qosTotals.rejected_overflow_total,
+    rejected_timeout_total: qosTotals.rejected_timeout_total,
     wait_p50_ms: qosPercentile(sorted, 0.5),
     wait_p95_ms: qosPercentile(sorted, 0.95),
     wait_p99_ms: qosPercentile(sorted, 0.99),
