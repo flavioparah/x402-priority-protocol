@@ -109,6 +109,29 @@ diff <(docker exec x402-landing cat /etc/nginx/conf.d/default.conf) \
 
 If diff returns anything, the container is on a stale inode — recreate.
 
+---
+
+## Gotcha: Solana rent-exempt minimum on multi-agent funding
+
+When spinning up N ephemeral wallets to stress-test the Shield (see `tools/stress-test/spawn-agents.js`), each new wallet **must** end every transaction with at least ~890_880 lamports (the rent-exempt minimum for a native account). If you fund a fresh wallet with just `deposit_amount + tx_fee`, the wallet's post-tx balance falls below rent-exempt and Solana rejects the transaction with `"Transaction results in an account (0) with insufficient funds for rent"`.
+
+**Fix**: treasury must send `FUND_LAMPORTS + 900_000 (rent-exempt buffer) + 5_500 (tx fee)` per agent. The rent-exempt portion stays stuck in the ephemeral wallet (~$0.075 per agent at $83/SOL — uncrunchable cost without closing the account in another tx).
+
+Implemented in `tools/stress-test/spawn-agents.js` constants `RENT_EXEMPT_RESERVE` and `TX_FEE`. See commit `b949aa7`.
+
+---
+
+## Gotcha: Public mainnet-beta RPC throttles bursts (HTTP 429)
+
+The Shield's `verifyDepositTx()` calls `getParsedTransaction` on the upstream RPC (defaults to `api.mainnet-beta.solana.com`) to verify each on-chain deposit. Public mainnet-beta has aggressive rate limits — concurrent `/escrow/deposit` POSTs above ~3 simultaneous trigger 429 from the upstream, propagated as HTTP 400 from the Shield with body `RPC error fetching transaction: 429 Too Many Requests`.
+
+**Two mitigations:**
+
+1. **Client-side**: retry the `/escrow/deposit` POST with backoff (3s, 8s, 15s). `tools/stress-test/spawn-agents.js` does this.
+2. **Server-side (recommended for production)**: switch `REAL_RPC_URL` and `SOLANA_RPC_URL` to a private RPC provider (Helius, Triton, QuickNode) that doesn't throttle. Public mainnet-beta is for demo/dev only.
+
+When running stress tests against mainnet, **keep `PARALLEL=1`** in `spawn-agents.js`. Sequential is slow (~30s per agent for 2 confirmations) but reliable. Parallel >3 hits 429s frequently even with retries.
+
 ## Smoke test from a client machine
 
 ```bash

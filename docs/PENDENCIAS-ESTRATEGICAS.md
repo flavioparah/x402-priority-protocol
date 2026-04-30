@@ -8,13 +8,14 @@ Para o porquê dessa priorização, ver [`ESTRATEGIA.md`](./ESTRATEGIA.md). Para
 
 ## Sequência sugerida (por ordem de impacto pré-hackatom)
 
-| # | Item | Esforço | Bloqueia? | Quando |
-|---|---|---|---|---|
-| 1 | Reposicionar pitch agêntico-first | ~2h | Hackatom | **Esta semana** |
-| 2 | Persistência de contadores Redis | ~2-3h | Volume real (>10 ops/dia) | **Antes do 1º cliente pago** |
-| 3 | Outreach tier 2/3 BR/LatAm | dias × 5 | Plano A (M+3) | Próximas 2 semanas |
-| 4 | RFC público x402-priority | ~1 semana | Autoridade de spec | M+1 |
-| 5 | Aproveitar hackatom estrategicamente | dia do evento | M+6 contracts | Dia do evento |
+| # | Item | Esforço | Bloqueia? | Quando | Status |
+|---|---|---|---|---|---|
+| 1 | Reposicionar pitch agêntico-first | ~2h | Hackatom | **Esta semana** | ⏳ pendente |
+| 2 | Persistência de contadores Redis | ~2-3h | Volume real (>10 ops/dia) | Antes do 1º cliente pago | ✅ **feito** (commit `9daf1a4`) |
+| 3 | Outreach tier 2/3 BR/LatAm | dias × 5 | Plano A (M+3) | Próximas 2 semanas | ⏳ pendente |
+| 4 | RFC público x402-priority | ~1 semana | Autoridade de spec | M+1 | ✅ **draft pronto** (commit `9b18f13` em `docs/rfc/`) — falta publicar nos fóruns |
+| 5 | Aproveitar hackatom estrategicamente | dia do evento | M+6 contracts | Dia do evento | ⏳ pendente |
+| 6 (NOVO) | **Multi-agent stress test em mainnet** | ~3h | Validação produção | Antes do hackatom | ✅ **feito** (commit `b949aa7`) — 1.000 paid requests, 5 wallets novas registradas em api.rpcpriority.com |
 
 ---
 
@@ -48,7 +49,13 @@ Nenhuma. Pode atacar agora.
 
 ---
 
-## 2. Persistência de contadores Redis
+## 2. Persistência de contadores Redis ✅ CONCLUÍDO (commit `9daf1a4`, 2026-04-30)
+
+> **Status final**: implementado, deployado em todos os 3 shields (mainnet, devnet, demo), validado end-to-end. Counters sobreviveram restart do container `x402-shield-mainnet` confirmadamente.
+>
+> **Validação adicional (commit `b949aa7`)**: stress test multi-agent em mainnet registrou 1.000 payments + 5 pubkeys novos no Redis do `api.rpcpriority.com`. Persistência confirmada sob carga real.
+>
+> Detalhes históricos preservados abaixo.
 
 ### Contexto
 Hoje em `index.js`, os contadores `total_challenges_issued_session` e `total_payments_session` (e os arrays `paymentLog`, `challengeLog`, `loadHistory`) são **in-memory**. Resetam quando o container reinicia.

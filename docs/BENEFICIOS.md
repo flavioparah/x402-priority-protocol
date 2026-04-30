@@ -31,9 +31,22 @@ Imagine uma rodovia pública que fica engarrafada todo dia. A defesa de hoje é 
 
 ## Prova de funcionamento (números medidos, não projetados)
 
+**Nove semanas de execução, do zero ao mainnet.**
+
 - **Overhead do protocolo: 8,7 ms (p95)** sobre uma chamada normal. Meta do nosso próprio pitch era < 50 ms — batemos por 6×.
-- **Economia real para cliente fiel: até 50%** de desconto automático via Trust-Score. Medido em produção contra o domínio público: 22 requisições, **26% de economia média** conforme a reputação acumulou.
-- **Rodando vivo na internet:** `https://x402.rpcpriority.com` — HTTPS válido, certificado Let's Encrypt, auditável por qualquer pessoa. Código aberto em `github.com/flavioparah/x402-priority-protocol`.
+- **Economia real para cliente fiel: até 50%** de desconto automático via Trust-Score. Medido em produção: 22 requisições, **26,1% de economia média** conforme a reputação acumulou.
+- **Stress test multi-agent em mainnet validado** (2026-04-30): 5 carteiras Solana independentes, criadas e fundadas on-chain, dispararam 1.000 priority requests via API real. Trust-Score progrediu **0 → 100 em 21 pagamentos confirmados** (matemática do spec, exata). Latência sustentada p50=378ms, p95=639ms. Persistência Redis confirmada — counters sobreviveram restart. Histórico público em `https://api.rpcpriority.com/stats/leaderboard`.
+- **43 de 43 testes passando** — detection signals (sybil, fraud, churn), atomic Lua sob Redis para anti-replay, conformidade do spec cooperative QoS.
+- **6 deploys ao vivo** com cert Let's Encrypt válido, auditáveis por qualquer pessoa:
+  - `api.rpcpriority.com` / `mainnet.rpcpriority.com` — **primeira implementação x402 em mainnet Solana**, depósitos verificados on-chain (operator: `CEH3dGLa…k6zp`)
+  - `devnet.rpcpriority.com` — devnet, depósitos verificados on-chain
+  - `demo.rpcpriority.com` — demo de trust-score progressivo (trusted deposits)
+  - `app.rpcpriority.com` — dashboard interativo (try, live, explorer)
+  - `rpcpriority.com` — landing institucional
+  - `www.rpcpriority.com` — 301 → apex
+- **3 RFCs formalizados** em `docs/rfc/`: `x402-priority` (v1.0), `x402-trust-score` (v0.1), `x402-qos-cooperative` (v1.0) — autoridade no padrão é parte do moat. Período de comments aberto até 2026-06-30.
+- **Pacote de outreach** pronto: 15 operadores tier 2/3 mapeados (BR + LATAM + Europa), templates EN/PT × 3 variantes, CRM, playbook de demo.
+- **Código privado** em `github.com/flavioparah/x402-priority-protocol` (acesso mediante NDA — juízes/parceiros recebem convite).
 
 ## Mercado e momento
 
@@ -79,16 +92,18 @@ Modelo de SaaS de alta margem com efeito de rede: quanto mais operadores aderire
 
 **Plano A — caminho principal:** Opção 4 + 2 + 5 combinados. Spec do protocolo aberto (Opção 4) constrói credibilidade no ecossistema. Server licenciado como SaaS para operadores (Opção 2) gera receita recorrente. Trust-Score centralizado (Opção 5) é o moat que sustenta tudo — efeito de rede em dados cross-operador, difícil de replicar.
 
-**Plano B — fallback se contrato B2B não fechar em 6 meses:** Opção 1 focada em nicho. Operamos nosso próprio nó RPC, mas atendendo apenas arbitradores DeFi e liquidadores que já pagam US$ 1k–10k/mês por latência previsível. Capital reduzido vs. Opção 1 ampla, validação imediata sem depender de terceiros.
+**Plano B — fallback se contrato B2B não fechar em 90 dias (gate comprimido pós-consultor):** Opção 1 focada em nicho. Operamos nosso próprio nó RPC, mas atendendo apenas arbitradores DeFi e liquidadores que já pagam US$ 1k–10k/mês por latência previsível. Capital reduzido vs. Opção 1 ampla, validação imediata sem depender de terceiros.
 
-**Barreira à cópia:** o código é open-source por design (gera adoção). O moat real são os dados — Trust-Score cross-operador acumula valor com cada novo operador conectado, e novo entrante começa com zero histórico. Detalhe na [estratégia interna](./ESTRATEGIA.md).
+**Plano C — saída via aquisição:** se Jito ou Helius anunciar produto similar com tração visível, ou se MRR ficar abaixo de US$ 30k mesmo com 3+ operadores em M+9, ativa-se a saída via M&A. Compradores prováveis: Jito Labs, Helius, Triton, Coinbase/Base. Valor estimado com 3-5 operadores integrados + Trust-Score data: **US$ 5-30M**.
+
+**Barreira à cópia:** o código é open-source por design (gera adoção). O moat real são os dados — Trust-Score cross-operador acumula valor com cada novo operador conectado, e novo entrante começa com zero histórico. Paralelo: Visa nunca virou banco; Plaid nunca virou fintech; vivem da neutralidade. Concorrente como Jito é direto de Helius/Triton — mesmo se shippar produto similar, vira "Jito Score" fechado, próprio. Mercado de **broker neutro** continua aberto.
 
 ---
 
 ## Próximo passo
 
-- **Se você é investidor:** toda IA que conversa com Solana vai passar por esta camada. Somos a primeira implementação com deploy público, certificado válido e medições reais. Conversar sobre uma rodada.
-- **Se você opera um nó:** 5 minutos de deploy transformam seu nó num ativo que se defende e paga por si. Conversar sobre um piloto.
+- **Se você é investidor:** toda IA que conversa com Solana vai passar por esta camada. Somos a primeira implementação com 3 deploys públicos (incluindo mainnet), certificado válido, 43/43 testes e medições reais. Pré-seed aberta: **US$ 150-300k** pra fechar 3 contratos com operadores em **90 dias** (gate comprimido).
+- **Se você opera um nó:** 5 minutos de deploy transformam seu nó num ativo que se defende e paga por si. Piloto de 30 dias com **revenue share 70/30 a favor do operador, sem fixed fee** nos primeiros 90 dias.
 - **Se você constrói agentes:** troque `new Connection(...)` por `new X402Provider(...)` e seu agente passa na frente da fila. Código aberto, sem fee para experimentar.
 
 ---
