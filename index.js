@@ -687,6 +687,71 @@ app.use((req, res, next) => {
 // which breaks http-proxy-middleware for /rpc (upstream times out waiting for
 // a body that was already parsed and discarded). Apply per-route instead.
 
+// Content negotiation: programmatic clients (SDK, curl with no Accept,
+// `Accept: application/json`) get raw JSON. Browsers (Accept includes
+// text/html) get a styled HTML page wrapping the same JSON, with a
+// "view raw" link. Force JSON from a browser via `?raw=1`.
+function respondHtmlOrJson(req, res, data, title) {
+  const forceRaw = req.query.raw === "1";
+  const accept = String(req.headers.accept || "");
+  const wantsHtml = !forceRaw && accept.includes("text/html");
+  if (!wantsHtml) return res.json(data);
+
+  const escapeHtml = (s) => String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const json = escapeHtml(JSON.stringify(data, null, 2));
+  // Naive syntax highlight for keys + strings + numbers + booleans/null
+  const highlighted = json
+    .replace(/("(?:\\.|[^"\\])*")(\s*:)/g, '<span class="k">$1</span>$2')
+    .replace(/:\s*("(?:\\.|[^"\\])*")/g, ': <span class="s">$1</span>')
+    .replace(/:\s*(-?\d+(?:\.\d+)?)/g, ': <span class="n">$1</span>')
+    .replace(/:\s*(true|false|null)/g, ': <span class="b">$1</span>');
+
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} — x402 Priority Gateway</title>
+  <link rel="icon" type="image/x-icon" href="https://rpcpriority.com/favicon.ico">
+  <meta name="theme-color" content="#14F195">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Inter',system-ui;background:#0a0a0a;color:#ededed;margin:0}
+    .wrap{max-width:1000px;margin:50px auto;padding:0 22px}
+    .crumbs{font-family:'JetBrains Mono',monospace;font-size:13px;opacity:0.55;margin-bottom:8px}
+    h1{color:#14F195;font-weight:800;letter-spacing:-0.5px;margin:0 0 4px;font-size:24px}
+    .subtitle{font-family:'JetBrains Mono',monospace;font-size:13px;opacity:0.6;margin-bottom:22px}
+    a{color:#9945FF;text-decoration:none;border-bottom:1px dotted #9945FF44}
+    a:hover{border-bottom-color:#9945FF}
+    pre{background:#1a1a1a;padding:18px 22px;border-radius:8px;overflow-x:auto;
+        font-family:'JetBrains Mono',monospace;font-size:13.5px;line-height:1.6;
+        border:1px solid rgba(255,255,255,0.08);margin:0;white-space:pre-wrap;word-break:break-all}
+    .k{color:#9945FF}
+    .s{color:#14F195}
+    .n{color:#f9a826}
+    .b{color:#ff6ec7}
+    .meta{margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.06);
+          font-family:'JetBrains Mono',monospace;font-size:12px;opacity:0.55;
+          display:flex;gap:18px;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="crumbs"><a href="/">← gateway home</a></div>
+  <h1>${title}</h1>
+  <div class="subtitle">${escapeHtml(req.path)}</div>
+  <pre>${highlighted}</pre>
+  <div class="meta">
+    <span>Returned at ${new Date().toISOString()}</span>
+    <span><a href="${escapeHtml(req.path)}?raw=1">view raw JSON</a></span>
+    <span><a href="/">back to home</a></span>
+  </div>
+</div>
+</body>
+</html>`);
+}
+
 // Health check (sem 402)
 app.get("/health", async (req, res) => {
   pruneRequestTimestamps();
@@ -695,7 +760,7 @@ app.get("/health", async (req, res) => {
     store.nonceCount(),
     store.escrowAccountCount(),
   ]);
-  res.json({
+  respondHtmlOrJson(req, res, {
     status: "ok",
     load: getRpcLoad().toFixed(2),
     rps: rps.toFixed(2),
@@ -705,7 +770,7 @@ app.get("/health", async (req, res) => {
     nonces_active,
     escrow_accounts,
     store_backend: store.backend,
-  });
+  }, "Health");
 });
 
 // Escrow deposit — verified via on-chain Solana transaction.
@@ -765,7 +830,7 @@ app.get("/reputation/:pubkey", async (req, res) => {
   const score = await getTrustScore(pubkey);
   const nextDiscountPrice = applyTrustDiscount(CONFIG.MAX_PRICE_MICRO_LAMPORTS, score);
   const risk = computeRisk(attestations, rec);
-  res.json({
+  respondHtmlOrJson(req, res, {
     pubkey,
     trust_score: score,
     paid_count: rec ? rec.paidCount : 0,
@@ -778,13 +843,13 @@ app.get("/reputation/:pubkey", async (req, res) => {
     fraud_flags: risk.fraud_flags,
     churn_pattern: risk.churn_pattern,
     attestations_observed: attestations.length,
-  });
+  }, "Reputation");
 });
 
 // Endpoint de consulta de saldo
 app.get("/escrow/balance/:pubkey", async (req, res) => {
   const balance = await store.getEscrow(req.params.pubkey);
-  res.json({ pubkey: req.params.pubkey, balance_micro_lamports: balance });
+  respondHtmlOrJson(req, res, { pubkey: req.params.pubkey, balance_micro_lamports: balance }, "Escrow balance");
 });
 
 // ─── Stats / dashboard endpoints ──────────────────────────────────────────────
@@ -793,7 +858,7 @@ app.get("/escrow/balance/:pubkey", async (req, res) => {
 app.get("/info", (req, res) => {
   const upstream = CONFIG.REAL_RPC_URL;
   const network = upstream.includes("mainnet") ? "mainnet" : upstream.includes("devnet") ? "devnet" : "unknown";
-  res.json({
+  respondHtmlOrJson(req, res, {
     operator_pubkey: CONFIG.PAYMENT_DESTINATION,
     network,
     upstream_rpc: upstream,
@@ -802,7 +867,7 @@ app.get("/info", (req, res) => {
     threshold: CONFIG.RPC_LOAD_THRESHOLD,
     nonce_ttl_seconds: CONFIG.NONCE_TTL_MS / 1000,
     trusted_deposits_enabled: CONFIG.TRUST_DEPOSITS,
-  });
+  }, "Gateway info");
 });
 
 // Recent activity for the live dashboard.
@@ -825,7 +890,7 @@ app.get("/stats/recent", async (req, res) => {
     store.getChallengesTotal(),
     store.getPaymentsTotal(),
   ]);
-  res.json({
+  respondHtmlOrJson(req, res, {
     payments,
     challenges,
     load_history,
@@ -838,7 +903,7 @@ app.get("/stats/recent", async (req, res) => {
       total_challenges_issued_session: challengesTotal,
       total_payments_session: paymentsTotal,
     },
-  });
+  }, "Recent activity");
 });
 
 // QoS dispatcher state — for the /live dashboard QoS card.
@@ -850,7 +915,7 @@ app.get("/stats/qos", async (req, res) => {
   const total_settled = qosTotals.dispatched_total + qosTotals.bypassed_total;
   const utilization = qosInFlight / Math.max(1, CONFIG.QOS_MAX_INFLIGHT);
   const now = Date.now();
-  res.json({
+  respondHtmlOrJson(req, res, {
     mode: CONFIG.QOS_MODE,
     queue_depth: qosQueue.length,
     in_flight: qosInFlight,
@@ -882,7 +947,7 @@ app.get("/stats/qos", async (req, res) => {
       check_interval_ms: QOS_HEALTH_INTERVAL_MS,
       unreachable_threshold_ms: QOS_HEALTH_UNREACHABLE_MS,
     },
-  });
+  }, "QoS dispatcher");
 });
 
 // Top 10 by Trust-Score for the leaderboard widget.
@@ -895,7 +960,7 @@ app.get("/stats/leaderboard", async (req, res) => {
     total_paid_micro_lamports: r.totalPaid,
     last_paid_at: r.lastPaidAt,
   }));
-  res.json({ leaderboard: top, generated_at: Date.now() });
+  respondHtmlOrJson(req, res, { leaderboard: top, generated_at: Date.now() }, "Leaderboard");
 });
 
 // ─── Public dashboard pages ──────────────────────────────────────────────────
