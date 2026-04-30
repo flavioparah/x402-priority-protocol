@@ -88,11 +88,18 @@ async function fundAgentDemo(agent, operatorPubkey) {
   agent.escrowBalance = dep.balance;
 }
 
+// Solana requires every account to maintain a rent-exempt minimum balance
+// (~890_880 lamports for a native account with 0 data bytes). If an account
+// drops below this, the transaction is rejected. So the treasury must fund
+// each agent with: deposit_amount + rent_exempt_min + tx_fee. The rent-exempt
+// portion gets stuck in the ephemeral agent wallet (not recoverable without
+// closing the account, which itself requires another tx).
+const RENT_EXEMPT_RESERVE = 900_000;  // safety buffer over Solana's ~890_880
+const TX_FEE = 5_500;
+
 async function fundAgentMainnet(agent, treasury, operator, conn) {
-  // Step 1: Treasury sends SOL to AGENT's address (covers deposit + tx fee).
-  // The agent needs SOL on-chain because the Shield credits whoever signs the
-  // deposit transaction. We need the AGENT to be the signer of the deposit tx.
-  const totalToSend = FUND_LAMPORTS + 5500; // funding + 1 tx fee
+  // Step 1: Treasury sends SOL to AGENT (covers deposit + rent-exempt + 1 fee).
+  const totalToSend = FUND_LAMPORTS + RENT_EXEMPT_RESERVE + TX_FEE;
   const tx1 = new Transaction().add(SystemProgram.transfer({
     fromPubkey: treasury.publicKey,
     toPubkey: new PublicKey(agent.pubkey),
@@ -111,12 +118,21 @@ async function fundAgentMainnet(agent, treasury, operator, conn) {
   agent.txSignature = depositSig;
 
   // Step 3: POST signature → Shield credits agent's escrow.
-  const r = await fetch(`${SHIELD_URL}/escrow/deposit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tx_signature: depositSig }),
-  });
-  if (!r.ok) throw new Error(`escrow/deposit ${r.status}: ${(await r.text()).slice(0, 100)}`);
+  // The Shield calls Solana getParsedTransaction to verify, which goes through
+  // mainnet-beta public RPC and frequently hits 429 under bursts. Retry with
+  // backoff: 3 attempts × (3s, 8s, 15s).
+  let r, lastErr;
+  for (const wait of [0, 3000, 8000, 15000]) {
+    if (wait) await new Promise((res) => setTimeout(res, wait));
+    r = await fetch(`${SHIELD_URL}/escrow/deposit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tx_signature: depositSig }),
+    });
+    if (r.ok) break;
+    lastErr = `escrow/deposit ${r.status}: ${(await r.text()).slice(0, 120)}`;
+  }
+  if (!r.ok) throw new Error(lastErr);
   const dep = await r.json();
   if (dep.pubkey !== agent.pubkey) {
     throw new Error(`escrow credited ${dep.pubkey} (expected ${agent.pubkey})`);
