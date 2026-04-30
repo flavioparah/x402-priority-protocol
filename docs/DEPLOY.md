@@ -70,6 +70,45 @@ docker compose logs -f --tail=50 x402-shield
 
 The in-memory state (escrow, nonces, rate counters) is lost on restart. This is acceptable for the MVP — operators should treat the MVP Shield as ephemeral. Real deployments will need Redis (see open issue O-001 / O-002 in `ENGINEERING.md`).
 
+---
+
+## Gotcha: bind-mounted config files survive `nginx -s reload` with stale content
+
+When a config file is mounted into a container via Docker bind mount (e.g., `./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro`), the mount is bound to the file's **inode** at container start time, not its path.
+
+`git pull` (and `mv`, `rm + write`, IDE save-as, most editors) **replaces** the file on the host with a new inode. The old inode becomes orphaned. The container continues to see the original file content because its bind mount still points at the orphaned inode.
+
+`docker exec <container> nginx -s reload` re-reads the file from the bind-mount path — which is the orphaned inode, with the old content. So the reload "succeeds" but nothing changes.
+
+**Symptom**: you `git pull` config changes, run `nginx -s reload`, and behaviour doesn't change. `docker exec <container> cat <config>` shows the old content.
+
+### Decision rule
+
+| Change type | Action |
+|---|---|
+| In-place edit (`sed -i`, `tee`, vi/nano save-in-place) | `docker exec <container> nginx -s reload` is enough |
+| File replacement (`git pull`, `cp`, `mv`, most IDEs) | **Recreate the container** |
+
+### Recreate (the fix)
+
+```bash
+docker compose -f docker-compose.landing.yml up -d --force-recreate
+```
+
+`--force-recreate` re-resolves bind mounts against current host inodes. Container downtime is ~1 s.
+
+For the application code (Node `index.js` in the shields), `--build` is the analogous step (rebuild the image).
+
+### How to verify the bind mount is fresh
+
+```bash
+# Should match
+diff <(docker exec x402-landing cat /etc/nginx/conf.d/default.conf) \
+     /root/x402/nginx/default.conf
+```
+
+If diff returns anything, the container is on a stale inode — recreate.
+
 ## Smoke test from a client machine
 
 ```bash
