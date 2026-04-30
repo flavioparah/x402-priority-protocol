@@ -8,3 +8,9 @@ dist/
 
 # Team-internal context (pitch deck, exported chats). Not for the public repo.
 docs/context/
+
+# Stress test artifacts: agents.json contains private keys; results.json/csv
+# are derived run output. Both are local-only, never versioned.
+tools/stress-test/agents.json
+tools/stress-test/stress-results.json
+tools/stress-test/stress-results.csv
