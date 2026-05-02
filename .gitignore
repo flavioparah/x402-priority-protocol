@@ -14,3 +14,9 @@ docs/context/
 tools/stress-test/agents.json
 tools/stress-test/stress-results.json
 tools/stress-test/stress-results.csv
+
+# Generated documents: PDF/HTML built locally from MD via pandoc + Chrome.
+# Source-of-truth is the .md file; binaries reproduced on demand.
+docs/*.pdf
+docs/*.html
+docs/.pandoc-style.css

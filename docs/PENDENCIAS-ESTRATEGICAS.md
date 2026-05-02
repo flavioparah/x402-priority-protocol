@@ -16,6 +16,7 @@ Para o porquê dessa priorização, ver [`ESTRATEGIA.md`](./ESTRATEGIA.md). Para
 | 4 | RFC público x402-priority | ~1 semana | Autoridade de spec | M+1 | ✅ **draft pronto** (commit `9b18f13` em `docs/rfc/`) — falta publicar nos fóruns |
 | 5 | Aproveitar hackatom estrategicamente | dia do evento | M+6 contracts | Dia do evento | ⏳ pendente |
 | 6 (NOVO) | **Multi-agent stress test em mainnet** | ~3h | Validação produção | Antes do hackatom | ✅ **feito** (commit `b949aa7`) — 1.000 paid requests, 5 wallets novas registradas em api.rpcpriority.com |
+| 7 (NOVO) | **Análise sugestões consultor 2026-05-02** (subsídio + multi-VPS) | ~30min | Disciplina de capital pré-M+6 | Documentado | 🔒 **gate-locked** — ver [`CONSULTOR-ANALISE-2026-05-02.md`](./CONSULTOR-ANALISE-2026-05-02.md). Reabertura condicionada a 3+ negociações pedindo case study (subsídio) ou pivot pra Plano B em M+6 (multi-VPS). |
 
 ---
 
