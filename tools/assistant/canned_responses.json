@@ -1,0 +1,186 @@
+{
+  "_comment": "FAQ canned responses para geragentes. Top 30 perguntas mais prováveis de juízes/avaliadores/parceiros, com resposta pré-aprovada. Coverage: o que é o produto, modelo comercial, comparação competitiva, status técnico, time, perguntas defensivas. Idioma: PT-BR.",
+  "version": "2026-05-04",
+  "responses": [
+    {
+      "category": "produto",
+      "intent": "o-que-e",
+      "patterns": ["o que é", "what is", "que projeto", "explica em uma frase", "do que se trata"],
+      "response": "RPC Priority Protocol é uma camada de prioridade paga para nós RPC Solana, baseada no padrão x402 (HTTP 402 Payment Required). Cliente paga por request — sem API key, sem contrato mensal. Em carga baixa passa de graça; em pico, paga prioridade. Trust-Score recompensa cliente fiel com até 50% de desconto automático. Em mainnet desde 24/abr/2026: https://api.rpcpriority.com/info"
+    },
+    {
+      "category": "produto",
+      "intent": "tese",
+      "patterns": ["por que existe", "qual a tese", "qual o problema", "qual a dor"],
+      "response": "Cobramos pelo pico, não pelo plano. A dor que atacamos não é a de hoje — Solana mainnet aguenta 60-80k TPS. É a de amanhã: quando agentes IA multiplicarem RPC calls 100× nos próximos 12-24 meses, o modelo API key + plano fixo da Helius/Triton quebra (agente roda em infra elástica, rotaciona IP, tem wallet em vez de cartão). Somos a primitiva nativa pra esse futuro agêntico."
+    },
+    {
+      "category": "tecnico",
+      "intent": "como-funciona",
+      "patterns": ["como funciona", "como integra", "como pago", "qual o flow", "fluxo"],
+      "response": "Cliente faz POST em https://api.rpcpriority.com/rpc com body JSON-RPC normal. Sob carga, gateway retorna HTTP 402 com nonce + amount + destination. Cliente assina o nonce com Ed25519 (mesma chave Solana) e retry com header Authorization: x402 <sig>.<pubkey>.<msg>. Gateway verifica, debita escrow, encaminha pro RPC e devolve resposta. Tudo em ~45ms p50."
+    },
+    {
+      "category": "tecnico",
+      "intent": "deposit",
+      "patterns": ["como deposito", "escrow", "como adicionar saldo", "funding"],
+      "response": "Uma transferência on-chain única (SystemProgram.transfer) para a operator wallet CEH3dGLaYQmYGGwDpszfuBRfcUmBbLNinrSdVdi7k6zp. Depois POST em /escrow/deposit com a tx_signature. Gateway verifica on-chain (origem, destino, valor, anti-replay) e credita 1.000 µL por lamport. Daí em diante, requests assinados off-chain consomem da escrow — sem mais TX on-chain por chamada."
+    },
+    {
+      "category": "tecnico",
+      "intent": "trust-score",
+      "patterns": ["trust score", "reputação", "como funciona desconto", "fidelidade"],
+      "response": "Score = min(100, paidCount × 5). Cada pagamento confirmado adiciona 5 pontos. Aos 20 pagamentos chega ao máximo (100/100). Desconto = score / 200, ou seja, até 50% off. Validado matematicamente em mainnet: 5 wallets independentes progrediram 0→100 em 21 pagamentos cada, exato. Endpoint: GET /reputation/<pubkey>. Spec completa em docs/rfc/x402-trust-score.md."
+    },
+    {
+      "category": "tecnico",
+      "intent": "preco",
+      "patterns": ["quanto custa", "preço", "cost", "tarifa", "valor"],
+      "response": "Em mainnet hoje: BASE 1.000 µL (~$0,000007) → MAX 50.000 µL (~$0,0085). Curva linear baseada em load. Trust-Score reduz até 50%. Custos reais medidos: 1 request priority $0,000007, stress test 1.000 paid requests $0,032, onboarding completo de 30 dias $0,17. Per-request, não plano mensal — paga só quando congestiona."
+    },
+    {
+      "category": "tecnico",
+      "intent": "metricas",
+      "patterns": ["latência", "performance", "p95", "p99", "tps"],
+      "response": "Overhead do protocolo (handshake 402+retry): 8,7 ms p95. Stress test em mainnet (1.000 paid requests, 5 wallets simultâneas): p50=378ms, p95=639ms, p99=701ms. Sustained throughput: 3,9 RPS na rajada (gargalo é o RPC público mainnet-beta dando 429, não nosso shield)."
+    },
+    {
+      "category": "tecnico",
+      "intent": "validacao",
+      "patterns": ["mainnet?", "está em produção", "status", "live", "validado"],
+      "response": "Sim, em produção em mainnet desde 24/abr/2026. 1.000+ paid requests registrados em https://api.rpcpriority.com/stats/leaderboard, persistência Redis confirmada (counters sobreviveram restart de container). 6 deploys ao vivo com cert Let's Encrypt válido (api/mainnet/devnet/demo/app/apex). Pode validar agora: curl https://api.rpcpriority.com/info"
+    },
+    {
+      "category": "comercial",
+      "intent": "modelo",
+      "patterns": ["modelo de negócio", "monetização", "como ganham dinheiro"],
+      "response": "B2B SaaS para node-operadores (Plano A): licença $500-5000/mês por instância + revenue share opcional 5% + Trust-Score Premium $200-500/mês. Cliente-operador (agente IA, bot) é usuário do protocolo, paga ao node-operator parceiro, não a nós. Primeiros 90 dias zero rev-share pra primeiro contrato. Plano B (fallback se gate M+6 falhar): viramos node-operador próprio em nicho MEV — break-even ~10 clientes a $1k/mês."
+    },
+    {
+      "category": "comercial",
+      "intent": "cliente-alvo",
+      "patterns": ["cliente alvo", "icp", "target", "para quem", "quem usa"],
+      "response": "Plano A — cliente que paga LICENÇA: node-operadores RPC Solana (Helius, Triton, Jito, validators tier 2/3 BR/LatAm). Cliente que USA o protocolo: agentes IA autônomos, bots de MEV, frontends de DEX, indexadores, oracles, backends de wallet — qualquer workload programático que faça 100+ req/s e tenha SOL na wallet. Não atendemos retail humano direto."
+    },
+    {
+      "category": "comercial",
+      "intent": "concorrencia-helius",
+      "patterns": ["e a helius", "vs helius", "helius já tem", "concorrência"],
+      "response": "Substituímos o plano fixo deles, não o native fee. Helius cobra $49-499/mês independente de carga. Quebra pra agente que rotaciona IP, não tem cartão de crédito, e precisa pay-per-use. Trabalhamos por identidade criptográfica + per-request. Pra cliente com cargas SPIKE (não sustentadas), nosso modelo é mais barato e mais alinhado. Estratégia: vender pra eles licenciarem nosso Shield, não competir frontalmente."
+    },
+    {
+      "category": "comercial",
+      "intent": "concorrencia-jito",
+      "patterns": ["e o jito", "vs jito", "jito já não", "mev"],
+      "response": "Camadas diferentes. Jito ordena TXs DENTRO do bloco (validator/leader layer). Nós damos priority no ACESSO ao RPC ANTES disso. Pra agente que faz 80-95% reads (sem TX), Jito não toca — só nós cobrimos. Os dois empilham, não competem. Cliente MEV usa AMBOS: nós pra read priority + monitoring + simulation; Jito pra TX bundling on-chain."
+    },
+    {
+      "category": "comercial",
+      "intent": "concorrencia-native-fees",
+      "patterns": ["native priority", "compute unit", "priority fee solana", "EIP-1559"],
+      "response": "Native priority fees pagam INCLUSÃO de TX no bloco. Nós pagamos ACESSO ao RPC pra falar. Cliente paga AMBOS, em ordem, sem conflito. Importante: reads NÃO tocam native priority — só nós resolvemos read priority. E 80-95% do tráfego de agente é read."
+    },
+    {
+      "category": "comercial",
+      "intent": "stellar-oxide",
+      "patterns": ["stellar oxide", "concorrente stellar", "outro x402"],
+      "response": "Stellar Oxide Gateway é outra equipe construindo x402 gateway, mas em Stellar e pra APIs HTTP genéricas (não RPC). Mesmo padrão arquitetural, escopo e chain diferentes. Validação de tese, não competição direta. Eles ainda em testnet, sem Trust-Score. Nós em mainnet com Trust-Score validado e RFCs publicados."
+    },
+    {
+      "category": "tecnico",
+      "intent": "moat",
+      "patterns": ["moat", "diferencial", "barreira de entrada", "por que defensável"],
+      "response": "1) Trust-Score cross-operador é o moat real — efeito de rede tipo Metcalfe sobre dados comportamentais. Cada operador integrado aumenta valor pros outros. Concorrente novo começa com 0 histórico. 2) Autoridade de spec via 3 RFCs (x402-priority, x402-trust-score, x402-qos-cooperative). 3) Velocidade: 9 semanas do zero ao mainnet validado. 4) Anti-sybil/fraud detection cross-operator (5 sinais). Código sozinho não defende — é open spec. Mas dataset + relacionamentos defendem."
+    },
+    {
+      "category": "tecnico",
+      "intent": "rfcs",
+      "patterns": ["rfc", "spec", "padrão", "specification"],
+      "response": "Três RFCs em docs/rfc/: x402-priority v1.0 (wire protocol — 402 challenge format, signed retry, atomic consume primitive), x402-trust-score v0.1 (cross-operator reputation broker, sybil signals, federation outline), x402-qos-cooperative v1.0 (operator-side QoS hint via X-Priority-Score / X-QoS-Overload headers). Período de comments aberto até 30/06/2026."
+    },
+    {
+      "category": "comercial",
+      "intent": "time",
+      "patterns": ["time", "team", "founder", "quem fez"],
+      "response": "João Romeiro (Flavio) — CTO/founder. 9 semanas do zero ao mainnet validado. Para conhecer time completo, conversar diretamente com fundador, ou avaliar parceria estratégica: flavio@rpcpriority.com."
+    },
+    {
+      "category": "comercial",
+      "intent": "investimento",
+      "patterns": ["captação", "round", "investidores", "valuation", "equity"],
+      "response": "Decisões de captação, valuation e cap table são conversa direta com fundador, não comigo. Email: flavio@rpcpriority.com. Posso te preparar resumo do status técnico e tração se quiser — só me peça."
+    },
+    {
+      "category": "comercial",
+      "intent": "token",
+      "patterns": ["token", "ico", "tokenomics", "airdrop"],
+      "response": "Não. Negócio é SaaS B2B (licença pra node-operadores) + revenue share opcional + Trust-Score Premium. Eventual token só faria sentido se Trust-Score broker virar federation descentralizada — anos de distância, não está no roadmap atual."
+    },
+    {
+      "category": "comercial",
+      "intent": "repo",
+      "patterns": ["github", "repo", "código", "open source"],
+      "response": "Repo privado em github.com/flavioparah/x402-priority-protocol. Acesso mediante NDA — juízes/parceiros recebem convite. Os 3 RFCs públicos em docs/rfc/ podem ser citados livremente — autoridade de spec é parte do moat. Licença das specs: CC BY 4.0. Reference implementation: BUSL-1.1 quando virar pública."
+    },
+    {
+      "category": "tecnico",
+      "intent": "sdk",
+      "patterns": ["sdk", "biblioteca", "library", "como integro no codigo"],
+      "response": "SDK TypeScript em desenvolvimento. Por enquanto, exemplos diretos em tools/ do repo (acesso mediante NDA). Padrão é 1 linha de integração: const conn = x402Connection({gateway: 'https://api.rpcpriority.com/rpc', agentKeypair: myKp, maxBudgetMicroLamports: 50000}). Resto do código (getBalance, sendTransaction etc.) funciona transparente sobre @solana/web3.js."
+    },
+    {
+      "category": "demo",
+      "intent": "como-testar",
+      "patterns": ["quero testar", "demo", "experimentar", "tentar"],
+      "response": "Três caminhos por nível: (1) Discovery zero-código: curl https://api.rpcpriority.com/info — retorna metadata. (2) Visual no browser: https://app.rpcpriority.com/try — clica e vê o 402 challenge ao vivo. (3) End-to-end pago com SOL real (~$0,003 USD): roda tools/pay-test-mainnet.js com sua privkey. 6 passos automáticos: deposito on-chain → 402 → assinatura → retry → resposta → trust score sobe."
+    },
+    {
+      "category": "tecnico",
+      "intent": "anti-sybil",
+      "patterns": ["sybil", "fraud", "abuso", "defesa", "spam"],
+      "response": "Cinco sinais formalizados em docs/rfc/x402-trust-score.md §10: cross-provider velocity, wash payment suspect, coordinated burst, dormant revival, cross-provider dispute. Detector flagra automaticamente patterns — observado durante stress test multi-agent (50 wallets disparou coordinated_burst, exatamente como esperado). Sinais são informativos, operador decide ação (block, throttle, raise floor)."
+    },
+    {
+      "category": "comercial",
+      "intent": "parceria",
+      "patterns": ["parceria", "operador", "implementar no meu rpc", "licenciar"],
+      "response": "Sim, esse é o Plano A (foco principal). Modelo: licença $500-5000/mês por tier de volume, revenue share opcional 5%, Trust-Score Premium $200-500/mês. Primeiros 90 dias zero rev-share pra reduzir resistência. Setup: 10 minutos via Docker Compose como proxy reverso na frente do seu RPC. Conversa direta com fundador: flavio@rpcpriority.com."
+    },
+    {
+      "category": "tecnico",
+      "intent": "multi-chain",
+      "patterns": ["outras redes", "ethereum", "evm", "multi-chain", "tier 4"],
+      "response": "Tier 4 (multi-chain) está no roadmap mas gate-locked em M+6+ — só ataca se Plano A Solana validar. Razão: foco diluído mata startup. Quando ativar, ordem provável: Base (EVM, Coinbase backing AgentKit), depois outras EVM L2s, depois Sui/Aptos (Ed25519 nativo). Detalhes em docs/PENDENCIAS-ESTRATEGICAS.md."
+    },
+    {
+      "category": "comercial",
+      "intent": "subsidio",
+      "patterns": ["trial grátis", "test grátis", "free tier", "subsídio"],
+      "response": "Não há trial aberto. Custo de teste real é $0,032 USD pra 1.000 paid requests — barreira já é desprezível. Quem não topa pagar centavos não é nosso ICP (agentes IA já têm SOL por definição, operam em Solana). Subsídio escala a custos imprevisíveis e atrai farmers. Modelo de risco zero existe, mas é pra OPERADOR parceiro: 90 dias rev-share zero pra primeiro contrato."
+    },
+    {
+      "category": "tecnico",
+      "intent": "infraestrutura",
+      "patterns": ["onde roda", "infra", "vps", "datacenter", "hospedagem"],
+      "response": "Hoje 1 VPS Hostinger (kvm4 BR) hospedando 4 containers (3 shields + landing). Pra Plano A não precisamos multi-VPS — operador parceiro hospeda no datacenter dele com latência local. Multi-VPS regional só viraria necessário em Plano B (operador próprio MEV) — análise formal em docs/CONSULTOR-ANALISE-2026-05-02.md."
+    },
+    {
+      "category": "tecnico",
+      "intent": "glossario",
+      "patterns": ["glossário", "termos", "x402", "que é x402"],
+      "response": "x402 = padrão HTTP 402 Payment Required (criação Coinbase). Especifica como serviços HTTP cobram per-request com identidade criptográfica. Termos: nonce (token único 30s TTL), µL = micro-lamport (1 lamport = 1.000 µL), Ed25519 (esquema de assinatura nativo Solana), trusted_deposits (modo demo, sem on-chain verification). Glossário Solana PT-BR canônico: https://github.com/solanabr/solana-glossary."
+    },
+    {
+      "category": "comercial",
+      "intent": "hackathon",
+      "patterns": ["hackathon", "hackatom", "competição", "evento"],
+      "response": "Estamos no Hackatom 2026. Goal não é vencer prêmio — é gerar 1-2 conversas estratégicas com Solana Foundation, Helius, Triton, Jito ou Colosseum. Demos: app.rpcpriority.com/try (visual), api.rpcpriority.com/info (validação técnica), api.rpcpriority.com/stats/leaderboard (1.000+ paid requests reais). Material de pitch em docs/PITCH-2MIN.md."
+    },
+    {
+      "category": "geral",
+      "intent": "contato",
+      "patterns": ["contato", "como falar", "email", "whatsapp"],
+      "response": "Email: flavio@rpcpriority.com. Pra perguntas técnicas estou aqui (Hermes). Pra decisões comerciais, parceria, captação, contratos: vá direto pro fundador. Quanto mais info você puder me dar antes (cargo, empresa, contexto), mais eu posso preparar o resumo pra ele."
+    }
+  ]
+}
