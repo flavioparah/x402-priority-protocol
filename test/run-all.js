@@ -34,6 +34,9 @@ const FILES = [
   "test/ratelimit-3dim.test.js",
   "test/rpc-content-length.test.js",
   "test/paid-lane.test.js",
+  // Phase 3 additions
+  "test/abuse-reasons.test.js",
+  "test/trust-multiplier.test.js",
 ];
 
 let failed = 0;
