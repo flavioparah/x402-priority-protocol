@@ -18,6 +18,8 @@ const { logger, sampledWarn } = require("./lib/logger");
 const preflight = require("./lib/preflight");
 const { createRateLimitMiddleware } = require("./lib/ratelimit");
 const { rpcBodyLimit } = require("./lib/rpc-bodylimit");
+const { fireSolanaCircuit } = require("./lib/solana-circuit");
+const { SIG_RE } = require("./lib/preflight");
 
 // ─── Configuração ────────────────────────────────────────────────────────────
 
@@ -106,6 +108,11 @@ const CONFIG = {
     10
   ),
   BODY_LIMIT_RPC_BYTES: parseInt(process.env.BODY_LIMIT_RPC_BYTES || "32768"),
+  DEPOSIT_PENDING_TTL_MS: parseInt(process.env.DEPOSIT_PENDING_TTL_MS || "15000"),
+  DEPOSIT_NEGATIVE_CACHE_TTL_MS: parseInt(process.env.DEPOSIT_NEGATIVE_CACHE_TTL_MS || "60000"),
+  SOLANA_CIRCUIT_THRESHOLD_PCT: parseInt(process.env.SOLANA_CIRCUIT_THRESHOLD_PCT || "50"),
+  SOLANA_CIRCUIT_RESET_MS: parseInt(process.env.SOLANA_CIRCUIT_RESET_MS || "30000"),
+  SOLANA_CIRCUIT_TIMEOUT_MS: parseInt(process.env.SOLANA_CIRCUIT_TIMEOUT_MS || "15000"),
 };
 
 // Graceful shutdown state — flipped by SIGTERM/SIGINT (spec §10.5).
@@ -376,15 +383,13 @@ async function verifyDepositTx(signature) {
     return { ok: false, reason: "signature already used for a deposit" };
   }
 
-  let tx;
-  try {
-    tx = await getSolanaConnection().getParsedTransaction(signature, {
-      commitment: CONFIG.DEPOSIT_COMMITMENT,
-      maxSupportedTransactionVersion: 0,
-    });
-  } catch (err) {
-    return { ok: false, reason: `RPC error fetching transaction: ${err.message}` };
-  }
+  // RPC errors propagate so the opossum circuit (lib/solana-circuit.js) can
+  // count them toward the failure threshold. Validation failures continue to
+  // return { ok: false } below — those don't count toward circuit.
+  const tx = await getSolanaConnection().getParsedTransaction(signature, {
+    commitment: CONFIG.DEPOSIT_COMMITMENT,
+    maxSupportedTransactionVersion: 0,
+  });
 
   if (!tx) {
     return { ok: false, reason: `transaction not found or not yet ${CONFIG.DEPOSIT_COMMITMENT}` };
@@ -880,22 +885,74 @@ app.get("/health", rl.meta, async (req, res) => {
 // Trustless: the Shield never takes the client's word for the amount — only
 // for the signature, which the chain adjudicates.
 app.post("/escrow/deposit", rl.deposit, express.json({ limit: '1kb' }), async (req, res) => {
-  const { tx_signature } = req.body || {};
-  if (!tx_signature) {
-    return res.status(400).json({ error: "tx_signature (base58) required" });
+  const { tx_signature: sig } = req.body || {};
+
+  // 1. Format gate (free)
+  if (!sig || typeof sig !== "string" || !SIG_RE.test(sig)) {
+    return res.status(400).json({ error: "invalid_signature_format", code: 400 });
   }
-  const result = await verifyDepositTx(tx_signature);
-  if (!result.ok) {
-    return res.status(400).json({ error: result.reason });
+
+  // 2. Negative cache — same bad sig was rejected within the last TTL window
+  if (await store.isDepositKnownBad(sig)) {
+    return res.status(400).json({
+      error: "deposit_signature_known_invalid",
+      code: 400,
+      reason: "cached_negative",
+    });
   }
-  logger.info({ reason: "escrow_deposit_verified", pubkey: result.pubkey, lamports: result.lamports, micro_lamports: result.micro_lamports, sig_prefix: result.signature.slice(0, 12), slot: result.slot, req_id: req.id });
-  return res.json({
-    pubkey: result.pubkey,
-    credited_micro_lamports: result.micro_lamports,
-    balance: result.balance,
-    signature: result.signature,
-    slot: result.slot,
-  });
+
+  // 3. In-flight idempotency lock — N concurrent requests with same sig hit Solana once
+  const requestId = req.id || crypto.randomBytes(4).toString("hex");
+  const claim = await store.claimPendingDeposit(sig, requestId, CONFIG.DEPOSIT_PENDING_TTL_MS);
+  if (!claim.ok) {
+    const remainingMs = await store.pendingDepositPttl(sig);
+    const retryAfter = Math.max(1, Math.ceil((remainingMs > 0 ? remainingMs : 1000) / 1000));
+    res.set("Retry-After", String(retryAfter));
+    return res.status(409).json({
+      error: "deposit_in_progress",
+      code: 409,
+      sig,
+      retry_after_seconds: retryAfter,
+    });
+  }
+
+  try {
+    // 4. Fire through circuit breaker
+    const circuitResult = await fireSolanaCircuit(sig, { verify: verifyDepositTx });
+    if (circuitResult.ok === false && circuitResult.reason === "circuit_open") {
+      res.set("Retry-After", "30");
+      return res.status(503).json({
+        error: "solana_rpc_unavailable",
+        code: 503,
+        reason: "circuit_open",
+      });
+    }
+
+    const result = circuitResult.value;
+    if (!result.ok) {
+      // Cache negative for 60s — same sig won't bother Solana again until TTL.
+      await store.markDepositKnownBad(sig, CONFIG.DEPOSIT_NEGATIVE_CACHE_TTL_MS);
+      return res.status(400).json({ error: result.reason, code: 400 });
+    }
+    logger.info({
+      reason: "escrow_deposit_verified",
+      pubkey: result.pubkey,
+      lamports: result.lamports,
+      micro_lamports: result.micro_lamports,
+      sig_prefix: result.signature.slice(0, 12),
+      slot: result.slot,
+      req_id: req.id,
+    });
+    return res.json({
+      pubkey: result.pubkey,
+      credited_micro_lamports: result.micro_lamports,
+      balance: result.balance,
+      signature: result.signature,
+      slot: result.slot,
+    });
+  } finally {
+    await store.clearPendingDeposit(sig).catch(() => {});
+  }
 });
 
 // DEMO/TEST ONLY: credit escrow without an on-chain tx. Mounts only when
