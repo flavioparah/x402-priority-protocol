@@ -39,6 +39,7 @@ const FILES = [
   "test/trust-multiplier.test.js",
   "test/detection-fraud-flags.test.js",
   "test/enforcement-checkban.test.js",
+  "test/enforcement-ladder.test.js",
 ];
 
 let failed = 0;
