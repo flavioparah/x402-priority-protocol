@@ -96,7 +96,7 @@ ratio  = clamp(0, 1, (load - THRESHOLD) / (1 - THRESHOLD))
 amount = round(BASE_PRICE + ratio * (MAX_PRICE - BASE_PRICE))
 ```
 
-In micro-lamports (µL). The reference deployment uses `BASE_PRICE=1000` (1 lamport) and `MAX_PRICE=50000` (50 lamports). Operators MAY publish their own values via `GET /info` (Section 7.4).
+In micro-lamports (µL). The reference deployment uses `BASE_PRICE=20000` (20 lamports) and `MAX_PRICE=1000000` (1000 lamports). Operators MAY publish their own values via `GET /info` (Section 7.4).
 
 If the client sends a Trust-Score hint (`X-x402-Agent-Pubkey` header), the gateway MAY apply a discount per [`x402-trust-score`](./x402-trust-score.md). The discount formula is:
 

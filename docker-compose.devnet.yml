@@ -54,8 +54,8 @@ services:
       LOAD_WINDOW_MS: ${LOAD_WINDOW_MS:-5000}
       REQUESTS_PER_IP_LIMIT: ${REQUESTS_PER_IP_LIMIT:-100}
       RATE_WINDOW_MS: ${RATE_WINDOW_MS:-60000}
-      BASE_PRICE: ${BASE_PRICE:-1000}
-      MAX_PRICE: ${MAX_PRICE:-50000}
+      BASE_PRICE: ${BASE_PRICE:-20000}
+      MAX_PRICE: ${MAX_PRICE:-1000000}
     networks:
       - portainer_default
     labels:

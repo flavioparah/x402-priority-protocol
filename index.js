@@ -28,8 +28,9 @@ const CONFIG = {
   RATE_WINDOW_MS: parseInt(process.env.RATE_WINDOW_MS || "60000"),
 
   // Preço dinâmico (micro-lamports) — escala com a carga
-  BASE_PRICE_MICRO_LAMPORTS: parseInt(process.env.BASE_PRICE || "1000"),
-  MAX_PRICE_MICRO_LAMPORTS: parseInt(process.env.MAX_PRICE || "50000"),
+  // Defaults Cenário 20×: 20 lamports (BASE) → 1000 lamports (MAX saturado)
+  BASE_PRICE_MICRO_LAMPORTS: parseInt(process.env.BASE_PRICE || "20000"),
+  MAX_PRICE_MICRO_LAMPORTS: parseInt(process.env.MAX_PRICE || "1000000"),
 
   // Real load metric: requests per second we consider "full load" (load = 1.0).
   // The Shield tracks its own req/s over LOAD_WINDOW_MS and scales linearly.

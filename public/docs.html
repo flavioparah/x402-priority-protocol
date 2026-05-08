@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get Started — RPC Priority Protocol</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#14F195">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #ededed; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .gradient-text { background: linear-gradient(135deg, #9945FF 0%, #14F195 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .gradient-bg { background: linear-gradient(135deg, #9945FF 0%, #14F195 100%); }
+  .card-glass { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); border-radius: 16px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #14F195; box-shadow: 0 0 8px #14F195; animation: pulse-dot 1.5s ease-in-out infinite; display: inline-block; }
+  @keyframes pulse-dot { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+  .reveal { animation: fadeUp 0.35s ease-out both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+
+  /* ── Navigation ─────────────────────────────────────────────────────────── */
+  .nav-container { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem; }
+  .nav-logo { display: flex; align-items: center; gap: 0.75rem; font-size: 1.1rem; font-weight: bold; letter-spacing: -0.5px; text-decoration: none; color: inherit; }
+  .nav-links { display: flex; align-items: center; gap: 1.5rem; font-size: 0.8rem; font-weight: 500; opacity: 0.7; }
+  .nav-links a { transition: opacity 0.2s; text-decoration: none; color: inherit; }
+  .nav-links a:hover { opacity: 1; }
+  .nav-separator { opacity: 0.3; }
+  .nav-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #14F195; animation: pulse-dot 1.5s ease-in-out infinite; display: inline-block; }
+  .nav-network-dropdown { position: relative; }
+  .nav-network-btn { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .nav-network-menu { position: absolute; right: 0; top: 100%; margin-top: 0.5rem; width: 200px; background: rgba(10,10,10,0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.5rem; opacity: 0; visibility: hidden; transition: opacity 0.2s 0.2s, visibility 0.2s 0.2s; z-index: 100; backdrop-filter: blur(10px); }
+  .nav-network-menu::before { content: ""; position: absolute; top: -0.5rem; left: 0; right: 0; height: 0.5rem; }
+  .nav-network-dropdown:hover .nav-network-menu { opacity: 1; visibility: visible; transition-delay: 0s; }
+  .nav-network-item { display: block; padding: 0.5rem 0.75rem; text-decoration: none; color: inherit; border-radius: 4px; transition: background 0.2s; }
+  .nav-network-item:hover { background: rgba(255,255,255,0.05); }
+  .nav-network-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 8px; }
+  .nav-network-label { opacity: 0.5; font-size: 0.7rem; display: block; }
+  @media (max-width: 768px) { .nav-links { display: none; } .nav-container { padding: 1rem; } }
+
+  /* ── Quick Test Tabs ─────────────────────────────────────────────────────── */
+  .tab-bar { display: flex; gap: 0; background: rgba(255,255,255,0.03); border-radius: 12px; padding: 4px; border: 1px solid rgba(255,255,255,0.06); }
+  .tab-btn { flex: 1; padding: 10px 12px; border: none; background: transparent; color: rgba(255,255,255,0.5); font-family: 'Inter', sans-serif; font-size: 0.75rem; font-weight: 600; cursor: pointer; border-radius: 8px; transition: all 0.15s ease; text-align: center; white-space: nowrap; }
+  .tab-btn:hover { color: #ededed; }
+  .tab-btn.active { background: rgba(255,255,255,0.08); color: #14F195; box-shadow: 0 0 0 1px rgba(20,241,149,0.2); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── Code block ──────────────────────────────────────────────────────────── */
+  .code-block { position: relative; background: #0d0d0d; border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 1.25rem 1.5rem; overflow-x: auto; }
+  .code-block pre { margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.7; color: #c9d1d9; white-space: pre; }
+  .code-block .comment { color: rgba(255,255,255,0.3); }
+  .code-block .cmd { color: #14F195; }
+  .code-block .str { color: #a5d6ff; }
+  .code-block .kw { color: #ff7b72; }
+  .copy-btn { position: absolute; top: 0.75rem; right: 0.75rem; padding: 4px 10px; font-size: 0.65rem; font-family: 'Inter', sans-serif; font-weight: 600; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; }
+  .copy-btn:hover { background: rgba(255,255,255,0.1); color: #ededed; }
+  .copy-btn.copied { color: #14F195; border-color: rgba(20,241,149,0.4); }
+
+  /* ── Path Toggle ─────────────────────────────────────────────────────────── */
+  .path-toggle { display: flex; gap: 4px; background: rgba(255,255,255,0.03); border-radius: 12px; padding: 4px; border: 1px solid rgba(255,255,255,0.06); width: fit-content; }
+  .path-btn { padding: 10px 28px; border: none; background: transparent; color: rgba(255,255,255,0.5); font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-radius: 8px; transition: all 0.15s ease; }
+  .path-btn.active { background: rgba(255,255,255,0.08); color: #ededed; }
+
+  /* ── Step indicator ──────────────────────────────────────────────────────── */
+  .step-row { display: flex; gap: 1rem; align-items: flex-start; }
+  .step-circle { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.8rem; background: linear-gradient(135deg, #9945FF, #14F195); color: #000; }
+  .step-done .step-circle { background: rgba(20,241,149,0.15); color: #14F195; }
+  .step-line { width: 2px; background: rgba(255,255,255,0.08); margin: 0 auto; flex-shrink: 0; }
+
+  /* ── Status widget ───────────────────────────────────────────────────────── */
+  .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .status-ok { background: rgba(20,241,149,0.1); border: 1px solid rgba(20,241,149,0.25); color: #14F195; }
+  .status-err { background: rgba(255,80,80,0.1); border: 1px solid rgba(255,80,80,0.3); color: #ff5555; }
+  .status-loading { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); }
+  .endpoint-row { display: flex; align-items: center; justify-content: space-between; padding: 0.65rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .endpoint-row:last-child { border-bottom: none; }
+
+  /* ── Badges ──────────────────────────────────────────────────────────────── */
+  .time-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5); margin-left: 8px; }
+  .diff-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; }
+  .diff-easy { background: rgba(20,241,149,0.1); color: #14F195; }
+  .diff-medium { background: rgba(249,168,38,0.12); color: #f9a826; }
+  .diff-hard { background: rgba(153,69,255,0.12); color: #9945FF; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ─── Navigation ─────────────────────────────────────────────────────────── -->
+<header style="background: rgba(10,10,10,0.85); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,255,255,0.05); position: sticky; top: 0; z-index: 50;">
+  <div class="nav-container">
+    <a href="/" class="nav-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#14F195" stroke-width="2.5">
+        <path d="M12 2L4 5V11C4 16.18 7.41 21.03 12 22C16.59 21.03 20 16.18 20 11V5L12 2Z"/>
+      </svg>
+      <span style="color:#14F195;">RPC</span>&nbsp;<span>PRIORITY</span>
+    </a>
+    <nav class="nav-links">
+      <a href="/">Home</a>
+      <span class="nav-separator">|</span>
+      <a href="/live"><span class="nav-live-dot"></span>&nbsp;Live</a>
+      <a href="/try">Try it</a>
+      <a href="/explorer">Explorer</a>
+      <a href="/docs" style="opacity:1; color:#14F195;">Docs</a>
+      <span class="nav-separator">|</span>
+      <div class="nav-network-dropdown">
+        <div class="nav-network-btn">Network <span style="font-size:0.6rem;">▼</span></div>
+        <div class="nav-network-menu">
+          <a href="https://api.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
+            <span class="nav-network-dot" style="background:#14F195;"></span>Mainnet
+            <span class="nav-network-label">api.rpcpriority.com · real SOL</span>
+          </a>
+          <a href="https://devnet.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
+            <span class="nav-network-dot" style="background:#f9a826;"></span>Devnet
+            <span class="nav-network-label">devnet.rpcpriority.com · testnet</span>
+          </a>
+          <a href="https://demo.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
+            <span class="nav-network-dot" style="background:#9945FF;"></span>Trust Demo
+            <span class="nav-network-label">demo.rpcpriority.com · fake deposits</span>
+          </a>
+        </div>
+      </div>
+      <a href="https://github.com/flavioparah/x402-priority-protocol" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ─── Page content ────────────────────────────────────────────────────────── -->
+<main class="max-w-4xl mx-auto px-6 py-12 space-y-14">
+
+  <!-- Hero -->
+  <section class="reveal">
+    <div class="text-xs uppercase tracking-widest text-white/40 mb-3 mono">x402-shield · developer guide</div>
+    <h1 class="text-4xl md:text-5xl font-extrabold leading-tight">
+      Get started in<br><span class="gradient-text">under 5 minutes</span>
+    </h1>
+    <p class="mt-4 text-white/60 max-w-2xl text-lg">
+      x402-shield is an HTTP reverse proxy that turns any Solana RPC node into a priority-gated service.
+      Under load it issues <span class="mono text-white/80">HTTP 402 Payment Required</span> — agents that pay move to the front.
+    </p>
+    <div class="mt-6 flex flex-wrap gap-3">
+      <a href="#quick-test" class="gradient-bg text-black font-bold px-5 py-2.5 rounded-full text-sm">Quick test</a>
+      <a href="#operator" class="px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 hover:border-white/30 transition-colors">Deploy as operator</a>
+      <a href="#agent" class="px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 hover:border-white/30 transition-colors">Integrate SDK</a>
+    </div>
+  </section>
+
+  <!-- How it works — 5-step flow -->
+  <section class="reveal">
+    <h2 class="text-xs uppercase tracking-widest text-white/40 mb-6">How the protocol works</h2>
+    <div class="card-glass p-6">
+      <div class="flex flex-col md:flex-row gap-2 md:gap-0 items-start md:items-center justify-between">
+        <div class="flex flex-col items-center text-center w-full md:w-auto">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mb-2" style="background:rgba(153,69,255,0.15);border:1px solid rgba(153,69,255,0.4);color:#9945FF;">1</div>
+          <div class="text-xs text-white/70 font-semibold">Agent sends<br>RPC request</div>
+        </div>
+        <div class="hidden md:block flex-1 h-px" style="background:linear-gradient(90deg, rgba(153,69,255,0.3), rgba(20,241,149,0.3)); margin: 0 12px; margin-bottom: 24px;"></div>
+        <div class="flex flex-col items-center text-center w-full md:w-auto">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mb-2" style="background:rgba(255,200,0,0.12);border:1px solid rgba(255,200,0,0.35);color:#f9a826;">2</div>
+          <div class="text-xs text-white/70 font-semibold">Shield checks<br>load &amp; budget</div>
+        </div>
+        <div class="hidden md:block flex-1 h-px" style="background:linear-gradient(90deg, rgba(249,168,38,0.3), rgba(255,80,80,0.3)); margin: 0 12px; margin-bottom: 24px;"></div>
+        <div class="flex flex-col items-center text-center w-full md:w-auto">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mb-2" style="background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.35);color:#ff5555;">3</div>
+          <div class="text-xs text-white/70 font-semibold">HTTP 402 +<br>signed nonce</div>
+        </div>
+        <div class="hidden md:block flex-1 h-px" style="background:linear-gradient(90deg, rgba(255,80,80,0.3), rgba(20,241,149,0.3)); margin: 0 12px; margin-bottom: 24px;"></div>
+        <div class="flex flex-col items-center text-center w-full md:w-auto">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mb-2" style="background:rgba(20,241,149,0.1);border:1px solid rgba(20,241,149,0.35);color:#14F195;">4</div>
+          <div class="text-xs text-white/70 font-semibold">Agent signs &amp;<br>retries</div>
+        </div>
+        <div class="hidden md:block flex-1 h-px" style="background:linear-gradient(90deg, rgba(20,241,149,0.3), rgba(20,241,149,0.6)); margin: 0 12px; margin-bottom: 24px;"></div>
+        <div class="flex flex-col items-center text-center w-full md:w-auto">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mb-2" style="background:rgba(20,241,149,0.15);border:1px solid rgba(20,241,149,0.5);color:#14F195;">5</div>
+          <div class="text-xs text-white/70 font-semibold">RPC call<br>proxied through</div>
+        </div>
+      </div>
+      <p class="mt-6 text-xs text-white/40 text-center">No API keys. No IP whitelists. Identity = Ed25519 keypair. Payment = off-chain escrow debit. Overhead ≈ 8ms p95.</p>
+    </div>
+  </section>
+
+  <!-- Quick Test -->
+  <section id="quick-test" class="reveal">
+    <h2 class="text-xs uppercase tracking-widest text-white/40 mb-2">Quick test</h2>
+    <p class="text-white/50 text-sm mb-5">Choose the fastest path to see the protocol in action.</p>
+
+    <div class="tab-bar mb-6" id="qt-tabs">
+      <button class="tab-btn active" data-tab="curl">curl<span class="time-badge">30s</span></button>
+      <button class="tab-btn" data-tab="demo">local demo<span class="time-badge">5min</span></button>
+      <button class="tab-btn" data-tab="docker">docker<span class="time-badge">15min</span></button>
+      <button class="tab-btn" data-tab="sdk">SDK<span class="time-badge">30min</span></button>
+    </div>
+
+    <!-- Tab: curl -->
+    <div class="tab-panel active" id="tab-curl">
+      <div class="card-glass p-6 space-y-4">
+        <div class="flex items-center gap-3">
+          <span class="diff-badge diff-easy">Easy</span>
+          <span class="text-sm text-white/60">No install required. Hit the live demo endpoint from any terminal.</span>
+        </div>
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Step 1 — send an unauthenticated request (expect 402)</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="cmd">curl</span> -s -o /dev/null -w <span class="str">"%{http_code}"</span> \
+  -X POST https://demo.rpcpriority.com/rpc \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'</span>
+<span class="comment"># → 402</span></pre>
+          </div>
+        </div>
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Step 2 — inspect the challenge payload</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="cmd">curl</span> -s \
+  -X POST https://demo.rpcpriority.com/rpc \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'</span> | jq .
+<span class="comment"># → { "error": { "code": 402, "data": { "nonce": "...", "amount_micro_lamports": 1000, ... } } }</span></pre>
+          </div>
+        </div>
+        <div class="p-3 rounded-lg text-xs text-white/50" style="background:rgba(153,69,255,0.07);border:1px solid rgba(153,69,255,0.15);">
+          <span style="color:#9945FF;">Note:</span> <code class="mono">demo.rpcpriority.com</code> runs with <code class="mono">RPC_LOAD_FORCE=0.9</code> — 402 fires on ~90% of requests so you can see the challenge without waiting for real load.
+          Want to bypass with a signed payment? See the <strong>SDK</strong> tab.
+        </div>
+        <div class="pt-2">
+          <a href="/try" class="text-sm font-semibold" style="color:#14F195;">→ Interactive console (no curl needed)</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: local demo -->
+    <div class="tab-panel" id="tab-demo">
+      <div class="card-glass p-6 space-y-4">
+        <div class="flex items-center gap-3">
+          <span class="diff-badge diff-easy">Easy</span>
+          <span class="text-sm text-white/60">Runs a full 5-step handshake locally with colored output and timing.</span>
+        </div>
+
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Terminal 1 — start the shield</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="cmd">git</span> clone https://github.com/flavioparah/x402-priority-protocol
+<span class="cmd">cd</span> x402-priority-protocol
+<span class="cmd">npm</span> install
+
+<span class="comment"># RPC_LOAD_THRESHOLD=0 forces 402 on every request
+# ESCROW_TRUST_DEPOSITS=1 allows deposits without real SOL</span>
+RPC_LOAD_THRESHOLD=0 ESCROW_TRUST_DEPOSITS=1 \
+  PAYMENT_DESTINATION=YourSolanaWalletHere \
+  <span class="cmd">npm</span> start</pre>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Terminal 2 — run the demo</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="cmd">npm</span> run demo
+<span class="comment"># Generates keypair → deposits escrow → sends request
+# → receives 402 → signs nonce → retries → 200 OK
+# Reports handshake overhead (target &lt; 50ms p95)</span></pre>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Bonus — watch Trust-Score build up over 22 requests</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="cmd">npm</span> run demo:trust
+<span class="comment"># Shows per-request table: score 0→100, price declining, ~26% avg savings</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: docker -->
+    <div class="tab-panel" id="tab-docker">
+      <div class="card-glass p-6 space-y-4">
+        <div class="flex items-center gap-3">
+          <span class="diff-badge diff-medium">Medium</span>
+          <span class="text-sm text-white/60">Full production stack: Shield + Redis in containers.</span>
+        </div>
+
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Step 1 — configure</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="cmd">git</span> clone https://github.com/flavioparah/x402-priority-protocol
+<span class="cmd">cd</span> x402-priority-protocol
+<span class="cmd">cp</span> .env.example .env
+<span class="comment"># Edit .env — set PAYMENT_DESTINATION to your Solana wallet address</span></pre>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Step 2 — start (demo mode: devnet, trusted deposits, simulated load)</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="cmd">docker</span> compose up -d --build
+<span class="comment"># Shield listens on localhost:3000
+# Redis runs on localhost:6379 (internal only)</span></pre>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Step 3 — verify</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="cmd">curl</span> http://localhost:3000/health | jq .
+<span class="comment"># → { "status": "ok", "load": 0.9, "rps": 0, ... }</span>
+
+<span class="cmd">curl</span> -s -X POST http://localhost:3000/rpc \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'</span>
+<span class="comment"># → HTTP 402 with challenge payload</span></pre>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-lg text-xs text-white/50" style="background:rgba(20,241,149,0.05);border:1px solid rgba(20,241,149,0.1);">
+          <span style="color:#14F195;">Mainnet deploy:</span> use <code class="mono">docker compose -f docker-compose.mainnet.yml up -d --build</code> — requires real SOL for deposits, upstream points to <code class="mono">api.mainnet-beta.solana.com</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: SDK -->
+    <div class="tab-panel" id="tab-sdk">
+      <div class="card-glass p-6 space-y-4">
+        <div class="flex items-center gap-3">
+          <span class="diff-badge diff-hard">TypeScript</span>
+          <span class="text-sm text-white/60">Drop-in replacement for <code class="mono text-xs">@solana/web3.js Connection</code>. Handles 402 transparently.</span>
+        </div>
+
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Step 1 — install deps</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="cmd">npm</span> install @solana/web3.js tweetnacl bs58</pre>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Step 2 — generate keypair &amp; fund escrow</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="kw">import</span> { Keypair } <span class="kw">from</span> <span class="str">'@solana/web3.js'</span>;
+
+<span class="kw">const</span> keypair = Keypair.generate();
+<span class="kw">const</span> pubkey = keypair.publicKey.toBase58();
+
+<span class="comment">// Deposit escrow (demo: trusted, no real SOL needed)</span>
+<span class="kw">await</span> fetch(<span class="str">'https://demo.rpcpriority.com/escrow/deposit-trusted'</span>, {
+  method: <span class="str">'POST'</span>,
+  headers: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> },
+  body: JSON.stringify({ pubkey, amount_micro_lamports: 200_000 }),
+});
+<span class="comment">// For mainnet use /escrow/deposit with a real on-chain tx signature</span></pre>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Step 3 — wrap with X402Provider</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="kw">import</span> { X402Provider } <span class="kw">from</span> <span class="str">'./x402-client-sdk'</span>;
+
+<span class="kw">const</span> conn = <span class="kw">new</span> X402Provider(
+  <span class="str">'https://demo.rpcpriority.com/rpc'</span>,
+  keypair,
+  { priorityBudget: 50_000 },   <span class="comment">// max µL per request</span>
+);</pre>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs text-white/40 mono mb-2">Step 4 — use as a normal Connection</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+            <pre><span class="comment">// All existing @solana/web3.js calls work transparently.
+// The SDK intercepts 402 → signs nonce → retries. No code change needed.</span>
+<span class="kw">const</span> slot = <span class="kw">await</span> conn.getSlot();
+<span class="kw">const</span> balance = <span class="kw">await</span> conn.getBalance(somePubkey);
+<span class="kw">const</span> sig = <span class="kw">await</span> conn.sendRawTransaction(rawTx);</pre>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-lg text-xs text-white/50" style="background:rgba(153,69,255,0.07);border:1px solid rgba(153,69,255,0.15);">
+          <span style="color:#9945FF;">Trust-Score:</span> each paid request adds 5 reputation points (max 100). At score 100, the agent pays 50% less on every future call. Run <code class="mono">npm run demo:trust</code> to watch the discount grow across 22 requests.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Choose Your Path -->
+  <section id="path" class="reveal">
+    <h2 class="text-xs uppercase tracking-widest text-white/40 mb-2">Implementation guide</h2>
+    <p class="text-white/50 text-sm mb-5">Select your role for a step-by-step integration checklist.</p>
+
+    <div class="path-toggle mb-8" id="path-toggle">
+      <button class="path-btn active" data-path="operator">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:6px;vertical-align:middle;"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>
+        Operator (deploy shield)
+      </button>
+      <button class="path-btn" data-path="agent">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:6px;vertical-align:middle;"><circle cx="12" cy="12" r="3"></circle><path d="M20.188 10.934a9 9 0 1 0-1.235 4.584"></path></svg>
+        Agent developer (SDK)
+      </button>
+    </div>
+
+    <!-- ─── OPERATOR PATH ────────────────────────────────────────────── -->
+    <div id="path-operator" class="space-y-4">
+
+      <div class="card-glass p-6">
+        <div class="step-row">
+          <div>
+            <div class="step-circle">1</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold mb-1">Prerequisites</div>
+            <p class="text-sm text-white/50 mb-3">You need a Solana wallet (to receive payments) and a VPS with at least 2 vCPU / 4 GB RAM. Docker is recommended for production.</p>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this)">copy</button>
+              <pre><span class="comment"># Requirements</span>
+Node.js &gt;= 22          <span class="comment"># runtime</span>
+Redis &gt;= 6             <span class="comment"># atomic nonce store (optional for single-instance)</span>
+Docker + Docker Compose <span class="comment"># recommended for deploy</span>
+
+<span class="comment"># Get a Solana wallet address (if you don't have one)</span>
+<span class="cmd">solana-keygen</span> new --outfile wallet.json
+<span class="cmd">solana</span> address -k wallet.json</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-glass p-6">
+        <div class="step-row">
+          <div>
+            <div class="step-circle">2</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold mb-1">Clone &amp; configure</div>
+            <p class="text-sm text-white/50 mb-3">Copy <code class="mono text-xs">.env.example</code> to <code class="mono text-xs">.env</code> and fill the required values.</p>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this)">copy</button>
+              <pre><span class="cmd">git</span> clone https://github.com/flavioparah/x402-priority-protocol
+<span class="cmd">cd</span> x402-priority-protocol
+<span class="cmd">cp</span> .env.example .env</pre>
+            </div>
+            <div class="mt-3 code-block">
+              <button class="copy-btn" onclick="copyCode(this)">copy</button>
+              <pre><span class="comment"># .env — minimum required settings</span>
+PAYMENT_DESTINATION=<span class="str">YourSolanaWalletHere</span>      <span class="comment"># receives priority fees</span>
+REAL_RPC_URL=https://api.mainnet-beta.solana.com <span class="comment"># upstream to proxy</span>
+
+<span class="comment"># Gating — 402 fires when load exceeds this fraction (0–1)</span>
+RPC_LOAD_THRESHOLD=0.75
+MAX_RPS=50                <span class="comment"># what "100% load" means for your node</span>
+
+<span class="comment"># Pricing in micro-lamports (Cenário 20× — production tier)</span>
+BASE_PRICE=20000          <span class="comment"># min fee at threshold (= 20 lamports)</span>
+MAX_PRICE=1000000         <span class="comment"># max fee at full load (= 1000 lamports)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-glass p-6">
+        <div class="step-row">
+          <div>
+            <div class="step-circle">3</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold mb-1">Start &amp; verify</div>
+            <p class="text-sm text-white/50 mb-3">Start the shield and confirm it's healthy. Set <code class="mono text-xs">RPC_LOAD_THRESHOLD=0</code> to force 402 on every request during testing.</p>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this)">copy</button>
+              <pre><span class="cmd">npm</span> install
+RPC_LOAD_THRESHOLD=0 <span class="cmd">npm</span> start   <span class="comment"># forces 402 on every request</span>
+
+<span class="comment"># In another terminal:</span>
+<span class="cmd">curl</span> http://localhost:3000/health | jq .
+<span class="comment"># → { "status": "ok", "load": 0.0, "rps": 0, "nonces_active": 0 }</span>
+
+<span class="cmd">curl</span> -s -X POST http://localhost:3000/rpc \
+  -H <span class="str">"Content-Type: application/json"</span> \
+  -d <span class="str">'{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'</span>
+<span class="comment"># → HTTP 402 with signed challenge</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-glass p-6">
+        <div class="step-row">
+          <div>
+            <div class="step-circle">4</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold mb-1">Run the test suite</div>
+            <p class="text-sm text-white/50 mb-3">43/43 tests pass on a fresh clone. Run all of them to confirm your environment is correctly configured.</p>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this)">copy</button>
+              <pre><span class="cmd">npm</span> run build              <span class="comment"># compile TypeScript SDK</span>
+<span class="cmd">npm</span> test                  <span class="comment"># smoke test (requires shield running)</span>
+<span class="cmd">npm</span> run test:detection    <span class="comment"># fraud signal tests (offline)</span>
+<span class="cmd">npm</span> run test:atomic       <span class="comment"># atomic nonce (in-memory)</span>
+<span class="cmd">npm</span> run test:cooperative-qos <span class="comment"># QoS spec compliance</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-glass p-6">
+        <div class="step-row">
+          <div>
+            <div class="step-circle">5</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold mb-1">Production deploy (Docker + Traefik)</div>
+            <p class="text-sm text-white/50 mb-3">The production compose file enables Redis persistence, mainnet upstream, and Traefik TLS. Tested on Hostinger KVM4 (4 vCPU / 16 GB).</p>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this)">copy</button>
+              <pre><span class="comment"># Mainnet (real SOL payments, no trusted deposits)</span>
+<span class="cmd">docker</span> compose -f docker-compose.mainnet.yml up -d --build
+
+<span class="comment"># Check logs</span>
+<span class="cmd">docker</span> compose logs -f shield
+
+<span class="comment"># Devnet for staging</span>
+<span class="cmd">docker</span> compose -f docker-compose.devnet.yml up -d --build</pre>
+            </div>
+            <div class="mt-3 p-3 rounded-lg text-xs text-white/50" style="background:rgba(20,241,149,0.05);border:1px solid rgba(20,241,149,0.1);">
+              <span style="color:#14F195;">Cooperative QoS:</span> add <code class="mono">QOS_MODE=cooperative</code> to your env to forward <code class="mono">X-Priority-Score</code> headers to an upstream operator that implements the <a href="https://github.com/flavioparah/x402-priority-protocol/blob/main/docs/QOS-COOPERATIVE-SPEC.md" target="_blank" class="underline">cooperative QoS spec</a>.
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end operator path -->
+
+    <!-- ─── AGENT DEVELOPER PATH ──────────────────────────────────────── -->
+    <div id="path-agent" class="space-y-4 hidden">
+
+      <div class="card-glass p-6">
+        <div class="step-row">
+          <div>
+            <div class="step-circle">1</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold mb-1">Install dependencies</div>
+            <p class="text-sm text-white/50 mb-3">The SDK requires <code class="mono text-xs">@solana/web3.js</code>, <code class="mono text-xs">tweetnacl</code> (Ed25519 signing), and <code class="mono text-xs">bs58</code> (base58 encoding).</p>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this)">copy</button>
+              <pre><span class="cmd">npm</span> install @solana/web3.js tweetnacl bs58
+
+<span class="comment"># Copy the SDK file into your project</span>
+<span class="cmd">curl</span> -o x402-client-sdk.ts \
+  https://raw.githubusercontent.com/flavioparah/x402-priority-protocol/main/x402-client-sdk.ts
+
+<span class="comment"># Add to tsconfig.json if needed:</span>
+<span class="comment"># "esModuleInterop": true, "moduleResolution": "node"</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-glass p-6">
+        <div class="step-row">
+          <div>
+            <div class="step-circle">2</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold mb-1">Generate keypair &amp; fund escrow</div>
+            <p class="text-sm text-white/50 mb-3">Your agent's identity is an Ed25519 keypair — no API key required. Pre-fund an off-chain escrow so the Shield can debit payments instantly.</p>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this)">copy</button>
+              <pre><span class="kw">import</span> { Keypair } <span class="kw">from</span> <span class="str">'@solana/web3.js'</span>;
+
+<span class="comment">// Generate once; persist secretKey in your config</span>
+<span class="kw">const</span> keypair = Keypair.generate();
+<span class="kw">const</span> pubkey = keypair.publicKey.toBase58();
+
+<span class="comment">// Option A: demo (no real SOL) — for testing only</span>
+<span class="kw">await</span> fetch(<span class="str">'https://demo.rpcpriority.com/escrow/deposit-trusted'</span>, {
+  method: <span class="str">'POST'</span>,
+  headers: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> },
+  body: JSON.stringify({ pubkey, amount_micro_lamports: 200_000 }),
+});
+
+<span class="comment">// Option B: mainnet (real SOL, verified on-chain)
+// Send SOL to the Shield's PAYMENT_DESTINATION address, then:</span>
+<span class="kw">await</span> fetch(<span class="str">'https://api.rpcpriority.com/escrow/deposit'</span>, {
+  method: <span class="str">'POST'</span>,
+  headers: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> },
+  body: JSON.stringify({ pubkey, tx_signature: <span class="str">'5z3kY…'</span> }),
+});</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-glass p-6">
+        <div class="step-row">
+          <div>
+            <div class="step-circle">3</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold mb-1">Wrap Connection with X402Provider</div>
+            <p class="text-sm text-white/50 mb-3"><code class="mono text-xs">X402Provider</code> extends <code class="mono text-xs">Connection</code> and intercepts all RPC calls. The 402 handshake is invisible to your application code.</p>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this)">copy</button>
+              <pre><span class="kw">import</span> { X402Provider } <span class="kw">from</span> <span class="str">'./x402-client-sdk'</span>;
+
+<span class="kw">const</span> conn = <span class="kw">new</span> X402Provider(
+  <span class="str">'https://demo.rpcpriority.com/rpc'</span>,  <span class="comment">// or api.rpcpriority.com</span>
+  keypair,
+  {
+    priorityBudget: 50_000,    <span class="comment">// max µL per request (refuse if over)</span>
+    onChallenge: (c) => {      <span class="comment">// optional: inspect challenge before paying</span>
+      console.log(<span class="str">`Paying ${c.amount_micro_lamports} µL`</span>);
+      <span class="kw">return</span> <span class="kw">true</span>;            <span class="comment">// return false to abort</span>
+    },
+  }
+);</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-glass p-6">
+        <div class="step-row">
+          <div>
+            <div class="step-circle">4</div>
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold mb-1">Use normally — 402 is invisible</div>
+            <p class="text-sm text-white/50 mb-3">Every existing <code class="mono text-xs">@solana/web3.js</code> call works as-is. Under load, the SDK intercepts the 402, signs the nonce, and retries — your app code sees only the final result.</p>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this)">copy</button>
+              <pre><span class="comment">// No code change needed in your application layer</span>
+<span class="kw">const</span> slot = <span class="kw">await</span> conn.getSlot();
+<span class="kw">const</span> balance = <span class="kw">await</span> conn.getBalance(somePubkey);
+<span class="kw">const</span> blockhash = (<span class="kw">await</span> conn.getLatestBlockhash()).blockhash;
+<span class="kw">const</span> sig = <span class="kw">await</span> conn.sendRawTransaction(rawTx);
+
+<span class="comment">// Check your escrow balance any time</span>
+<span class="kw">const</span> res = <span class="kw">await</span> fetch(
+  <span class="str">`https://api.rpcpriority.com/escrow/balance/${pubkey}`</span>
+).then(r => r.json());
+console.log(res.balance_micro_lamports, <span class="str">'µL remaining'</span>);</pre>
+            </div>
+            <div class="mt-3 p-3 rounded-lg text-xs text-white/50" style="background:rgba(153,69,255,0.07);border:1px solid rgba(153,69,255,0.15);">
+              <span style="color:#9945FF;">Trust-Score tip:</span> your discount grows automatically with every paid request. At score 100 you pay 50% less. Check your score at
+              <a href="/explorer" style="color:#14F195;" class="underline">/explorer</a> or via <code class="mono">/reputation/:pubkey</code>.
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end agent path -->
+  </section>
+
+  <!-- API Quick Reference -->
+  <section class="reveal">
+    <h2 class="text-xs uppercase tracking-widest text-white/40 mb-5">API quick reference</h2>
+    <div class="card-glass overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-xs uppercase tracking-widest text-white/40 border-b border-white/08">
+            <th class="text-left p-4">Endpoint</th>
+            <th class="text-left p-4">Method</th>
+            <th class="text-left p-4">Description</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/05">
+          <tr class="hover:bg-white/02 transition-colors">
+            <td class="p-4 mono text-xs" style="color:#14F195;">/rpc</td>
+            <td class="p-4 text-xs text-white/50">POST</td>
+            <td class="p-4 text-xs text-white/60">JSON-RPC proxy. Returns 402 under load or 200 on pass-through.</td>
+          </tr>
+          <tr class="hover:bg-white/02 transition-colors">
+            <td class="p-4 mono text-xs" style="color:#14F195;">/escrow/deposit</td>
+            <td class="p-4 text-xs text-white/50">POST</td>
+            <td class="p-4 text-xs text-white/60">Verify an on-chain tx and credit escrow. Body: <code class="mono">{ pubkey, tx_signature }</code>.</td>
+          </tr>
+          <tr class="hover:bg-white/02 transition-colors">
+            <td class="p-4 mono text-xs" style="color:#9945FF;">/escrow/deposit-trusted</td>
+            <td class="p-4 text-xs text-white/50">POST</td>
+            <td class="p-4 text-xs text-white/60">Demo-only deposit (no on-chain tx). Requires <code class="mono">ESCROW_TRUST_DEPOSITS=1</code>.</td>
+          </tr>
+          <tr class="hover:bg-white/02 transition-colors">
+            <td class="p-4 mono text-xs" style="color:#14F195;">/escrow/balance/:pubkey</td>
+            <td class="p-4 text-xs text-white/50">GET</td>
+            <td class="p-4 text-xs text-white/60">Returns <code class="mono">{ balance_micro_lamports }</code> for the given agent pubkey.</td>
+          </tr>
+          <tr class="hover:bg-white/02 transition-colors">
+            <td class="p-4 mono text-xs" style="color:#14F195;">/reputation/:pubkey</td>
+            <td class="p-4 text-xs text-white/50">GET</td>
+            <td class="p-4 text-xs text-white/60">Trust-Score (0–100), paid count, discount %, history.</td>
+          </tr>
+          <tr class="hover:bg-white/02 transition-colors">
+            <td class="p-4 mono text-xs" style="color:#14F195;">/health</td>
+            <td class="p-4 text-xs text-white/50">GET</td>
+            <td class="p-4 text-xs text-white/60">Shield health, current load fraction, active nonce count, rps.</td>
+          </tr>
+          <tr class="hover:bg-white/02 transition-colors">
+            <td class="p-4 mono text-xs" style="color:#14F195;">/stats/leaderboard</td>
+            <td class="p-4 text-xs text-white/50">GET</td>
+            <td class="p-4 text-xs text-white/60">Top 10 agents by Trust-Score.</td>
+          </tr>
+          <tr class="hover:bg-white/02 transition-colors">
+            <td class="p-4 mono text-xs" style="color:#14F195;">/stats/qos</td>
+            <td class="p-4 text-xs text-white/50">GET</td>
+            <td class="p-4 text-xs text-white/60">Queue depth, in-flight count, avg wait time, overload events.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Live Status -->
+  <section id="status" class="reveal">
+    <h2 class="text-xs uppercase tracking-widest text-white/40 mb-5">Live endpoints</h2>
+    <div class="card-glass p-6 space-y-1" id="status-container">
+      <div class="endpoint-row">
+        <div>
+          <span class="mono text-sm">api.rpcpriority.com</span>
+          <span class="text-xs text-white/40 ml-2">mainnet · real SOL</span>
+        </div>
+        <span class="status-pill status-loading" id="status-mainnet">
+          <span class="live-dot" style="background:rgba(255,255,255,0.3);box-shadow:none;"></span> checking…
+        </span>
+      </div>
+      <div class="endpoint-row">
+        <div>
+          <span class="mono text-sm">devnet.rpcpriority.com</span>
+          <span class="text-xs text-white/40 ml-2">devnet · testnet SOL</span>
+        </div>
+        <span class="status-pill status-loading" id="status-devnet">
+          <span class="live-dot" style="background:rgba(255,255,255,0.3);box-shadow:none;"></span> checking…
+        </span>
+      </div>
+      <div class="endpoint-row">
+        <div>
+          <span class="mono text-sm">demo.rpcpriority.com</span>
+          <span class="text-xs text-white/40 ml-2">demo · trusted deposits · forced load</span>
+        </div>
+        <span class="status-pill status-loading" id="status-demo">
+          <span class="live-dot" style="background:rgba(255,255,255,0.3);box-shadow:none;"></span> checking…
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="text-center text-xs text-white/30 pt-6 pb-8 space-y-2">
+    <div class="flex items-center justify-center gap-6 flex-wrap">
+      <a href="https://github.com/flavioparah/x402-priority-protocol" target="_blank" rel="noopener" class="hover:text-white/60 transition-colors">GitHub</a>
+      <a href="/live" class="hover:text-white/60 transition-colors">Live Dashboard</a>
+      <a href="/explorer" class="hover:text-white/60 transition-colors">Explorer</a>
+      <a href="/try" class="hover:text-white/60 transition-colors">Interactive Console</a>
+      <a href="https://x402.org" target="_blank" rel="noopener" class="hover:text-white/60 transition-colors">x402 spec</a>
+    </div>
+    <div>Built for the Colosseum Frontier Hackathon 2026 · RPC Priority Protocol</div>
+  </footer>
+
+</main>
+
+<script>
+  // ─── Tab switching ────────────────────────────────────────────────────────
+  document.getElementById('qt-tabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+  });
+
+  // ─── Path toggle ──────────────────────────────────────────────────────────
+  document.getElementById('path-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('.path-btn');
+    if (!btn) return;
+    const path = btn.dataset.path;
+    document.querySelectorAll('.path-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('path-operator').classList.toggle('hidden', path !== 'operator');
+    document.getElementById('path-agent').classList.toggle('hidden', path !== 'agent');
+  });
+
+  // ─── Copy to clipboard ────────────────────────────────────────────────────
+  function copyCode(btn) {
+    const pre = btn.closest('.code-block').querySelector('pre');
+    const text = pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  // ─── Live status check ────────────────────────────────────────────────────
+  async function checkEndpoint(id, host) {
+    const el = document.getElementById(id);
+    const t0 = Date.now();
+    try {
+      const r = await fetch(`https://${host}/health`, { signal: AbortSignal.timeout(5000) });
+      const latency = Date.now() - t0;
+      if (r.ok) {
+        const data = await r.json().catch(() => ({}));
+        const load = data.load !== undefined ? `load ${parseFloat(data.load).toFixed(2)} · ` : '';
+        el.className = 'status-pill status-ok';
+        el.innerHTML = `<span class="live-dot"></span> ${load}${latency}ms`;
+      } else {
+        el.className = 'status-pill status-err';
+        el.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#ff5555;display:inline-block;"></span> HTTP ${r.status}`;
+      }
+    } catch (_) {
+      el.className = 'status-pill status-err';
+      el.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#ff5555;display:inline-block;"></span> unreachable`;
+    }
+  }
+
+  function refreshStatus() {
+    checkEndpoint('status-mainnet', 'api.rpcpriority.com');
+    checkEndpoint('status-devnet', 'devnet.rpcpriority.com');
+    checkEndpoint('status-demo', 'demo.rpcpriority.com');
+  }
+  refreshStatus();
+  setInterval(refreshStatus, 30_000);
+</script>
+</body>
+</html>

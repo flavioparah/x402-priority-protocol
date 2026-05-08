@@ -144,8 +144,8 @@ All configurable via env vars (see `index.js`):
 | `RPC_LOAD_FORCE` | `unset` | `0..1` forces `getRpcLoad()` regardless of real traffic (demo mode) |
 | `REQUESTS_PER_IP_LIMIT` | `100` | Per-IP request cap per window |
 | `RATE_WINDOW_MS` | `60000` | Per-IP window (ms) |
-| `BASE_PRICE` | `1000` | Min µ-lamports per priority request |
-| `MAX_PRICE` | `50000` | Max µ-lamports (at full load) |
+| `BASE_PRICE` | `20000` | Min µ-lamports per priority request (= 20 lamports) |
+| `MAX_PRICE` | `1000000` | Max µ-lamports at full load (= 1000 lamports) |
 
 ---
 

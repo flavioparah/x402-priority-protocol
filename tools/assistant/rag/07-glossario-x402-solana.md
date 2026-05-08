@@ -14,8 +14,8 @@
 | **Authorization x402** | Header de retry: `x402 <bs58sig>.<bs58pubkey>.<bs58msg>`. 3 partes base58. |
 | **Escrow** | Saldo pré-pago do cliente, mantido em Redis HASH. Creditado via on-chain deposit; debitado off-chain via signed retry. |
 | **µL (micro-lamport)** | Unidade interna de pricing. 1 lamport = 1.000 µL. |
-| **BASE_PRICE** | Preço mínimo gating (default 1.000 µL = 1 lamport). |
-| **MAX_PRICE** | Preço máximo gating saturado (default 50.000 µL = 50 lamports). |
+| **BASE_PRICE** | Preço mínimo gating (default 20.000 µL = 20 lamports). |
+| **MAX_PRICE** | Preço máximo gating saturado (default 1.000.000 µL = 1.000 lamports). |
 | **THRESHOLD** | Carga acima da qual gating ativa (default 0,5 = 50%). |
 | **Trust-Score** | Reputação cripto-key 0-100. Score = min(100, paidCount × 5). Desconto até 50%. |
 | **trusted_deposits** | Modo demo do Shield onde POST /escrow/deposit-trusted credita escrow sem on-chain verification. SÓ habilitar em demo. |
