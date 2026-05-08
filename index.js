@@ -15,6 +15,7 @@ const bs58 = require("bs58");
 const crypto = require("crypto");
 const { Connection, PublicKey, SystemProgram } = require("@solana/web3.js");
 const { logger, sampledWarn } = require("./lib/logger");
+const preflight = require("./lib/preflight");
 
 // ─── Configuração ────────────────────────────────────────────────────────────
 
@@ -547,60 +548,52 @@ setInterval(() => {
  * Formato esperado: "x402 <base58(signature)>.<base58(pubkey)>.<base58(message)>"
  */
 async function verifyX402Authorization(authHeader) {
-  if (!authHeader || !authHeader.startsWith("x402 ")) return { ok: false, reason: "Missing x402 header" };
+  const pre = preflight.preflightAuth(authHeader);
+  if (pre) return { ok: false, reason: `preflight:${pre}` };
 
+  const token = authHeader.slice(5);
+  const parts = token.split(".");
+
+  // Bounded nonce pre-check happens BEFORE bs58.decode of sig/pubkey
+  // and BEFORE nacl.sign.detached.verify. Nonce must exist in Redis.
+  const np = await preflight.noncePreCheck(parts, store);
+  if (!np.ok) return { ok: false, reason: `preflight:${np.reason}` };
+
+  const { nonce, messageBytes, payload } = np;
+
+  let signature, pubkeyBytes;
   try {
-    const token = authHeader.slice(5); // remove "x402 "
-    const parts = token.split(".");
-    if (parts.length !== 3) return { ok: false, reason: "Malformed token (expected sig.pubkey.msg)" };
-
-    const [sigB58, pubkeyB58, msgB58] = parts;
-    const signature = bs58.decode(sigB58);
-    const pubkeyBytes = bs58.decode(pubkeyB58);
-    const messageBytes = bs58.decode(msgB58);
-
-    // Verifica a assinatura Ed25519
-    const valid = nacl.sign.detached.verify(messageBytes, signature, pubkeyBytes);
-    if (!valid) return { ok: false, reason: "Invalid signature" };
-
-    // Decodifica o payload
-    const payload = JSON.parse(Buffer.from(messageBytes).toString("utf8"));
-    const { nonce, pubkey, amount, destination } = payload;
-
-    if (pubkey !== pubkeyB58) return { ok: false, reason: "Pubkey mismatch" };
-    if (destination !== CONFIG.PAYMENT_DESTINATION) return { ok: false, reason: "Wrong destination" };
-
-    // Atomic consume: validates nonce existence, used flag, amount,
-    // hintedPubkey match, and escrow balance — and marks nonce used + debits
-    // escrow — all in one server-side operation (Redis Lua, or single
-    // synchronous JS tick for in-memory). This is what closes the
-    // double-spend race where two concurrent requests with the same signed
-    // nonce could both observe used:false before either marks it true.
-    const consume = await store.consumeNonceAndDebit(nonce, pubkeyB58, amount);
-    if (!consume.ok) {
-      // Map machine reason codes to friendlier messages for response/logs.
-      const friendly = {
-        nonce_not_found: "Unknown or expired nonce",
-        nonce_already_used: "Nonce already used (replay detected)",
-        nonce_expired: "Nonce expired",
-        insufficient_payment: `Insufficient payment for nonce`,
-        pubkey_hint_mismatch: "Signer pubkey does not match the hinted pubkey for this challenge",
-        insufficient_balance: `Insufficient escrow balance: ${consume.balance} < ${amount}`,
-      };
-      return { ok: false, reason: friendly[consume.reason] || consume.reason };
-    }
-
-    // Credit reputation so subsequent challenges for this pubkey are cheaper.
-    // Done after the atomic consume — if recordPayment fails, the debit
-    // already happened (acceptable: rep is best-effort metadata, debit is the
-    // money-critical op).
-    await recordPayment(pubkeyB58, amount);
-
-    const score = await getTrustScore(pubkeyB58);
-    return { ok: true, pubkey: pubkeyB58, amount, nonce, score };
+    signature = bs58.decode(parts[0]);
+    pubkeyBytes = bs58.decode(parts[1]);
   } catch (err) {
-    return { ok: false, reason: `Verification error: ${err.message}` };
+    return { ok: false, reason: `bad_base58_credential: ${err.message}` };
   }
+
+  // Ed25519 verify — authenticates the entire messageBytes, after which
+  // payload.pubkey/amount/destination become trustworthy.
+  const valid = nacl.sign.detached.verify(messageBytes, signature, pubkeyBytes);
+  if (!valid) return { ok: false, reason: "Invalid signature" };
+
+  const { pubkey, amount, destination } = payload;
+  const pubkeyB58 = parts[1];
+  if (pubkey !== pubkeyB58) return { ok: false, reason: "Pubkey mismatch" };
+  if (destination !== CONFIG.PAYMENT_DESTINATION) return { ok: false, reason: "Wrong destination" };
+
+  const consume = await store.consumeNonceAndDebit(nonce, pubkeyB58, amount);
+  if (!consume.ok) {
+    const friendly = {
+      nonce_not_found: "Unknown or expired nonce",
+      nonce_already_used: "Nonce already used (replay detected)",
+      nonce_expired: "Nonce expired",
+      insufficient_payment: `Insufficient payment for nonce`,
+      pubkey_hint_mismatch: "Signer pubkey does not match the hinted pubkey for this challenge",
+      insufficient_balance: `Insufficient escrow balance: ${consume.balance} < ${amount}`,
+    };
+    return { ok: false, reason: friendly[consume.reason] || consume.reason };
+  }
+  await recordPayment(pubkeyB58, amount);
+  const score = await getTrustScore(pubkeyB58);
+  return { ok: true, pubkey: pubkeyB58, amount, nonce, score };
 }
 
 // ─── Middleware principal: x402 Rate Limiter + Challenger ─────────────────────

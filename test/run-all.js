@@ -28,6 +28,8 @@ const FILES = [
   "test/store-misc.test.js",
   "test/headers-and-reqid.test.js",
   "test/no-console-residue.test.js",
+  // Phase 2 additions
+  "test/cheap-reject.test.js",
 ];
 
 let failed = 0;
