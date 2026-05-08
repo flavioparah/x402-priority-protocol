@@ -132,6 +132,29 @@ The Shield's `verifyDepositTx()` calls `getParsedTransaction` on the upstream RP
 
 When running stress tests against mainnet, **keep `PARALLEL=1`** in `spawn-agents.js`. Sequential is slow (~30s per agent for 2 confirmations) but reliable. Parallel >3 hits 429s frequently even with retries.
 
+## Edge middlewares (Phase 1)
+
+Once Phase 1 is deployed, Traefik enforces 4 middlewares **before** any
+request reaches Node:
+
+- `x402-ratelimit` — 30 req/s sustained, burst 60, per-IP
+- `x402-inflight` — 200 concurrent connections (cumulative across devnet+mainnet)
+- `x402-bodylimit` — 64KB max request body
+- `x402-headers` — HSTS / no-sniff / referrer policy / strip Server fingerprint
+
+Full operational guide: [`docs/EDGE-MIDDLEWARE-RUNBOOK.md`](EDGE-MIDDLEWARE-RUNBOOK.md).
+
+Quick post-deploy sanity from a client machine:
+
+```bash
+SHIELD_URL=https://devnet.rpcpriority.com bash tools/edge-smoke/test-security-headers.sh
+SHIELD_URL=https://devnet.rpcpriority.com bash tools/edge-smoke/test-bodylimit.sh
+SHIELD_URL=https://devnet.rpcpriority.com bash tools/edge-smoke/test-ratelimit.sh
+```
+
+All three must exit 0. The `test-inflight.sh` smoke is heavier and runs
+once at hour 0 / 12 / 24 of the soak window per the runbook.
+
 ## Smoke test from a client machine
 
 ```bash
