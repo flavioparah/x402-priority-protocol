@@ -34,6 +34,7 @@ Combinado, um agente malicioso enviando 50k requisições — em 3 padrões real
 5. Definir um **Código de Conduta dos Agentes** explícito, máquina-legível, que SDKs e operadores referenciam.
 6. Disponibilizar enforcement para **operador-agente** via `/admin/*` com auditoria.
 7. Auditoria OWASP completa: security headers, CORS escopado, body limits, supply chain, secrets review.
+8. Preservar o posicionamento correto: Shield é uma camada plugável de defesa/enforcement/monetização para RPCs existentes, não um substituto de RPC provider nem um agregador estilo Ankr.
 
 ### Não-objetivos (follow-up)
 
@@ -41,6 +42,8 @@ Combinado, um agente malicioso enviando 50k requisições — em 3 padrões real
 - mTLS para `/admin/*` (API key bearer é suficiente pra MVP; mTLS quando volume operador escalar).
 - Audit log imutável remoto (S3 WORM, syslog externo) — logs locais bastam pro MVP.
 - Cooperação cross-operator no broker (já planejada em RFC separada; este spec é single-operator).
+- Operar uma rede RPC própria como narrativa principal.
+- Construir marketplace/agregador de RPCs nesta versão. Ankr já valida esse mercado; este spec foca no middleware que um operador/agregador pode plugar.
 
 ## 3. Restrições de design
 

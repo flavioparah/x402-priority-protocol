@@ -1,7 +1,7 @@
 # Tese e pitch — RPC Priority Protocol
 
 ## Em uma frase
-Cobramos pelo pico, não pelo plano. Per-request priority pra Solana RPC, com Trust-Score recompensando cliente fiel — feito pra agentes que vão multiplicar tráfego 100× nos próximos 12-24 meses.
+Camada plugável para RPCs Solana existentes: cobramos pelo pico, não pelo plano. Per-request priority com Trust-Score recompensando cliente fiel — feito pra agentes que vão multiplicar tráfego 100× nos próximos 12-24 meses.
 
 ## O problema (versão correta — agêntica, não anti-spam)
 Solana mainnet hoje aguenta 60-80k TPS. Congestionamento severo NÃO é dor real pra usuário humano. **A dor está no futuro agêntico:**
@@ -13,10 +13,10 @@ Solana mainnet hoje aguenta 60-80k TPS. Congestionamento severo NÃO é dor real
   - Agente escala horizontalmente — N réplicas paralelas
   - Agente precisa pagar por uso, não por subscription
 
-Hoje não existe primitiva nativa de prioridade pra essa camada agêntica. **Nós somos.**
+Hoje não existe primitiva nativa de prioridade pra essa camada agêntica que seja plugável em qualquer operador RPC. **Nós somos essa camada, não um substituto do RPC.**
 
 ## A solução
-Camada de prioridade paga em SOL via padrão x402 (HTTP 402 Payment Required, Coinbase). Funciona em 5 passos:
+Camada de prioridade paga em SOL via padrão x402 (HTTP 402 Payment Required, Coinbase). Entra como proxy reverso na frente da infraestrutura RPC existente. Funciona em 5 passos:
 
 1. Cliente faz POST em `/rpc` com body JSON-RPC normal
 2. Sob carga, gateway retorna `HTTP 402` com nonce + amount + destination
@@ -25,6 +25,12 @@ Camada de prioridade paga em SOL via padrão x402 (HTTP 402 Payment Required, Co
 5. Gateway verifica, debita escrow off-chain, encaminha pro RPC, devolve resposta
 
 **Resultado**: cliente nunca bloqueado por IP, paga só quando congestiona, identidade criptográfica zero-friction.
+
+## Posicionamento contra comparáveis
+
+- **Ankr**: valida RPC provider/agregador. Não somos outro agregador; somos middleware de enforcement/monetização que um operador ou agregador poderia adotar.
+- **x402.vip**: valida x402 aplicado a RPC. Nosso diferencial precisa ser operador-grade: escrow verificado, anti-replay, Redis state, QoS, Trust-Score, anti-flood e audit log.
+- **Frase canônica**: "One push away from any Solana RPC because this is not a new RPC network; it is a drop-in x402 enforcement layer for existing RPC operators."
 
 ## Quem ganha o quê
 

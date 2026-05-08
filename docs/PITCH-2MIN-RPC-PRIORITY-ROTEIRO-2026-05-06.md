@@ -9,7 +9,7 @@ Tempo alvo: **120 segundos cravados**. Deck com 6 slides reais: capa + 5 slides 
 ## Slide 1 — Capa (0:00-0:08)
 
 Somos o **RPC Priority Protocol**: crypto priority and trust infra for the agentic era.  
-Criamos uma camada neutra de prioridade em x402 antes dos nós RPC da Solana.
+Criamos uma camada neutra de prioridade em x402 para plugar antes dos nós RPC existentes da Solana.
 
 ## Slide 2 — Problema (0:08-0:31)
 
@@ -25,7 +25,7 @@ O x402 ainda está no começo: em requests, a penetração atual contra a escala
 
 ## Slide 4 — Solução (0:52-1:22)
 
-A nossa solução fica antes do nó RPC.  
+A nossa solução fica antes do nó RPC que o operador já roda.
 O agente recebe um desafio x402, assina com sua chave, paga quando há congestionamento e entra na fila de prioridade.  
 O Shield verifica pagamento, aplica Trust-Score e envia tráfego limpo para o operador.  
 A pepita de ouro é esta: **não estamos criando só um proxy; estamos criando uma camada neutra de reputação para prioridade na rede Solana.** Sem reputação neutra, prioridade vira só mais uma API key privada. Com a nossa camada, o agente prova histórico econômico, não IP.

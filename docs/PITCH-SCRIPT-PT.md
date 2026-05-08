@@ -32,7 +32,7 @@
 
 > *(Trocar contato visual entre os juízes/consultor enquanto fala os nomes.)*
 
-**"Em cinco minutos vou te mostrar como a gente está transformando o spam que sobrecarrega a rede Solana em receita pro operador de nó e em acesso prioritário pro agente que paga."**
+**"Em cinco minutos vou te mostrar uma camada plugável para RPCs Solana existentes: ela transforma o spam que sobrecarrega a rede em receita pro operador de nó e em acesso prioritário pro agente que paga."**
 
 > *(Pausa de 1 segundo. Avançar pro slide 2.)*
 
@@ -74,7 +74,7 @@
 
 > *(Pausa. Deixar a frase pousar.)*
 
-**"E faz isso usando um padrão aberto da Coinbase, chamado x402. Pensa no x402 como o **HTTPS do pagamento HTTP** — não é nosso, qualquer um pode usar."**
+**"E faz isso sem substituir o RPC. A gente entra como um proxy reverso na frente da infraestrutura que o operador já roda. Usamos um padrão aberto da Coinbase, chamado x402. Pensa no x402 como o **HTTPS do pagamento HTTP** — não é nosso, qualquer um pode usar."**
 
 **"Funciona em três batidas:"**
 
@@ -84,13 +84,14 @@
 
 **"Segundo: preço que respira com a demanda. Quando o nó está folgado, passa de graça. Quando lota, cobra de quem quer prioridade. Não é bloqueio binário."**
 
-**"Terceiro — e essa é a virada de chave: defesa que paga a conta. Quem quer atacar, paga. **A defesa contra spam vira a maior fonte de receita do operador.**"
+**"Terceiro — e essa é a virada de chave: defesa que paga a conta. Quem quer atacar, paga. A defesa contra spam vira receita para o operador."**
 
 > *(Olhar pra o consultor. Ênfase máxima nessa última frase.)*
 
 **Notas pro apresentador:**
 - Se for um investidor com background cripto, pode mencionar "é um EIP-1559 aplicado à camada de RPC, em vez de blockspace". Isso conecta na hora.
 - Se for leigo, NÃO falar EIP-1559. Manter analogia da rodovia.
+- Se alguém citar Ankr ou x402.vip, responder: "Ankr valida RPC routing; x402.vip valida x402 para RPC. Nosso produto não é outro RPC nem agregador: é a camada de enforcement, QoS, Trust-Score e anti-flood para o operador."
 
 ---
 
@@ -102,7 +103,7 @@
 
 > *(Apontar pra coluna da esquerda.)*
 
-**"Operador de nó: spam que era prejuízo agora vira receita recorrente. Cliente fiel ganha desconto automático — chamamos de Trust-Score, e isso é exatamente nosso moat, vou voltar nele em um minuto. Tudo isso com cinco minutos de deploy. É um proxy reverso, não exige reescrever o nó."**
+**"Operador de nó: spam que era prejuízo agora vira receita recorrente. Cliente fiel ganha desconto automático — chamamos de Trust-Score, e isso é exatamente nosso moat, vou voltar nele em um minuto. Tudo isso com deploy plugável. É um proxy reverso, não exige reescrever o nó e não troca o provedor RPC."**
 
 > *(Apontar pra coluna da direita.)*
 
@@ -171,7 +172,7 @@ curl -X POST https://x402-mainnet.rpcpriority.com/rpc \
 
 **"Segunda: a Solana está vivendo um boom de agentes IA. Bots de arbitragem, liquidadores, MCP servers, DeFi automatizada — todo mundo multiplicando o tráfego de RPC. O Helius sozinho reporta tráfego na casa de bilhões de requisições por mês."**
 
-**"Terceira: dois concorrentes recentes do Colosseum, MCPay e Latinum, ganharam categorias com prêmios de vinte e cinco mil dólares cada. **Eles cobram pela aplicação. A gente cobra pelo acesso à rede.** Camada diferente, raio de impacto incomparavelmente maior — toda aplicação Solana, não só as que expõem MCP."**
+**"Terceira: dois concorrentes recentes do Colosseum, MCPay e Latinum, ganharam categorias com prêmios de vinte e cinco mil dólares cada. Eles cobram pela aplicação. A gente aplica prioridade, pagamento e enforcement no acesso ao RPC existente. Camada diferente, raio de impacto incomparavelmente maior — toda aplicação Solana, não só as que expõem MCP."**
 
 > *(Pausa.)*
 

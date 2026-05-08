@@ -53,7 +53,7 @@ Então o bloqueio derruba o cliente legítimo junto — e ainda não ganha nada 
 
 > *(Pausa de 1s. Deixar pousar.)*
 
-**"Instalamos um proxy reverso na frente do nó.
+**"Não substituímos o RPC. Instalamos um proxy reverso na frente do nó que o operador já roda.
 Carga baixa — a requisição passa de graça.
 Carga alta — o sistema dispara um desafio de pagamento automático,
 o agente que quer prioridade paga em SOL, sem cadastro, sem contrato,
@@ -115,7 +115,7 @@ Se não funcionar, não paga."**
 ### Se a plateia não é técnica (investidor leigo, não-dev)
 Substitua os blocos de código pela fala:
 
-> *"Para o operador: clona o repositório, configura três variáveis — carteira, URL do nó e threshold de carga — e sobe com Docker. Meia hora. Para o desenvolvedor: uma linha de código troca a conexão normal pelo Shield. É tudo."*
+> *"Para o operador: clona o repositório, configura três variáveis — carteira, URL do nó e threshold de carga — e sobe com Docker na frente do RPC existente. Meia hora. Para o desenvolvedor: uma linha de código troca a conexão normal pelo Shield. É tudo."*
 
 ### Timing discipline
 

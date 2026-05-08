@@ -227,11 +227,22 @@ Evitar fazer do pitch principal:
 - "wallet para humanos";
 - "protocolo genérico x402";
 - "empresa de RPC full-stack";
+- "substituto de RPCs existentes";
+- "agregador RPC no estilo Ankr" como narrativa inicial;
 - "universal AI passport" antes de provar o Tier 1.
 
 Essas narrativas diluem a tese. A versão mais forte é:
 
-> RPC é o ponto obrigatório para agentes falarem com Solana. Agentes multiplicam chamadas automáticas. API key, IP rate limit e planos fixos quebram para esse perfil. O RPC Priority Protocol cria um mercado nativo de prioridade por requisição, pago via x402, com reputação criptográfica por agente.
+> RPC é o ponto obrigatório para agentes falarem com Solana. Agentes multiplicam chamadas automáticas. API key, IP rate limit e planos fixos quebram para esse perfil. O RPC Priority Protocol é uma camada plugável para RPCs existentes: cria prioridade por requisição, paga via x402, com reputação criptográfica por agente e enforcement para o operador.
+
+### 5.4 Validação competitiva pós-consultor
+
+O feedback do consultor corrige o enquadramento: o produto deve ser posicionado como mecanismo para RPCs, não como substituto deles.
+
+- **Ankr** já valida a categoria de RPC provider/agregador há anos. Isso não invalida o projeto; define a fronteira. Não competir como agregador. Vender como camada de monetização, defesa e enforcement que operadores/agregadores podem adotar.
+- **x402.vip** valida que "x402 para RPC" está emergindo. A diferenciação não pode ser "tem x402"; precisa ser operador-grade: escrow verificado, anti-replay, Redis state, QoS, Trust-Score, anti-flood, audit log e integração com infraestrutura RPC existente.
+- **Public good:** specs abertas e referência implementável para operadores RPC. O valor para o ecossistema é aumentar resiliência e monetização de RPCs, não substituir operadores.
+- **Frase canônica:** "One push away from any Solana RPC because this is not a new RPC network; it is a drop-in x402 enforcement layer for existing RPC operators."
 
 ---
 
@@ -278,14 +289,14 @@ Essas narrativas diluem a tese. A versão mais forte é:
 
 | Categoria | O que temos hoje | O que oferecer agora para aumentar chance no hackathon | O que oferecer depois, mas hoje é caro/ousado |
 |---|---|---|---|
-| Produto core | Shield x402 para Solana RPC, escrow, nonce, assinatura Ed25519 | Demo "AI agent pays for priority RPC under load" com antes/depois claro | RPC marketplace global |
+| Produto core | Shield x402 plugável para Solana RPC existente, escrow, nonce, assinatura Ed25519 | Demo "AI agent pays for priority RPC under load" com antes/depois claro | RPC marketplace global somente após rede de operadores |
 | Infra operador | Proxy reverso, Redis, QoS, Docker/deploy docs | Hosted Shield: "instale em 5 min ou deixe conosco" | Multi-region HA enterprise com SLA contratual |
 | Pagamentos | Depósito on-chain verificado + débito off-chain por request | Receipts por request + export CSV/JSON para operador | Split on-chain auditado com programa Solana |
 | Prioridade | QoS standalone e cooperative | Mostrar fila priorizando requests pagos em dashboard live | Integração profunda com scheduler interno de Helius/Triton/Jito |
 | Trust/Reputação | Trust-Score por pubkey e detecção v1 | "Good agents pay less, abusive agents pay more" em linguagem simples | Cross-chain AI agent passport |
 | SDK/DevEx | SDK TypeScript | Exemplo mínimo: bot faz `getAccountInfo`, recebe 402, paga e continua | SDKs Python/Rust/Go + plugins MCP |
 | Narrativa | Docs fortes, mas muito técnicas | Pitch agentic-first: RPC como ponto obrigatório para agentes econômicos | Tese universal de trust layer para toda economia de agentes |
-| Mercado | Operadores RPC como ICP | ROI calculator: requests bloqueados viram receita | Marketplace/liquidity network entre operadores |
+| Mercado | Operadores RPC como ICP | ROI calculator: requests bloqueados viram receita | Marketplace/liquidity network entre operadores, não narrativa inicial |
 | Segurança | Atomic consume, anti-replay, Redis, detection tests | Destacar testes principais passando | Auditoria externa OtterSec/Zellic |
 | Comercial | Outreach docs e lista de operadores | Plano piloto 90 dias, zero fixo, rev-share simples | Contratos enterprise anuais e compliance global |
 
@@ -384,4 +395,3 @@ A recomendação é não adicionar features especulativas antes da submissão. O
 - Stellar Hacks: Agents summary: https://www.competehub.dev/en/competitions/dorahacksstellar-agents-x402-stripe-mpp
 - HackStellar winner reference: https://www.linkedin.com/posts/risein_hackstellar-hackathon-winners-activity-7401250445479972866-AclP
 - Solana x402 Hackathon winners reference: https://phemex.com/news/article/solana-x402-hackathon-announces-winners-in-micropayments-and-ai-41757
-

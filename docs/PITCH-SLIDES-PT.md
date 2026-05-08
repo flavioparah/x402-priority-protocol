@@ -10,7 +10,7 @@
 >
 > *"Não é um erro — é uma negociação econômica automatizada."*
 >
-> A camada de prioridade paga para a economia de agentes na Solana.
+> A camada plugável de prioridade paga para RPCs Solana existentes.
 
 **Time:** Flávio Furtado (CEO) · João Romeiro (CTO) · Felipe Cardoso (DPO)
 **Rodando vivo:** três deploys públicos com cert válido —
@@ -44,6 +44,8 @@ Código em `github.com/flavioparah/x402-priority-protocol`
 
 O trilho é o **x402** — padrão HTTP aberto da Coinbase, 2024-2025. A implementação é nossa.
 
+**Não substitui RPCs.** Entra como proxy reverso na frente do RPC que o operador já roda.
+
 ---
 
 ## Slide 4 — Quem ganha o quê
@@ -53,7 +55,7 @@ O trilho é o **x402** — padrão HTTP aberto da Coinbase, 2024-2025. A impleme
 | **Receita** | Spam vira receita recorrente | Paga só sob carga — folga é grátis |
 | **Operação** | Nada de caçar atacante manualmente | Troca de infra sem perder prioridade |
 | **Fidelidade** | Cliente fiel ganha desconto automático | Até 50% off via Trust-Score |
-| **Integração** | 5 min de deploy (proxy reverso) | Drop-in em `@solana/web3.js` |
+| **Integração** | Deploy plugável (proxy reverso, sem trocar o RPC) | Drop-in em `@solana/web3.js` |
 
 ---
 
@@ -87,7 +89,8 @@ X-X402-Trust-Score: 0
 
 - **x402 é novíssimo.** Coinbase publicou o padrão em 2024-25. Janela curta para quem chega primeiro.
 - **Solana vive boom de agentes IA.** MCP, DeFi automatizada, bots de arbitragem multiplicando o tráfego RPC. Helius sozinho reporta bilhões de requisições/mês.
-- **Concorrência está na camada de cima.** MCPay e Latinum — ambos vencedores recentes do Colosseum com prêmios de ~US$ 25k — cobram **pelo serviço** (camada de aplicação MCP). **Nós cobramos pelo acesso à rede** (camada de protocolo RPC). Raio de impacto incomparavelmente maior.
+- **Concorrência está na camada de cima.** MCPay e Latinum — ambos vencedores recentes do Colosseum com prêmios de ~US$ 25k — cobram **pelo serviço** (camada de aplicação MCP). Nós aplicamos prioridade e enforcement no acesso ao RPC existente. Raio de impacto incomparavelmente maior.
+- **Comparáveis validam a categoria.** Ankr prova que RPC routing/agregação é mercado real; x402.vip prova que x402 para RPC está emergindo. Nosso foco é operador-grade: QoS, Trust-Score, escrow, anti-flood e auditoria.
 
 **TAM:** se 1% das requisições RPC mensais virar prioridade paga a 1 lamport, estamos falando de milhões de dólares/ano circulando pela camada que intermedia.
 
@@ -113,7 +116,7 @@ X-X402-Trust-Score: 0
 
 - **Investidor:** rodada pré-seed de **US$ 150-300k** pra fechar 3 contratos com operadores parceiros nos próximos 90 dias.
 - **Operador parceiro:** 30 dias de piloto num nó de produção. Revenue share 70/30 a favor do operador, sem licença fixa.
-- **Colosseum:** considerar categoria de *Public Goods* — os 3 specs x402 que a gente autora viram infra pública do ecossistema Solana.
+- **Colosseum:** considerar categoria de *Public Goods* — os 3 specs x402 que a gente autora viram infra pública para operadores RPC do ecossistema Solana.
 
 **Contato:** `rpcpriority.com` · Flávio@rpcpriority.com
 

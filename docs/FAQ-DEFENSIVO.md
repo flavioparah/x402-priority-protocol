@@ -6,6 +6,22 @@
 
 ## A. Mercado, posicionamento e concorrência
 
+### A.0 Vocês estão tentando substituir RPCs como Ankr, Helius ou Triton?
+
+**Resposta curta:** não. Somos uma camada para eles.
+
+**Resposta longa:** o produto correto é um mecanismo plugável para RPCs existentes: um reverse proxy que adiciona pagamento x402, prioridade, Trust-Score, anti-flood, auditoria e enforcement. Ankr, Helius, Triton, Jito e operadores regionais são potenciais clientes ou parceiros. Se tentarmos virar outro RPC provider/agregador, entramos numa guerra de infraestrutura madura; se vendemos a camada, ficamos "one push away" de qualquer RPC Solana.
+
+---
+
+### A.0.1 E x402.vip? Eles já fazem algo parecido?
+
+**Resposta curta:** validam a categoria, mas não encerram a tese.
+
+**Resposta longa:** "RPC com x402" por si só não é moat suficiente. A diferenciação que precisamos defender é operador-grade: escrow verificado, anti-replay, Redis state, QoS standalone/cooperative, Trust-Score por pubkey, anti-flood, audit log e integração com a stack do operador. O pitch não deve ser "somos os únicos a cobrar RPC com x402"; deve ser "somos a camada segura de enforcement e monetização para operadores RPC".
+
+---
+
 ### A.1 Por que vocês e não Helius já constrói isso?
 
 **Resposta curta:** porque pra Helius isso canibaliza receita atual.

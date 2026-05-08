@@ -14,7 +14,7 @@ Format: one shared screen with a terminal on one side and the speaker video on t
 >
 > Spam is pure cost. It should be revenue."
 
-*[Cut to title card: **x402-shield** — HTTP 402 priority gate for Solana RPC.]*
+*[Cut to title card: **x402-shield** — HTTP 402 priority gate for existing Solana RPC operators.]*
 
 Goal of this segment: name the pain in 15 seconds, so the rest of the video is obviously useful.
 
@@ -24,7 +24,7 @@ Goal of this segment: name the pain in 15 seconds, so the rest of the video is o
 
 > "x402 is Coinbase's new HTTP payment status. We use it as a **protocol-level economic negotiation**. Not an error — a handshake.
 >
-> When our Shield sees load, it responds `402 Payment Required` with a signed challenge: destination wallet, price, nonce. The agent signs the payload with its Ed25519 key — the same key that pre-funded an escrow on the Shield — and retries. We verify the signature, debit the escrow, forward to the RPC.
+> We do not replace the RPC provider. The Shield sits in front of the operator's existing RPC. When it sees load, it responds `402 Payment Required` with a signed challenge: destination wallet, price, nonce. The agent signs the payload with its Ed25519 key — the same key that pre-funded an escrow on the Shield — and retries. We verify the signature, debit the escrow, forward to the RPC.
 >
 > No API keys. No IP whitelists. No on-chain confirmation wait. The whole handshake is sub-10 milliseconds."
 
@@ -98,7 +98,9 @@ Single slide. No terminal.
 
 > "MCPay and Latinum won prizes this cycle for payment layers above MCP — the application layer.
 >
-> We're one layer below. This is payment on the protocol itself, between the agent and the RPC node. Every MCP, every DeFi bot, every indexer talks to RPC. That's the blast radius.
+> We're one layer below. This is payment and enforcement between the agent and the existing RPC node. Every MCP, every DeFi bot, every indexer talks to RPC. That's the blast radius.
+>
+> Ankr proves RPC routing is a mature market. x402.vip proves x402 for RPC is emerging. Our wedge is operator-grade enforcement: escrow, anti-replay, QoS, Trust-Score, anti-flood, and auditability.
 >
 > The spec, the server, the SDK — all open-source. The Trust-Score backend stays ours. **Code is commodity, data is moat.**"
 
