@@ -76,6 +76,31 @@ services:
       - "traefik.http.routers.x402-shield-mainnet.tls.certresolver=leresolver"
       - "traefik.http.services.x402-shield-mainnet.loadbalancer.server.port=3000"
 
+      # ── x402-Shield edge middlewares (Phase 1 — Traefik) ─────────────────
+      # Same names as devnet — Traefik shares the middleware definition across
+      # containers. Inflight cap of 200 is therefore *cumulative* across the
+      # devnet+mainnet shield routers in this Traefik instance.
+
+      - "traefik.http.middlewares.x402-ratelimit.ratelimit.average=30"
+      - "traefik.http.middlewares.x402-ratelimit.ratelimit.period=1s"
+      - "traefik.http.middlewares.x402-ratelimit.ratelimit.burst=60"
+      - "traefik.http.middlewares.x402-ratelimit.ratelimit.sourcecriterion.ipstrategy.depth=1"
+
+      - "traefik.http.middlewares.x402-inflight.inflightreq.amount=200"
+
+      - "traefik.http.middlewares.x402-bodylimit.buffering.maxRequestBodyBytes=65536"
+      - "traefik.http.middlewares.x402-bodylimit.buffering.memRequestBodyBytes=16384"
+
+      - "traefik.http.middlewares.x402-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.x402-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.x402-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.x402-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.x402-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.x402-headers.headers.customResponseHeaders.Server="
+      - "traefik.http.middlewares.x402-headers.headers.customResponseHeaders.X-Powered-By="
+
+      - "traefik.http.routers.x402-shield-mainnet.middlewares=x402-ratelimit,x402-inflight,x402-bodylimit,x402-headers"
+
 networks:
   portainer_default:
     external: true
