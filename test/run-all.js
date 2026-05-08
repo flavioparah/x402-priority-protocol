@@ -33,6 +33,7 @@ const FILES = [
   "test/nonce-precheck-bounded.test.js",
   "test/ratelimit-3dim.test.js",
   "test/rpc-content-length.test.js",
+  "test/paid-lane.test.js",
 ];
 
 let failed = 0;

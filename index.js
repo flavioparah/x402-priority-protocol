@@ -879,7 +879,7 @@ app.get("/health", rl.meta, async (req, res) => {
 //
 // Trustless: the Shield never takes the client's word for the amount — only
 // for the signature, which the chain adjudicates.
-app.post("/escrow/deposit", rl.deposit, express.json(), async (req, res) => {
+app.post("/escrow/deposit", rl.deposit, express.json({ limit: '1kb' }), async (req, res) => {
   const { tx_signature } = req.body || {};
   if (!tx_signature) {
     return res.status(400).json({ error: "tx_signature (base58) required" });
@@ -904,7 +904,7 @@ app.post("/escrow/deposit", rl.deposit, express.json(), async (req, res) => {
 // Solana for every deposit is prohibitive. NEVER enable in production.
 if (CONFIG.TRUST_DEPOSITS) {
   logger.warn({ reason: "escrow_trusted_deposits_mounted", msg: "/escrow/deposit-trusted is exposed (demo/test only)" });
-  app.post("/escrow/deposit-trusted", rl.deposit, express.json(), async (req, res) => {
+  app.post("/escrow/deposit-trusted", rl.deposit, express.json({ limit: '1kb' }), async (req, res) => {
     const { pubkey, amount_micro_lamports } = req.body || {};
     if (!pubkey || !amount_micro_lamports) {
       return res.status(400).json({ error: "pubkey and amount_micro_lamports required" });
@@ -1122,6 +1122,23 @@ app.use(
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 const bootGuards = require("./lib/boot-guards");
+
+// Catch PayloadTooLargeError + parse errors from express.json across all routes.
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  if (err.type === "entity.too.large") {
+    return res.status(413).json({
+      error: "body_too_large",
+      code: 413,
+      limit: err.limit,
+      received: err.length,
+    });
+  }
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "invalid_json", code: 400 });
+  }
+  return next(err);
+});
 
 // Guard A: trusted-deposits + mainnet — hard exit before anything else.
 bootGuards.checkTrustedDepositsGuard(process.env);
