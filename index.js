@@ -82,6 +82,21 @@ const CONFIG = {
   QOS_QUEUE_TIMEOUT_MS: parseInt(process.env.QOS_QUEUE_TIMEOUT_MS || "10000"),
   QOS_BYPASS_THRESHOLD: parseFloat(process.env.QOS_BYPASS_THRESHOLD || "0.5"),
   QOS_MODE: process.env.QOS_MODE || "standalone",  // "standalone" | "cooperative" | "off"
+  // Phase 0 — boot guards & admin wiring (spec §10.8, §12)
+  NETWORK: process.env.NETWORK || "",
+  REDIS_REQUIRED:
+    typeof process.env.REDIS_REQUIRED === "string"
+      ? /^(true|1|yes)$/i.test(process.env.REDIS_REQUIRED)
+      : (() => {
+          const mn =
+            String(process.env.NETWORK || "").toLowerCase() === "mainnet" ||
+            (process.env.REAL_RPC_URL || "").includes("mainnet-beta");
+          return mn;
+        })(),
+  REDIS_REQUIRED_TIMEOUT_MS: parseInt(
+    process.env.TEST_REDIS_REQUIRED_TIMEOUT_MS || "30000",
+    10
+  ),
 };
 
 // ─── Estado em memória (substitua por Redis em produção) ──────────────────────
@@ -1025,17 +1040,90 @@ app.use(
   })
 );
 
-app.listen(CONFIG.PORT, () => {
-  console.log(`
-╔══════════════════════════════════════════════════════╗
-║              x402-Shield  v0.1.0  (MVP)              ║
-╠══════════════════════════════════════════════════════╣
-║  Listening  : http://localhost:${CONFIG.PORT}/rpc           ║
-║  Upstream   : ${CONFIG.REAL_RPC_URL.slice(0, 36).padEnd(36)} ║
-║  Destination: ${CONFIG.PAYMENT_DESTINATION.slice(0, 36).padEnd(36)} ║
-║  Threshold  : ${String(CONFIG.RPC_LOAD_THRESHOLD * 100).padEnd(36)}% ║
-╚══════════════════════════════════════════════════════╝
-  `);
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+
+const { logger } = require("./lib/logger");
+const bootGuards = require("./lib/boot-guards");
+
+// Guard A: trusted-deposits + mainnet — hard exit before anything else.
+bootGuards.checkTrustedDepositsGuard(process.env);
+
+// Admin keys parsed once at boot. Empty Map → /admin/* mounted as 503 stubs.
+const ADMIN_KEYS = bootGuards.parseAdminKeys(process.env);
+
+// Mount /admin/* fall-through stub BEFORE proxy mount so it can intercept
+// every /admin/* path when ADMIN_KEYS is empty. Concrete handlers (Phase 4)
+// will register their own routes if ADMIN_KEYS.size > 0.
+if (ADMIN_KEYS.size === 0) {
+  app.use("/admin", (req, res) => {
+    res.set("X-Admin-Status", "not_configured");
+    res.status(503).json({
+      error: "admin_not_configured",
+      code: 503,
+      message:
+        "ADMIN_KEYS_JSON is not set on this deployment; /admin/* is unavailable",
+    });
+  });
+  logger.warn({
+    reason: "admin_not_configured",
+    msg: "ADMIN_KEYS_JSON missing — /admin/* mounted as 503 stub",
+  });
+}
+
+if (
+  bootGuards.isMainnet(process.env) &&
+  process.env.RPC_LOAD_FORCE &&
+  process.env.RPC_LOAD_FORCE !== "0" &&
+  process.env.RPC_LOAD_FORCE !== ""
+) {
+  logger.warn({
+    reason: "rpc_load_force_mainnet",
+    value: process.env.RPC_LOAD_FORCE,
+    msg: "RPC_LOAD_FORCE is active in mainnet — every request will see synthetic load",
+  });
+}
+
+async function boot() {
+  if (CONFIG.REDIS_REQUIRED) {
+    try {
+      await bootGuards.waitForRedisOrFail(store, {
+        timeoutMs: CONFIG.REDIS_REQUIRED_TIMEOUT_MS,
+      });
+    } catch (e) {
+      logger.fatal({
+        reason: "boot_guard_redis_required",
+        timeout_ms: CONFIG.REDIS_REQUIRED_TIMEOUT_MS,
+        msg: "REDIS_REQUIRED=true and Redis unreachable — exiting",
+      });
+      setTimeout(() => process.exit(1), 50);
+      return;
+    }
+  } else if (process.env.REDIS_URL) {
+    const healthy = await store.isStoreHealthy();
+    if (!healthy) {
+      logger.warn({
+        reason: "redis_unhealthy_memory_fallback",
+        msg: "REDIS_URL set but Redis is unhealthy and REDIS_REQUIRED=false — running in memory-fallback mode",
+      });
+    }
+  }
+
+  const server = app.listen(CONFIG.PORT, () => {
+    logger.info({
+      reason: "boot_listening",
+      port: CONFIG.PORT,
+      upstream: CONFIG.REAL_RPC_URL,
+      store_backend: store.backend,
+      msg: "x402-shield listening",
+    });
+  });
+  return server;
+}
+
+let _server;
+boot().then((s) => { _server = s; }).catch((e) => {
+  logger.fatal({ reason: "boot_failure", error: e.message });
+  setTimeout(() => process.exit(1), 50);
 });
 
 module.exports = { app, verifyX402Authorization, issueNonce };
