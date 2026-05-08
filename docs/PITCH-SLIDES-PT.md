@@ -13,7 +13,12 @@
 > A camada de prioridade paga para a economia de agentes na Solana.
 
 **Time:** Flávio Furtado (CEO) · João Romeiro (CTO) · Felipe Cardoso (DPO)
-**Rodando vivo:** `https://x402.rpcpriority.com` — código em `github.com/flavioparah/x402-priority-protocol`
+**Rodando vivo:** três deploys públicos com cert válido —
+- `https://x402-mainnet.rpcpriority.com` (mainnet, depósitos verificados on-chain)
+- `https://x402-devnet.rpcpriority.com` (devnet, depósitos verificados on-chain)
+- `https://x402.rpcpriority.com` (demo de trust-score progressivo)
+
+Código em `github.com/flavioparah/x402-priority-protocol`
 
 ---
 
@@ -54,14 +59,19 @@ O trilho é o **x402** — padrão HTTP aberto da Coinbase, 2024-2025. A impleme
 
 ## Slide 5 — Prova de funcionamento
 
-**Não são projeções. São medições.**
+**Não são projeções. São medições. 9 semanas, do zero ao mainnet.**
 
 - **8,7 ms** de overhead do protocolo (p95). Meta do pitch era < 50 ms. **Batemos por 6×.**
-- **26% de economia média** em 22 requisições consecutivas, com o Trust-Score saindo de 0 → 100 de reputação. Demo pública reproduzível.
-- **HTTPS válido + cert Let's Encrypt** em `https://x402.rpcpriority.com`. Qualquer juiz, investidor ou operador pode auditar agora.
+- **26,1% de economia média** em 22 requisições consecutivas, com o Trust-Score saindo de 0 → 100. Demo pública reproduzível.
+- **43 de 43 testes passando** — detection signals, atomic Lua sob Redis, conformidade de spec cooperative QoS.
+- **3 deploys ao vivo** com cert Let's Encrypt válido:
+  - `x402-mainnet.rpcpriority.com` — **primeira implementação x402 em mainnet**
+  - `x402-devnet.rpcpriority.com` — devnet, depósitos verificados on-chain
+  - `x402.rpcpriority.com` — demo de trust-score progressivo
+- **3 RFCs abertos** que a gente autora: x402-priority, x402-trust-score, x402-qos-cooperative.
 
 ```
-curl -X POST https://x402.rpcpriority.com/rpc \
+curl -X POST https://x402-mainnet.rpcpriority.com/rpc \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'
 HTTP/1.1 402 Payment Required
@@ -81,6 +91,8 @@ X-X402-Trust-Score: 0
 
 **TAM:** se 1% das requisições RPC mensais virar prioridade paga a 1 lamport, estamos falando de milhões de dólares/ano circulando pela camada que intermedia.
 
+**Precedente comprovado:** EIP-1559 da Ethereum, que introduziu pagamento por prioridade em 2021, **já queimou mais de US$ 11 bilhões em base fee**. Mercado de prioridade não é hipótese — é realidade. A gente aplica o mesmo princípio um andar acima, na camada de RPC, em vez de blockspace.
+
 ---
 
 ## Slide 7 — Time e pedido
@@ -89,13 +101,19 @@ X-X402-Trust-Score: 0
 **João Romeiro** — CTO · arquitetura e engenharia
 **Felipe Cardoso** — DPO · blockchain e segurança
 
-> Construído para o Colosseum Frontier Hackathon (abril–maio 2026). MVP **shippado e público**. Semana 2 (Trust-Score) já **embarcada adiantada**. Semana 3 (open-source do spec + rede de parceiros operadores) em andamento.
+> Construído para o Colosseum Frontier Hackathon (abril–maio 2026). **9 semanas de execução, todo o roadmap inicial shippado:**
+> MVP · Trust-Score (26,1% economia medida) · 3 RFCs abertos · QoS dual-track · Redis multi-instance · atomic consume Lua · detection v1 (sybil/fraud/churn) · 3 deploys ao vivo · pacote de outreach pra 15 operadores tier 2/3.
+
+**Próximos 90 dias (gate comprimido pós-consultor):**
+- **M+1** — outreach intensivo + pitch video publicado
+- **M+2** — 2 pilotos fechados em revenue-share (sem fixed fee nos primeiros 90 dias)
+- **M+3** — gate: 3+ operadores integrados → segue Plano A com pré-seed; senão, ativa Plano B (operador próprio nicho)
 
 **O que pedimos:**
 
-- **Investidor:** conversar sobre rodada de pré-seed. O tamanho é função do piloto com o primeiro operador parceiro.
-- **Operador parceiro:** 30 dias de piloto num nó de produção. Split da receita a combinar.
-- **Colosseum:** considerar categoria de *Public Goods* — o spec x402 que a gente consolida vira infra pública do ecossistema Solana.
+- **Investidor:** rodada pré-seed de **US$ 150-300k** pra fechar 3 contratos com operadores parceiros nos próximos 90 dias.
+- **Operador parceiro:** 30 dias de piloto num nó de produção. Revenue share 70/30 a favor do operador, sem licença fixa.
+- **Colosseum:** considerar categoria de *Public Goods* — os 3 specs x402 que a gente autora viram infra pública do ecossistema Solana.
 
 **Contato:** `rpcpriority.com` · Flávio@rpcpriority.com
 

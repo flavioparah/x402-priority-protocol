@@ -120,7 +120,7 @@
 
 > *(Esse é o slide mais importante. Falar mais devagar. Olhar nos olhos do consultor.)*
 
-**"Tudo isso que falei até agora, **não é projeção. É medição.**"**
+**"Tudo isso que falei até agora, **não é projeção. É medição. Nove semanas de execução, do zero ao mainnet.**"**
 
 > *(Pausa.)*
 
@@ -130,25 +130,27 @@
 
 **"Esse é o overhead do nosso protocolo no percentil 95. A meta original do nosso pitch era **abaixo de cinquenta** milissegundos. Batemos por **seis vezes**."**
 
-**"Segundo número: vinte e seis por cento de economia média. Vinte e duas requisições consecutivas, score subindo de zero a cem, desconto aplicado automaticamente. Isso foi rodado em produção, contra o domínio público que vou mostrar agora."**
+**"Segundo número: vinte e seis vírgula um por cento de economia média. Vinte e duas requisições consecutivas, score subindo de zero a cem, desconto aplicado automaticamente. Isso foi rodado em produção contra um dos três deploys públicos."**
+
+**"Terceiro número: quarenta e três de quarenta e três testes passando. Detection signals — sybil, fraud, churn. Atomic Lua sob Redis pra anti-replay. Conformidade do spec cooperative QoS. Tudo verificável."**
 
 > *(Tirar o celular do bolso ou apontar pra tela com a aba já aberta.)*
 
-**"Vou rodar agora, ao vivo:"**
+**"E pra fechar — três deploys ao vivo, com certificado válido. Vou rodar contra o de mainnet, agora:"**
 
 ```bash
-curl -X POST https://x402.rpcpriority.com/rpc \
+curl -X POST https://x402-mainnet.rpcpriority.com/rpc \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'
 ```
 
 > *(Mostrar a resposta na tela.)*
 
-**"HTTP 402, payment required. Header X-X402-Amount com o preço em micro-lamports. Header X-X402-Trust-Score zero, porque essa chave nunca pagou. **Isso aqui está rodando agora, com certificado Let's Encrypt válido. Qualquer juiz, investidor ou operador testa em dez segundos.**"**
+**"HTTP 402, payment required. Header X-X402-Amount com o preço em micro-lamports. Header X-X402-Trust-Score zero, porque essa chave nunca pagou. **Isso é a primeira implementação de x402 em mainnet Solana. Qualquer juiz, investidor ou operador testa em dez segundos.**"**
 
 > *(Voltar pra audiência. Pausa de 2 segundos.)*
 
-**"O site `rpcpriority.com` é a vitrine. **Esse domínio aqui é o motor.** A diferença é que o motor a gente já tem rodando."**
+**"O site `rpcpriority.com` é a vitrine. **Esses três motores aqui já estão rodando.**"**
 
 **Notas pro apresentador:**
 - ENSAIAR o curl antes. Se a internet falhar, ter screenshot pronto.
@@ -185,17 +187,17 @@ curl -X POST https://x402.rpcpriority.com/rpc \
 
 > *(Slide com fotos ou nome dos três fundadores.)*
 
-**"Sou Flávio. Toco produto e go-to-market. João Romeiro é nosso CTO, construiu o MVP que vocês acabaram de ver rodar. Felipe Cardoso é DPO, cuida de privacidade, contratos B2B e governança do RFC aberto."**
+**"Sou Flávio. Toco produto e go-to-market. João Romeiro é nosso CTO, autor dos três RFCs abertos e arquiteto do que vocês acabaram de ver rodar. Felipe Cardoso é DPO, cuida de privacidade, contratos B2B e governança do RFC aberto."**
 
 > *(Pausa.)*
 
 **"O que a gente está pedindo:"**
 
-**"Se você é investidor anjo ou fundo: rodada de pré-seed entre cento e cinquenta e trezentos mil dólares pra fechar o primeiro contrato com operador parceiro nos próximos seis meses."**
+**"Se você é investidor anjo ou fundo: rodada de pré-seed entre cento e cinquenta e trezentos mil dólares pra fechar **três contratos** com operadores parceiros nos próximos noventa dias. Esse é o gate comprimido — saímos de seis meses pra três, depois de feedback do consultor."**
 
-**"Se você opera um nó de Solana: trinta dias de piloto. Sem licença fixa nos primeiros noventa dias. Você só paga se a gente fizer você ganhar."**
+**"Se você opera um nó de Solana: trinta dias de piloto. Revenue share setenta-trinta a favor do operador, sem licença fixa nos primeiros noventa dias. Você só paga se a gente fizer você ganhar."**
 
-**"Se você é juiz ou consultor do Colosseum: considere a categoria de Public Goods. O spec x402-priority que a gente está consolidando vira infraestrutura aberta de toda a Solana — não só vencedor isolado."**
+**"Se você é juiz ou consultor do Colosseum: considere a categoria de Public Goods. **Os três specs x402** — priority, trust-score e cooperative QoS — que a gente está autorando viram infraestrutura aberta de toda a Solana, não só vencedor isolado."**
 
 > *(Pausa. Olhar pra plateia. Sorrir.)*
 
@@ -258,11 +260,11 @@ curl -X POST https://x402.rpcpriority.com/rpc \
 
 Caso encontre alguém num corredor:
 
-> "RPC Priority Protocol. A gente faz o spam que sobrecarrega os nós RPC da Solana virar receita recorrente pro operador. Ao invés de bloquear por IP — que pune agente IA legítimo — a gente cobra micro-pagamento por requisição usando o padrão x402 da Coinbase. Cliente fiel ganha desconto automático: até 50% off via reputação. **Já está rodando em produção, com cert válido, em** `x402.rpcpriority.com` **— oito vírgula sete milissegundos de overhead, vinte e seis por cento de economia média medida.** Pré-seed aberta. Conversamos?"
+> "RPC Priority Protocol. A gente faz o spam que sobrecarrega os nós RPC da Solana virar receita recorrente pro operador. Ao invés de bloquear por IP — que pune agente IA legítimo — a gente cobra micro-pagamento por requisição usando o padrão x402 da Coinbase. Cliente fiel ganha desconto automático: até 50% off via reputação. **Nove semanas de código, três deploys ao vivo — incluindo a primeira implementação x402 em mainnet Solana — quarenta e três testes passando, oito vírgula sete milissegundos de overhead.** Pré-seed aberta. Conversamos?"
 
 **60 segundos cravados.** Decorar.
 
 ---
 
-**Última atualização:** 2026-04-25.
-**Próxima revisão:** após primeira apresentação ao consultor, com ajustes baseados no que funcionou e no que travou.
+**Última atualização:** 2026-04-26 (status pós-Sem-9: outreach package + 3 deploys + 43/43 testes + gate comprimido M+3).
+**Próxima revisão:** após primeira apresentação ao consultor com material atualizado, com ajustes baseados no que funcionou e no que travou.

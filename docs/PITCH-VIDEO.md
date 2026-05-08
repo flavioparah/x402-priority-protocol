@@ -84,19 +84,23 @@ Voiceover through the demo (João): narrate each step as the lines appear — do
 
 Single slide. No terminal.
 
-**Left side — the KPI:**
+**Left side — the KPIs (measured, not projected):**
 
-> "End-to-end benchmark, 100 samples: x402 handshake overhead **8.3 ms p95**.
+> "End-to-end benchmark: x402 handshake overhead **8.7 ms p95**.
 >
-> Our target was under 50. We're at one-sixth."
+> Our target was under 50. We're at one-sixth.
+>
+> **43 of 43 tests passing.** Detection signals, atomic Redis Lua, cooperative QoS spec compliance.
+>
+> **Three live deployments**: mainnet, devnet, and a trusted demo — all on rpcpriority.com, with valid Let's Encrypt certs."
 
 **Right side — the positioning:**
 
 > "MCPay and Latinum won prizes this cycle for payment layers above MCP — the application layer.
 >
-> We're one layer below. This is payment on the protocol itself, between the agent and the RPC node. Every MCP, every DeFi bot, every indexer talks to RPC. That's the blast radius."
-
-*Optional one-line ping: "and yes, we ship open-source. Week 3."*
+> We're one layer below. This is payment on the protocol itself, between the agent and the RPC node. Every MCP, every DeFi bot, every indexer talks to RPC. That's the blast radius.
+>
+> The spec, the server, the SDK — all open-source. The Trust-Score backend stays ours. **Code is commodity, data is moat.**"
 
 ---
 
@@ -108,15 +112,15 @@ Team card on screen:
 - João Romeiro — CTO
 - Felipe Cardoso — DPO
 
-> "Three-week plan:
+> "Nine weeks in, here's where we are:
 >
-> **Week 1** — working MVP. You just saw it.
+> **Shipped** — MVP, Trust-Score with 26% measured savings, three open RFCs (priority, trust-score, cooperative QoS), Redis-backed multi-instance ready, sybil and fraud detection signals, and three live deployments.
 >
-> **Week 2** — Trust Score. Recurring agents with clean history pay progressively less. Reputation as Sybil defense without breaking pseudonymity.
+> **Next 90 days** — pilots with two operators on revenue-share. Three integrated by month three. That's the gate where Plan A turns into Series-Pre.
 >
-> **Week 3** — Open-source protocol spec plus a network of RPC operator partners. We're targeting Helius, Triton, and Jito — operators who already monetize priority and for whom this is a drop-in revenue layer.
+> **The ask** — Colosseum judges, please consider Public Goods category: the x402-priority spec is open infra for the whole Solana ecosystem. RPC operators, talk to us about a 30-day pilot. Investors, pre-seed of US$ 150-300k closes the first three contracts.
 >
-> We're building the economic layer of Solana's agent economy. Thank you."
+> We're building the trust layer for AI agents on Solana. Thank you."
 
 ---
 
@@ -138,7 +142,16 @@ Team card on screen:
 | Hook | 0:20 | Flávio | Title card |
 | Idea | 0:30 | João | Protocol diagram, 3 frames |
 | Demo | 1:10 | João | 2 terminals, live run |
-| Numbers + positioning | 0:30 | João | KPI + MCPay/Latinum comparison slide |
-| Team + roadmap + ask | 0:30 | Flávio | Team card + 3-week roadmap |
+| Numbers + positioning | 0:30 | João | KPIs (8.7 ms / 43-of-43 / 3 deploys) + MCPay/Latinum comparison |
+| Team + 90-day roadmap + ask | 0:30 | Flávio | Team card + Sem-9 shipped list + M+3 gate |
 
 Total: 3:00.
+
+---
+
+## What changed since v1 (2026-04-26)
+
+- **8.3 ms → 8.7 ms** p95 (corrected after second round of benchmarking with `RPC_LOAD_FORCE`)
+- **Roadmap reframed** — it's no longer a 3-week plan. We're at week 9, with the full backlog (MVP, Trust-Score, 3 RFCs, QoS dual-track, Redis persistence, atomic Lua consume, detection v1, outreach package) shipped.
+- **Ask reshaped** — gate moved from M+6 to M+3 (post-consultor). 90-day target is 3 operators integrated.
+- **Open-source posture clarified** — spec/server/SDK are open; Trust-Score backend stays closed (code is commodity, data is moat).
