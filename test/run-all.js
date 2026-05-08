@@ -27,6 +27,7 @@ const FILES = [
   "test/graceful-shutdown.test.js",
   "test/store-misc.test.js",
   "test/headers-and-reqid.test.js",
+  "test/no-console-residue.test.js",
 ];
 
 let failed = 0;

@@ -14,6 +14,7 @@ const nacl = require("tweetnacl");
 const bs58 = require("bs58");
 const crypto = require("crypto");
 const { Connection, PublicKey, SystemProgram } = require("@solana/web3.js");
+const { logger, sampledWarn } = require("./lib/logger");
 
 // ─── Configuração ────────────────────────────────────────────────────────────
 
@@ -502,9 +503,7 @@ if (CONFIG.QOS_MODE === "cooperative") {
         qosCoopHealthConsecutiveSuccesses >= QOS_HEALTH_REPROBE_REQUIRED &&
         qosOverloadFallbackUntil > Date.now()
       ) {
-        console.log(
-          `[qos] cooperative re-probe: ${QOS_HEALTH_REPROBE_REQUIRED} consecutive OK — ending fallback early`
-        );
+        logger.info({ reason: "qos_coop_reprobe_recovered", consecutive_successes: QOS_HEALTH_REPROBE_REQUIRED });
         qosOverloadFallbackUntil = 0;
       }
     } else {
@@ -516,9 +515,7 @@ if (CONFIG.QOS_MODE === "cooperative") {
         const newUntil = Date.now() + QOS_HEALTH_INTERVAL_MS * 2;
         if (newUntil > qosOverloadFallbackUntil) {
           qosOverloadFallbackUntil = newUntil;
-          console.warn(
-            `[qos] cooperative operator unreachable for >${QOS_HEALTH_UNREACHABLE_MS / 1000}s (${qosCoopHealthLastError}) — forcing fallback`
-          );
+          logger.warn({ reason: "qos_coop_unreachable_force_fallback", unreachable_threshold_ms: QOS_HEALTH_UNREACHABLE_MS, last_error: qosCoopHealthLastError });
         }
       }
     }
@@ -533,7 +530,7 @@ setInterval(() => {
     ts: Date.now(),
     load: parseFloat(getRpcLoad().toFixed(3)),
     rps: parseFloat((requestTimestamps.length / (CONFIG.LOAD_WINDOW_MS / 1000)).toFixed(2)),
-  }).catch((e) => console.error("[stats] pushLoadSample failed:", e.message));
+  }).catch((e) => logger.error({ reason: "stats_load_sample_failed", error: e.message }));
 }, 60_000);
 
 // ─── Verificação de assinatura (MVP off-chain) ────────────────────────────────
@@ -618,12 +615,12 @@ async function x402Shield(req, res, next) {
   if (authHeader) {
     const result = await verifyX402Authorization(authHeader);
     if (result.ok) {
-      console.log(`[x402] ✓ Payment accepted from ${result.pubkey} (${result.amount} µL, nonce: ${result.nonce}, trust=${result.score})`);
+      logger.info({ reason: "x402_payment_accepted", pubkey: result.pubkey, amount: result.amount, nonce: result.nonce, trust: result.score, req_id: req.id });
       req.x402Verified = result;
       return next();
     }
     // Prova inválida — retorna 402 com novo desafio
-    console.warn(`[x402] ✗ Invalid proof from ${ip}: ${result.reason}`);
+    sampledWarn("x402_invalid_proof", { ip, error: result.reason, req_id: req.id });
   }
 
   // Trust-Score discount: if the agent hints its pubkey (X-x402-Agent-Pubkey),
@@ -645,7 +642,7 @@ async function x402Shield(req, res, next) {
     load: parseFloat(load.toFixed(3)),
   });
 
-  console.log(`[x402] ⚡ Challenging ${ip} — load: ${(load * 100).toFixed(1)}%, base: ${basePrice} µL, trust: ${trustScore}, final: ${amount} µL`);
+  logger.info({ reason: "x402_challenge_issued", ip, load: parseFloat(load.toFixed(3)), base_price: basePrice, trust_score: trustScore, final_price: amount, req_id: req.id });
 
   res.status(402).set({
     "X-x402-Status": "challenged",
@@ -848,7 +845,7 @@ app.post("/escrow/deposit", express.json(), async (req, res) => {
   if (!result.ok) {
     return res.status(400).json({ error: result.reason });
   }
-  console.log(`[escrow] ✓ Verified deposit from ${result.pubkey}: ${result.lamports} lamports = ${result.micro_lamports} µL (sig=${result.signature.slice(0, 12)}…, slot=${result.slot})`);
+  logger.info({ reason: "escrow_deposit_verified", pubkey: result.pubkey, lamports: result.lamports, micro_lamports: result.micro_lamports, sig_prefix: result.signature.slice(0, 12), slot: result.slot, req_id: req.id });
   return res.json({
     pubkey: result.pubkey,
     credited_micro_lamports: result.micro_lamports,
@@ -863,7 +860,7 @@ app.post("/escrow/deposit", express.json(), async (req, res) => {
 // benchmarks, and the Trust-Score progression demo where a round trip to
 // Solana for every deposit is prohibitive. NEVER enable in production.
 if (CONFIG.TRUST_DEPOSITS) {
-  console.warn("[escrow] ⚠️  ESCROW_TRUST_DEPOSITS=1 — /escrow/deposit-trusted mounted. Demo/test only.");
+  logger.warn({ reason: "escrow_trusted_deposits_mounted", msg: "/escrow/deposit-trusted is exposed (demo/test only)" });
   app.post("/escrow/deposit-trusted", express.json(), async (req, res) => {
     const { pubkey, amount_micro_lamports } = req.body || {};
     if (!pubkey || !amount_micro_lamports) {
@@ -1065,9 +1062,7 @@ app.use(
       // upstream stack and trigger 30s fallback to standalone queueing.
       if (CONFIG.QOS_MODE === "cooperative" && proxyRes.headers["x-qos-overload"] === "1") {
         qosOverloadFallbackUntil = Date.now() + 30_000;
-        console.warn(
-          `[qos] cooperative operator returned X-QoS-Overload:1 — falling back to standalone queue for 30s`
-        );
+        logger.warn({ reason: "qos_coop_overload_fallback", duration_ms: 30_000 });
       }
     },
     onError: (err, req, res) => {
@@ -1080,7 +1075,6 @@ app.use(
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
-const { logger } = require("./lib/logger");
 const bootGuards = require("./lib/boot-guards");
 
 // Guard A: trusted-deposits + mainnet — hard exit before anything else.
