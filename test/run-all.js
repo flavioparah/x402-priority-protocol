@@ -26,6 +26,7 @@ const FILES = [
   "test/boot-guards.test.js",
   "test/graceful-shutdown.test.js",
   "test/store-misc.test.js",
+  "test/headers-and-reqid.test.js",
 ];
 
 let failed = 0;

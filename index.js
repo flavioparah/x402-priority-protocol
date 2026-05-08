@@ -685,6 +685,44 @@ async function x402Shield(req, res, next) {
 
 const app = express();
 
+const helmet = require("helmet");
+const cryptoMod = require("crypto");
+
+// Per spec §10.1
+app.set("trust proxy", 1);
+app.disable("etag");
+app.disable("x-powered-by");
+app.set("query parser", "simple");
+
+app.use(helmet({
+  hsts: { maxAge: 31_536_000, includeSubDomains: true, preload: false },
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      "script-src":  ["'self'", "'unsafe-inline'"],
+      "style-src":   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      "font-src":    ["'self'", "https://fonts.gstatic.com"],
+      "img-src":     ["'self'", "data:", "https:"],
+      "connect-src": ["'self'"],
+      "frame-ancestors": ["'none'"],
+    },
+  },
+  frameguard: { action: "deny" },
+  noSniff: true,
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+
+// Correlation ID — server always generates its own; client-supplied id ignored.
+app.use((req, res, next) => {
+  req.id = cryptoMod.randomBytes(4).toString("hex");
+  res.setHeader("X-Request-ID", req.id);
+  next();
+});
+
 // CORS middleware — must come BEFORE all routes so preflight OPTIONS resolves
 // without falling into the /rpc proxy.
 app.use((req, res, next) => {
