@@ -16,6 +16,7 @@ const crypto = require("crypto");
 const { Connection, PublicKey, SystemProgram } = require("@solana/web3.js");
 const { logger, sampledWarn } = require("./lib/logger");
 const preflight = require("./lib/preflight");
+const { createRateLimitMiddleware } = require("./lib/ratelimit");
 
 // ─── Configuração ────────────────────────────────────────────────────────────
 
@@ -28,6 +29,10 @@ const CONFIG = {
   RPC_LOAD_THRESHOLD: parseFloat(process.env.RPC_LOAD_THRESHOLD || "0.75"),
   REQUESTS_PER_IP_LIMIT: parseInt(process.env.REQUESTS_PER_IP_LIMIT || "100"),
   RATE_WINDOW_MS: parseInt(process.env.RATE_WINDOW_MS || "60000"),
+  RATE_IP_LIMIT: parseInt(process.env.RATE_IP_LIMIT || "100"),
+  RATE_PUBKEY_LIMIT: parseInt(process.env.RATE_PUBKEY_LIMIT || "200"),
+  RATE_PAID_PUBKEY_BASE: parseInt(process.env.RATE_PAID_PUBKEY_BASE || "200"),
+  RATE_GLOBAL_LIMIT: parseInt(process.env.RATE_GLOBAL_LIMIT || "5000"),
 
   // Preço dinâmico (micro-lamports) — escala com a carga
   // Defaults Cenário 20×: 20 lamports (BASE) → 1000 lamports (MAX saturado)
@@ -103,11 +108,6 @@ const CONFIG = {
 
 // Graceful shutdown state — flipped by SIGTERM/SIGINT (spec §10.5).
 let shuttingDown = false;
-
-// ─── Estado em memória (substitua por Redis em produção) ──────────────────────
-
-/** @type {Map<string, { count: number, resetAt: number }>} */
-const ipCounters = new Map();
 
 // ─── Persistence layer ────────────────────────────────────────────────────────
 // The four critical state pieces (escrow, nonces, reputation, deposit
@@ -446,18 +446,6 @@ async function recordPayment(pubkeyB58, amount) {
   });
 }
 
-/** Verifica se o IP excedeu o limite de requisições. */
-function isRateLimited(ip) {
-  const now = Date.now();
-  let counter = ipCounters.get(ip);
-  if (!counter || counter.resetAt < now) {
-    counter = { count: 0, resetAt: now + CONFIG.RATE_WINDOW_MS };
-    ipCounters.set(ip, counter);
-  }
-  counter.count++;
-  return counter.count > CONFIG.REQUESTS_PER_IP_LIMIT;
-}
-
 /**
  * Gera um nonce único e armazena os detalhes do desafio.
  * If a hinted pubkey was used to discount the price, bind the nonce to
@@ -602,7 +590,7 @@ async function x402Shield(req, res, next) {
   recordRequest();
   const ip = req.ip || req.socket.remoteAddress;
   const load = getRpcLoad();
-  const challenged = load > CONFIG.RPC_LOAD_THRESHOLD || isRateLimited(ip);
+  const challenged = load > CONFIG.RPC_LOAD_THRESHOLD;
 
   if (!challenged) return next();
 
@@ -799,8 +787,62 @@ function respondHtmlOrJson(req, res, data, title) {
 </html>`);
 }
 
+// ─── Rate-limit middleware (Phase 2, spec §6.3) ───────────────────────────────
+const rl = {
+  rpcEdge: createRateLimitMiddleware({
+    routeName: "rpc",
+    ip:     { keyPrefix: "rl:rpc:ip",     max: CONFIG.RATE_IP_LIMIT,     windowMs: CONFIG.RATE_WINDOW_MS },
+    global: { key:       "rl:global",     max: CONFIG.RATE_GLOBAL_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+  rpcAfterAuth: createRateLimitMiddleware({
+    routeName: "rpc",
+    pubkey: { keyPrefix: "rl:rpc:pk",     max: CONFIG.RATE_PUBKEY_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+    paid:   { keyPrefix: "rl:rpc:paid",   baseMax: CONFIG.RATE_PAID_PUBKEY_BASE, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+  deposit: createRateLimitMiddleware({
+    routeName: "deposit",
+    ip: { keyPrefix: "rl:deposit:ip", max: 5, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+  balance: createRateLimitMiddleware({
+    routeName: "balance",
+    ip: { keyPrefix: "rl:balance:ip", max: 60, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+  reputation: createRateLimitMiddleware({
+    routeName: "reputation",
+    ip: { keyPrefix: "rl:reputation:ip", max: 30, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+  stats: createRateLimitMiddleware({
+    routeName: "stats",
+    ip: { keyPrefix: "rl:stats:ip", max: 60, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+  meta: createRateLimitMiddleware({
+    routeName: "meta",
+    ip: { keyPrefix: "rl:meta:ip", max: parseInt(process.env.META_IP_LIMIT || "120", 10), windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+};
+
+// Test-only hooks (gated behind env flags)
+if (process.env.X402_TEST_GLOBAL_ON_META === "1") {
+  rl.meta = createRateLimitMiddleware({
+    routeName: "meta",
+    ip:     { keyPrefix: "rl:meta:ip", max: parseInt(process.env.META_IP_LIMIT || "120", 10), windowMs: CONFIG.RATE_WINDOW_MS },
+    global: { key:       "rl:global",  max: CONFIG.RATE_GLOBAL_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger });
+}
+if (process.env.X402_ENABLE_TEST_ROUTES === "1") {
+  const rlPubkeyOnly = createRateLimitMiddleware({
+    routeName: "test-pubkey",
+    pubkey: { keyPrefix: "rl:test:pk", max: CONFIG.RATE_PUBKEY_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger });
+  app.get("/x-test/pubkey-bucket",
+    (req, _res, next) => { req.x402Verified = { pubkey: "TestPubkey1111111111111111111111111111111111" }; next(); },
+    rlPubkeyOnly,
+    (_req, res) => res.json({ ok: true })
+  );
+}
+
 // Health check (sem 402)
-app.get("/health", async (req, res) => {
+app.get("/health", rl.meta, async (req, res) => {
   if (shuttingDown) {
     return res.status(503).json({ status: "shutting_down", code: 503 });
   }
@@ -835,7 +877,7 @@ app.get("/health", async (req, res) => {
 //
 // Trustless: the Shield never takes the client's word for the amount — only
 // for the signature, which the chain adjudicates.
-app.post("/escrow/deposit", express.json(), async (req, res) => {
+app.post("/escrow/deposit", rl.deposit, express.json(), async (req, res) => {
   const { tx_signature } = req.body || {};
   if (!tx_signature) {
     return res.status(400).json({ error: "tx_signature (base58) required" });
@@ -860,7 +902,7 @@ app.post("/escrow/deposit", express.json(), async (req, res) => {
 // Solana for every deposit is prohibitive. NEVER enable in production.
 if (CONFIG.TRUST_DEPOSITS) {
   logger.warn({ reason: "escrow_trusted_deposits_mounted", msg: "/escrow/deposit-trusted is exposed (demo/test only)" });
-  app.post("/escrow/deposit-trusted", express.json(), async (req, res) => {
+  app.post("/escrow/deposit-trusted", rl.deposit, express.json(), async (req, res) => {
     const { pubkey, amount_micro_lamports } = req.body || {};
     if (!pubkey || !amount_micro_lamports) {
       return res.status(400).json({ error: "pubkey and amount_micro_lamports required" });
@@ -871,7 +913,7 @@ if (CONFIG.TRUST_DEPOSITS) {
 }
 
 // Endpoint de consulta de reputação (Trust-Score) + risk classification
-app.get("/reputation/:pubkey", async (req, res) => {
+app.get("/reputation/:pubkey", rl.reputation, async (req, res) => {
   const pubkey = req.params.pubkey;
   const [rec, attestations] = await Promise.all([
     store.getReputation(pubkey),
@@ -897,7 +939,7 @@ app.get("/reputation/:pubkey", async (req, res) => {
 });
 
 // Endpoint de consulta de saldo
-app.get("/escrow/balance/:pubkey", async (req, res) => {
+app.get("/escrow/balance/:pubkey", rl.balance, async (req, res) => {
   const balance = await store.getEscrow(req.params.pubkey);
   respondHtmlOrJson(req, res, { pubkey: req.params.pubkey, balance_micro_lamports: balance }, "Escrow balance");
 });
@@ -905,7 +947,7 @@ app.get("/escrow/balance/:pubkey", async (req, res) => {
 // ─── Stats / dashboard endpoints ──────────────────────────────────────────────
 
 // Static metadata about this Shield deployment (consumed by /live, /try, /explorer pages).
-app.get("/info", (req, res) => {
+app.get("/info", rl.meta, (req, res) => {
   const upstream = CONFIG.REAL_RPC_URL;
   const network = upstream.includes("mainnet") ? "mainnet" : upstream.includes("devnet") ? "devnet" : "unknown";
   respondHtmlOrJson(req, res, {
@@ -922,7 +964,7 @@ app.get("/info", (req, res) => {
 
 // Recent activity for the live dashboard.
 // All fields below survive container restart — persisted in Redis (LIST + HASH).
-app.get("/stats/recent", async (req, res) => {
+app.get("/stats/recent", rl.stats, async (req, res) => {
   const [
     payments,
     challenges,
@@ -959,7 +1001,7 @@ app.get("/stats/recent", async (req, res) => {
 // QoS dispatcher state — for the /live dashboard QoS card.
 // Cumulative counters are persisted in Redis (HASH); wait_samples stay in
 // memory as a rolling 200-sample window for percentile calculation.
-app.get("/stats/qos", async (req, res) => {
+app.get("/stats/qos", rl.stats, async (req, res) => {
   const sorted = [...qosWaitSamples].sort((a, b) => a - b);
   const qosTotals = await store.getQosStats();
   const total_settled = qosTotals.dispatched_total + qosTotals.bypassed_total;
@@ -1001,7 +1043,7 @@ app.get("/stats/qos", async (req, res) => {
 });
 
 // Top 10 by Trust-Score for the leaderboard widget.
-app.get("/stats/leaderboard", async (req, res) => {
+app.get("/stats/leaderboard", rl.stats, async (req, res) => {
   const raw = await store.getLeaderboard(10);
   const top = raw.map((r) => ({
     pubkey: r.pubkey,
@@ -1037,7 +1079,9 @@ const upstreamAgent = upstreamIsHttps
 
 app.use(
   "/rpc",
+  rl.rpcEdge,
   x402Shield,
+  rl.rpcAfterAuth,
   qosMiddleware,
   createProxyMiddleware({
     target: CONFIG.REAL_RPC_URL,
