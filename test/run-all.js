@@ -1,0 +1,48 @@
+/**
+ * test/run-all.js
+ *
+ * Master test runner. Executes every persistent test file in sequence,
+ * propagating failure. Skips Redis-only tests when REDIS_URL is unset
+ * (the individual test files already handle SKIP messaging).
+ *
+ * Each Phase (0-4) appends its own files here as they land. Phase 0 owns
+ * the initial list below.
+ */
+const { spawnSync } = require("child_process");
+const path = require("path");
+
+const FILES = [
+  // Existing pre-overhaul suite
+  "test/smoke.js",
+  "test/atomic-consume.test.js",
+  "test/atomic-consume-redis.test.js",
+  "test/cooperative-qos.test.js",
+  "test/detection.test.js",
+  // Phase 0 additions
+  "test/store-ratelimit.test.js",
+  "test/store-pending-deposit.test.js",
+  "test/store-abuse.test.js",
+  "test/store-ban.test.js",
+  "test/boot-guards.test.js",
+  "test/graceful-shutdown.test.js",
+];
+
+let failed = 0;
+for (const rel of FILES) {
+  const abs = path.join(__dirname, "..", rel);
+  console.log(`\n=== ${rel} ===`);
+  const res = spawnSync(process.execPath, [abs], {
+    stdio: "inherit",
+    env: process.env,
+  });
+  if (res.status !== 0) {
+    console.error(`FAILED: ${rel} (exit ${res.status})`);
+    failed++;
+  }
+}
+
+if (failed > 0) {
+  console.error(`\n${failed} test file(s) failed.\n`);
+  process.exit(1);
+}
+console.log("\nAll test files passed.\n");

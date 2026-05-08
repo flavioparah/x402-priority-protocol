@@ -1,7 +1,7 @@
 {
   "name": "x402-shield",
-  "version": "0.1.0",
-  "description": "HTTP 402 priority gate for Solana RPC nodes — MVP",
+  "version": "0.2.0",
+  "description": "HTTP 402 priority gate for Solana RPC nodes — security-hardened",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -11,28 +11,39 @@
     "bench": "node bench.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node test/smoke.js",
+    "test": "npm run build && node test/run-all.js",
     "test:smoke": "node test/smoke.js",
     "test:cooperative-qos": "npm run build && node test/cooperative-qos.test.js",
     "test:atomic": "node test/atomic-consume.test.js",
     "test:atomic:redis": "node test/atomic-consume-redis.test.js",
     "test:detection": "node test/detection.test.js",
+    "test:store-ratelimit": "node test/store-ratelimit.test.js",
+    "test:store-pending-deposit": "node test/store-pending-deposit.test.js",
+    "test:store-abuse": "node test/store-abuse.test.js",
+    "test:store-ban": "node test/store-ban.test.js",
+    "test:boot-guards": "node test/boot-guards.test.js",
+    "test:graceful-shutdown": "node test/graceful-shutdown.test.js",
     "operator:reference": "node examples/operator-qos-reference.js"
   },
   "dependencies": {
-    "@solana/web3.js": "^1.91.0",
-    "bip39": "^3.1.0",
-    "bs58": "^5.0.0",
-    "ed25519-hd-key": "^1.3.0",
-    "express": "^4.18.2",
-    "http-proxy-middleware": "^2.0.6",
-    "ioredis": "^5.10.1",
-    "tweetnacl": "^1.0.3"
+    "@solana/web3.js": "1.91.0",
+    "bip39": "3.1.0",
+    "bs58": "5.0.0",
+    "ed25519-hd-key": "1.3.0",
+    "express": "4.18.2",
+    "helmet": "7.1.0",
+    "http-proxy-middleware": "2.0.6",
+    "ioredis": "5.10.1",
+    "opossum": "8.1.4",
+    "pino": "8.21.0",
+    "prom-client": "15.1.3",
+    "tweetnacl": "1.0.3"
   },
   "devDependencies": {
-    "@stbr/solana-glossary": "^1.1.0",
-    "@types/node": "^20.11.0",
-    "nodemon": "^3.0.0",
-    "typescript": "^5.3.0"
+    "@stbr/solana-glossary": "1.1.0",
+    "@types/node": "20.11.0",
+    "nodemon": "3.0.0",
+    "pino-pretty": "11.2.2",
+    "typescript": "5.3.3"
   }
 }
