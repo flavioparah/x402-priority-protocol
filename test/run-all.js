@@ -30,6 +30,7 @@ const FILES = [
   "test/no-console-residue.test.js",
   // Phase 2 additions
   "test/cheap-reject.test.js",
+  "test/nonce-precheck-bounded.test.js",
 ];
 
 let failed = 0;
