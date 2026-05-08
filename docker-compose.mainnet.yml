@@ -35,6 +35,19 @@ services:
       dockerfile: Dockerfile
     container_name: x402-shield-mainnet
     restart: unless-stopped
+    # Container hardening (spec §10.9). Defense-in-depth on top of the
+    # USER node directive in Dockerfile.
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile: 65535
+    stop_grace_period: 30s
     depends_on:
       - redis-mainnet
     environment:
