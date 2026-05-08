@@ -100,6 +100,9 @@ const CONFIG = {
   ),
 };
 
+// Graceful shutdown state — flipped by SIGTERM/SIGINT (spec §10.5).
+let shuttingDown = false;
+
 // ─── Estado em memória (substitua por Redis em produção) ──────────────────────
 
 /** @type {Map<string, { count: number, resetAt: number }>} */
@@ -805,6 +808,9 @@ function respondHtmlOrJson(req, res, data, title) {
 
 // Health check (sem 402)
 app.get("/health", async (req, res) => {
+  if (shuttingDown) {
+    return res.status(503).json({ status: "shutting_down", code: 503 });
+  }
   pruneRequestTimestamps();
   const rps = requestTimestamps.length / (CONFIG.LOAD_WINDOW_MS / 1000);
   const [nonces_active, escrow_accounts] = await Promise.all([
@@ -1152,8 +1158,45 @@ async function boot() {
   return server;
 }
 
-let _server;
-boot().then((s) => { _server = s; }).catch((e) => {
+let _server = null;
+boot().then((s) => {
+  _server = s;
+  if (!_server) return;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info({ reason: "shutdown_begin", signal });
+    _server.close((err) => {
+      if (err) logger.error({ reason: "shutdown_server_close_error", error: err.message });
+    });
+
+    const drainStart = Date.now();
+    const drainDeadlineMs = 25_000;
+
+    const tick = setInterval(async () => {
+      const drainedQos = qosInFlight === 0 && qosQueue.length === 0;
+      const elapsed = Date.now() - drainStart;
+
+      if (drainedQos || elapsed > drainDeadlineMs) {
+        clearInterval(tick);
+        try { await store.close(); } catch (e) {
+          logger.error({ reason: "shutdown_store_close_error", error: e.message });
+        }
+        logger.info({
+          reason: "shutdown_complete",
+          elapsed_ms: elapsed,
+          qos_in_flight: qosInFlight,
+          qos_queue_depth: qosQueue.length,
+        });
+        setTimeout(() => process.exit(0), 100);
+      }
+    }, 200);
+    tick.unref();
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT",  () => shutdown("SIGINT"));
+}).catch((e) => {
   logger.fatal({ reason: "boot_failure", error: e.message });
   setTimeout(() => process.exit(1), 50);
 });
