@@ -20,6 +20,8 @@ const { createRateLimitMiddleware } = require("./lib/ratelimit");
 const { rpcBodyLimit } = require("./lib/rpc-bodylimit");
 const { fireSolanaCircuit } = require("./lib/solana-circuit");
 const { SIG_RE } = require("./lib/preflight");
+const { corsForRoute } = require("./lib/cors-scoped");
+const { bumpReqCounter } = require("./lib/metrics-counters");
 
 // ─── Configuração ────────────────────────────────────────────────────────────
 
@@ -113,6 +115,8 @@ const CONFIG = {
   SOLANA_CIRCUIT_THRESHOLD_PCT: parseInt(process.env.SOLANA_CIRCUIT_THRESHOLD_PCT || "50"),
   SOLANA_CIRCUIT_RESET_MS: parseInt(process.env.SOLANA_CIRCUIT_RESET_MS || "30000"),
   SOLANA_CIRCUIT_TIMEOUT_MS: parseInt(process.env.SOLANA_CIRCUIT_TIMEOUT_MS || "15000"),
+  ADMIN_ORIGIN_ALLOWLIST: (process.env.ADMIN_ORIGIN_ALLOWLIST || "https://api.rpcpriority.com,https://ops.rpcpriority.com").split(",").map(s => s.trim()).filter(Boolean),
+  PROTECTED_ORIGIN_ALLOWLIST: (process.env.PROTECTED_ORIGIN_ALLOWLIST || "https://rpcpriority.com,https://api.rpcpriority.com").split(",").map(s => s.trim()).filter(Boolean),
 };
 
 // Graceful shutdown state — flipped by SIGTERM/SIGINT (spec §10.5).
@@ -544,7 +548,10 @@ setInterval(() => {
  */
 async function verifyX402Authorization(authHeader) {
   const pre = preflight.preflightAuth(authHeader);
-  if (pre) return { ok: false, reason: `preflight:${pre}` };
+  if (pre) {
+    bumpReqCounter("/rpc", "shield_auth", "blocked");
+    return { ok: false, reason: `preflight:${pre}` };
+  }
 
   const token = authHeader.slice(5);
   const parts = token.split(".");
@@ -552,7 +559,10 @@ async function verifyX402Authorization(authHeader) {
   // Bounded nonce pre-check happens BEFORE bs58.decode of sig/pubkey
   // and BEFORE nacl.sign.detached.verify. Nonce must exist in Redis.
   const np = await preflight.noncePreCheck(parts, store);
-  if (!np.ok) return { ok: false, reason: `preflight:${np.reason}` };
+  if (!np.ok) {
+    bumpReqCounter("/rpc", "shield_auth", "blocked");
+    return { ok: false, reason: `preflight:${np.reason}` };
+  }
 
   const { nonce, messageBytes, payload } = np;
 
@@ -713,17 +723,10 @@ app.use((req, res, next) => {
 
 // CORS middleware — must come BEFORE all routes so preflight OPTIONS resolves
 // without falling into the /rpc proxy.
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-x402-Agent-Pubkey");
-  res.setHeader(
-    "Access-Control-Expose-Headers",
-    "X-x402-Status, X-x402-Payment-Destination, X-x402-Amount, X-x402-Amount-Base, X-x402-Trust-Score, X-x402-Nonce, X-x402-Nonce-TTL"
-  );
-  if (req.method === "OPTIONS") return res.status(204).end();
-  next();
-});
+app.use(corsForRoute([
+  ...CONFIG.PROTECTED_ORIGIN_ALLOWLIST,
+  ...CONFIG.ADMIN_ORIGIN_ALLOWLIST,
+]));
 
 // NB: do NOT mount express.json() globally — it consumes the request body,
 // which breaks http-proxy-middleware for /rpc (upstream times out waiting for
@@ -894,6 +897,7 @@ app.post("/escrow/deposit", rl.deposit, express.json({ limit: '1kb' }), async (r
 
   // 2. Negative cache — same bad sig was rejected within the last TTL window
   if (await store.isDepositKnownBad(sig)) {
+    bumpReqCounter("/escrow/deposit", "shield_deposit_validation", "blocked");
     return res.status(400).json({
       error: "deposit_signature_known_invalid",
       code: 400,
@@ -932,6 +936,7 @@ app.post("/escrow/deposit", rl.deposit, express.json({ limit: '1kb' }), async (r
     if (!result.ok) {
       // Cache negative for 60s — same sig won't bother Solana again until TTL.
       await store.markDepositKnownBad(sig, CONFIG.DEPOSIT_NEGATIVE_CACHE_TTL_MS);
+      bumpReqCounter("/escrow/deposit", "shield_deposit_validation", "blocked");
       return res.status(400).json({ error: result.reason, code: 400 });
     }
     logger.info({
@@ -943,6 +948,7 @@ app.post("/escrow/deposit", rl.deposit, express.json({ limit: '1kb' }), async (r
       slot: result.slot,
       req_id: req.id,
     });
+    bumpReqCounter("/escrow/deposit", "forwarded", "deposit_called_solana");
     return res.json({
       pubkey: result.pubkey,
       credited_micro_lamports: result.micro_lamports,
@@ -1133,8 +1139,8 @@ app.get("/explorer", (_req, res) => res.sendFile(path.join(__dirname, "public", 
 // With keep-alive the marginal cost collapses to a single round trip.
 const upstreamIsHttps = CONFIG.REAL_RPC_URL.startsWith("https:");
 const upstreamAgent = upstreamIsHttps
-  ? new https.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000 })
-  : new http.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000 });
+  ? new https.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000, timeout: 15_000 })
+  : new http.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000, timeout: 15_000 });
 
 app.use(
   "/rpc",
@@ -1148,6 +1154,7 @@ app.use(
     changeOrigin: true,
     pathRewrite: { "^/rpc": "" },
     agent: upstreamAgent,
+    proxyTimeout: 15_000,
     // http-proxy-middleware v2.x uses top-level onProxyReq / onProxyRes /
     // onError callbacks. The v3 nested `on: { proxyReq, error }` shape is
     // silently ignored on v2 (which is what's installed via package.json
@@ -1269,6 +1276,10 @@ async function boot() {
       msg: "x402-shield listening",
     });
   });
+  server.headersTimeout   = 10_000;
+  server.requestTimeout   = 30_000;
+  server.keepAliveTimeout = 5_000;
+  server.timeout          = 60_000;
   return server;
 }
 
