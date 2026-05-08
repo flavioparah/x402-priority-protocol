@@ -37,6 +37,7 @@ const FILES = [
   // Phase 3 additions
   "test/abuse-reasons.test.js",
   "test/trust-multiplier.test.js",
+  "test/detection-fraud-flags.test.js",
 ];
 
 let failed = 0;
