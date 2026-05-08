@@ -17,6 +17,7 @@ const { Connection, PublicKey, SystemProgram } = require("@solana/web3.js");
 const { logger, sampledWarn } = require("./lib/logger");
 const preflight = require("./lib/preflight");
 const { createRateLimitMiddleware } = require("./lib/ratelimit");
+const { rpcBodyLimit } = require("./lib/rpc-bodylimit");
 
 // ─── Configuração ────────────────────────────────────────────────────────────
 
@@ -104,6 +105,7 @@ const CONFIG = {
     process.env.TEST_REDIS_REQUIRED_TIMEOUT_MS || "30000",
     10
   ),
+  BODY_LIMIT_RPC_BYTES: parseInt(process.env.BODY_LIMIT_RPC_BYTES || "32768"),
 };
 
 // Graceful shutdown state — flipped by SIGTERM/SIGINT (spec §10.5).
@@ -1079,6 +1081,7 @@ const upstreamAgent = upstreamIsHttps
 
 app.use(
   "/rpc",
+  rpcBodyLimit(CONFIG.BODY_LIMIT_RPC_BYTES),
   rl.rpcEdge,
   x402Shield,
   rl.rpcAfterAuth,

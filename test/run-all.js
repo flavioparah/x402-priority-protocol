@@ -32,6 +32,7 @@ const FILES = [
   "test/cheap-reject.test.js",
   "test/nonce-precheck-bounded.test.js",
   "test/ratelimit-3dim.test.js",
+  "test/rpc-content-length.test.js",
 ];
 
 let failed = 0;
