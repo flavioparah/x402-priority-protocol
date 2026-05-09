@@ -48,6 +48,7 @@ const FILES = [
   "test/code-of-conduct.test.js",
   "test/store-slidingwindow-query.test.js",
   "test/metrics-output.test.js",
+  "test/admin-canonical.test.js",
 ];
 
 let failed = 0;
