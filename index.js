@@ -141,7 +141,8 @@ const { computeRisk } = require("./lib/detection");
 const { getCodeOfConduct } = require("./lib/code-of-conduct");
 const { makeAgentStatusHandler } = require("./lib/agent-status");
 const { getActiveFraudFlags } = require("./lib/detection");
-const { config: runtimeConfig } = require("./lib/config");
+const { config: runtimeConfig, getConfig, applyUpdate } = require("./lib/config");
+const { makeMetricsHandler, incAdminAction } = require("./lib/metrics");
 
 /**
  * Lazily-initialized Solana Connection used to verify deposit transactions.
@@ -1534,6 +1535,45 @@ if (ADMIN_KEYS.size > 0) {
     await store.removePermanent(storeKey);
     await auditAdminWrite(req, "unban", { type, key }, "ok", { reason });
     res.json({ ok: true, key, type });
+  });
+
+  // ─── Task 16: GET /admin/config + POST /admin/config (hot-reload) ─────────
+
+  adminRouter.get("/config", async (req, res) => {
+    await auditAdminWrite(req, "config_read", null, "ok");
+    res.json({ config: getConfig() });
+  });
+
+  adminRouter.post("/config", async (req, res) => {
+    const updates = req.body?.updates;
+    const reason  = req.body?.reason;
+    const meta    = req.body?.meta || {};
+    if (!updates || typeof updates !== "object" || Array.isArray(updates)) {
+      return res.status(400).json({ error: "updates_object_required", code: 400 });
+    }
+    if (typeof reason !== "string" || reason.trim().length < 3) {
+      return res.status(400).json({ error: "reason_required", code: 400 });
+    }
+
+    // Validate + apply — first failure short-circuits before any further keys.
+    const applied = [];
+    for (const [k, v] of Object.entries(updates)) {
+      const r = applyUpdate(k, v, meta);
+      if (!r.ok) {
+        await auditAdminWrite(req, "config_update", null, "rejected",
+          { failed_key: k, reason: r.reason });
+        return res.status(400).json({
+          error: "update_rejected", failed_key: k, reason: r.reason, range: r.range,
+        });
+      }
+      applied.push(r);
+    }
+
+    await auditAdminWrite(req, "config_update", null, "ok", {
+      updates: applied.map(d => ({ key: d.key, oldValue: d.oldValue, newValue: d.newValue })),
+      reason, meta,
+    });
+    res.json({ ok: true, applied, config: getConfig() });
   });
 }
 
