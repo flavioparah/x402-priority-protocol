@@ -251,38 +251,38 @@ const VALID_PK = "DemoStudent111111111111111111111111111111111";
 
   // ── Abuse history counters ──────────────────────────────────────────────────
 
-  await test("throttles_5m counts only throttle events within 5 min", async () => {
+  await test("throttles_5m counts only tier-1 events within 5 min", async () => {
     const store = makeFakeStore();
     const now = Date.now();
     store._setAbuseHistory(VALID_PK, [
-      { kind: "throttle",  ts: now - 60_000  },   // recent — counted
-      { kind: "throttle",  ts: now - 400_000 },   // older than 5min — not counted
-      { kind: "soft_ban",  ts: now - 10_000  },   // wrong kind — not counted
+      { tier: 1, ts: now - 60_000  },   // recent — counted
+      { tier: 1, ts: now - 400_000 },   // older than 5min — not counted
+      { tier: 2, ts: now - 10_000  },   // wrong tier — not counted
     ]);
     const snap = await buildAgentStatus(store, VALID_PK, {});
     assertEq(snap.throttles_5m, 1, "throttles_5m");
   });
 
-  await test("soft_bans_24h counts only soft_ban events within 24 h", async () => {
+  await test("soft_bans_24h counts only tier-2 events within 24 h", async () => {
     const store = makeFakeStore();
     const now = Date.now();
     store._setAbuseHistory(VALID_PK, [
-      { kind: "soft_ban", ts: now - 3_600_000  },   // 1 h ago — in window
-      { kind: "soft_ban", ts: now - 86_400_001 },   // just over 24 h — out
-      { kind: "hard_ban", ts: now - 1_000      },   // wrong kind
+      { tier: 2, ts: now - 3_600_000  },   // 1 h ago — in window
+      { tier: 2, ts: now - 86_400_001 },   // just over 24 h — out
+      { tier: 3, ts: now - 1_000      },   // wrong tier
     ]);
     const snap = await buildAgentStatus(store, VALID_PK, {});
     assertEq(snap.soft_bans_24h, 1, "soft_bans_24h");
   });
 
-  await test("hard_bans_7d counts only hard_ban events within 7 days", async () => {
+  await test("hard_bans_7d counts only tier-3 events within 7 days", async () => {
     const store = makeFakeStore();
     const now = Date.now();
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     store._setAbuseHistory(VALID_PK, [
-      { kind: "hard_ban", ts: now - 86_400_000    },   // 1 day ago — in window
-      { kind: "hard_ban", ts: now - SEVEN_DAYS - 1 },  // just over 7d — out
-      { kind: "soft_ban", ts: now - 1_000          },  // wrong kind
+      { tier: 3, ts: now - 86_400_000    },   // 1 day ago — in window
+      { tier: 3, ts: now - SEVEN_DAYS - 1 },  // just over 7d — out
+      { tier: 2, ts: now - 1_000          },  // wrong tier
     ]);
     const snap = await buildAgentStatus(store, VALID_PK, {});
     assertEq(snap.hard_bans_7d, 1, "hard_bans_7d");
@@ -291,9 +291,9 @@ const VALID_PK = "DemoStudent111111111111111111111111111111111";
   await test("abuse_history_count reflects total history entries", async () => {
     const store = makeFakeStore();
     store._setAbuseHistory(VALID_PK, [
-      { kind: "throttle", ts: 1 },
-      { kind: "throttle", ts: 2 },
-      { kind: "soft_ban", ts: 3 },
+      { tier: 1, ts: 1 },
+      { tier: 1, ts: 2 },
+      { tier: 2, ts: 3 },
     ]);
     const snap = await buildAgentStatus(store, VALID_PK, {});
     assertEq(snap.abuse_history_count, 3, "abuse_history_count");

@@ -22,7 +22,9 @@ function makeFakeStore() {
       const cutoff = Date.now() - sinceMs;
       return arr.filter(e => e.ts >= cutoff);
     },
-    async setBan(key, value, _ttlMs) { bans.set(key, value); },
+    async setBan(key, tier, reason, ttlMs) {
+      bans.set(key, { tier, reason, until: Math.floor((Date.now() + ttlMs) / 1000) });
+    },
     async getBan(key) { return bans.get(key) || null; },
     async clearBan(key) { bans.delete(key); },
     async isPermanent(key) { return permanent.has(key); },

@@ -771,11 +771,7 @@ if (process.env.ENFORCEMENT_TEST_HOOKS === "1") {
   app.post("/__test/ban", express.json(), async (req, res) => {
     const { key, tier } = req.body || {};
     if (tier === 4) await store.addPermanent(key, { reason: "test", by: "test-hook" });
-    else await store.setBan(key, {
-      tier,
-      until: Math.floor(Date.now() / 1000) + 300,
-      reason: "ip-rate-limit",
-    }, 300_000);
+    else await store.setBan(key, tier, "ip-rate-limit", 300_000);
     res.json({ ok: true });
   });
 }
