@@ -23,6 +23,10 @@ const { SIG_RE } = require("./lib/preflight");
 const { corsForRoute } = require("./lib/cors-scoped");
 const { bumpReqCounter } = require("./lib/metrics-counters");
 
+// ─── Phase 3 enforcement integration ─────────────────────────────────────────
+const enforcement = require("./lib/enforcement-public");
+const { REASONS } = enforcement;
+
 // ─── Configuração ────────────────────────────────────────────────────────────
 
 const CONFIG = {
@@ -727,6 +731,54 @@ app.use(corsForRoute([
   ...CONFIG.PROTECTED_ORIGIN_ALLOWLIST,
   ...CONFIG.ADMIN_ORIGIN_ALLOWLIST,
 ]));
+
+// Test-only endpoint for the integration suite. Mounted ONLY when
+// ENFORCEMENT_TEST_HOOKS=1 — production deploys never set this.
+if (process.env.ENFORCEMENT_TEST_HOOKS === "1") {
+  console.warn("[enforcement] ENFORCEMENT_TEST_HOOKS=1 — /__test/ban mounted (DO NOT enable in prod)");
+  app.post("/__test/ban", express.json(), async (req, res) => {
+    const { key, tier } = req.body || {};
+    if (tier === 4) await store.addPermanent(key, { reason: "test", by: "test-hook" });
+    else await store.setBan(key, {
+      tier,
+      until: Math.floor(Date.now() / 1000) + 300,
+      reason: "ip-rate-limit",
+    }, 300_000);
+    res.json({ ok: true });
+  });
+}
+
+// Pre-flight ban check — runs before any other defense. If the IP or
+// (optionally) the pubkey-hint is in a ban tier, respond immediately with
+// the appropriate enforcementResponse.
+app.use(async (req, res, next) => {
+  const ip = req.ip || req.socket.remoteAddress;
+  const ipKey = `ip:${ip}`;
+
+  const ipBan = await enforcement.checkBan(store, ipKey);
+  if (ipBan) {
+    enforcement.enforcementResponse(res, {
+      tier: ipBan.tier,
+      reason: enforcement.isKnownReason(ipBan.reason) ? ipBan.reason : "ip-rate-limit",
+      until: ipBan.until,
+    });
+    return;
+  }
+
+  const hintedPubkey = req.headers["x-x402-agent-pubkey"];
+  if (hintedPubkey) {
+    const pkBan = await enforcement.checkBan(store, `pk:${hintedPubkey}`);
+    if (pkBan) {
+      enforcement.enforcementResponse(res, {
+        tier: pkBan.tier,
+        reason: enforcement.isKnownReason(pkBan.reason) ? pkBan.reason : "pubkey-rate-limit",
+        until: pkBan.until,
+      });
+      return;
+    }
+  }
+  next();
+});
 
 // NB: do NOT mount express.json() globally — it consumes the request body,
 // which breaks http-proxy-middleware for /rpc (upstream times out waiting for

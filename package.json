@@ -33,7 +33,8 @@
     "test:feedback": "node test/feedback-headers.test.js",
     "test:permanent": "node test/permanent-ban-promotion.test.js",
     "test:cross-signal": "node test/enforcement-cross-signal.test.js",
-    "test:enforcement": "npm run test:abuse-reasons && npm run test:trust-multiplier && npm run test:fraud-flags && npm run test:checkban && npm run test:ladder && npm run test:whitelist && npm run test:feedback && npm run test:permanent && npm run test:cross-signal"
+    "test:enforcement": "npm run test:abuse-reasons && npm run test:trust-multiplier && npm run test:fraud-flags && npm run test:checkban && npm run test:ladder && npm run test:whitelist && npm run test:feedback && npm run test:permanent && npm run test:cross-signal",
+    "test:enforcement-integration": "cross-env ENFORCEMENT_TEST_HOOKS=1 node test/enforcement-shield-integration.test.js"
   },
   "dependencies": {
     "@solana/web3.js": "1.91.0",
