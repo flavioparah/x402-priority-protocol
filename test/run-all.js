@@ -47,6 +47,7 @@ const FILES = [
   // Phase 4 additions
   "test/code-of-conduct.test.js",
   "test/store-slidingwindow-query.test.js",
+  "test/metrics-output.test.js",
 ];
 
 let failed = 0;
