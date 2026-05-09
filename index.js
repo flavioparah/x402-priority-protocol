@@ -1413,11 +1413,26 @@ if (ADMIN_KEYS.size > 0) {
     next();
   };
 
+  // Parse req.rawBody (captured by captureRawBody) into req.body for POST routes.
+  // express.json() cannot re-read the already-consumed stream, so we do it here.
+  const parseAdminJson = (req, res, next) => {
+    if (!req.rawBody || !req.rawBody.length) return next();
+    const ct = (req.headers["content-type"] || "").split(";")[0].trim();
+    if (ct !== "application/json") return next();
+    try {
+      req.body = JSON.parse(req.rawBody.toString("utf8"));
+    } catch (e) {
+      return res.status(400).json({ error: "invalid_json", code: 400 });
+    }
+    next();
+  };
+
   app.use("/admin",
     adminLib.corsAdminLockdown,
     adminLib.captureRawBody,
     adminLib.verifyAdminAuth,
     adminKeyRateLimit,
+    parseAdminJson,
     adminRouter
   );
 
@@ -1471,7 +1486,7 @@ if (ADMIN_KEYS.size > 0) {
 
   const VALID_TIERS = new Set([2, 3, 4]);
 
-  adminRouter.post("/ban", express.json({ limit: "4kb" }), massBanGuard, async (req, res) => {
+  adminRouter.post("/ban", massBanGuard, async (req, res) => {
     const { key, type, tier, reason, ttl_s } = req.body || {};
     if (typeof key !== "string" || !key.length) {
       await auditAdminWrite(req, "ban", { key, type }, "rejected", { reason: "missing_key" });
@@ -1505,7 +1520,7 @@ if (ADMIN_KEYS.size > 0) {
     res.json({ ok: true, tier, key, type, ttl_ms: effectiveTtl });
   });
 
-  adminRouter.post("/unban", express.json({ limit: "4kb" }), async (req, res) => {
+  adminRouter.post("/unban", async (req, res) => {
     const { key, type, reason } = req.body || {};
     if (typeof key !== "string" || !key.length || !["ip", "pubkey"].includes(type)) {
       await auditAdminWrite(req, "unban", { key, type }, "rejected", { reason: "invalid_input" });
