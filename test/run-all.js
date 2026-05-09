@@ -40,6 +40,7 @@ const FILES = [
   "test/detection-fraud-flags.test.js",
   "test/enforcement-checkban.test.js",
   "test/enforcement-ladder.test.js",
+  "test/enforcement-whitelist.test.js",
 ];
 
 let failed = 0;
