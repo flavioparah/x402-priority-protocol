@@ -850,16 +850,20 @@ function respondHtmlOrJson(req, res, data, title) {
 }
 
 // ─── Rate-limit middleware (Phase 2, spec §6.3) ───────────────────────────────
+const { wrapRateLimitWithEnforcement } = require("./lib/ratelimit-enforcement");
+
 const rl = {
   rpcEdge: createRateLimitMiddleware({
     routeName: "rpc",
-    ip:     { keyPrefix: "rl:rpc:ip",     max: CONFIG.RATE_IP_LIMIT,     windowMs: CONFIG.RATE_WINDOW_MS },
-    global: { key:       "rl:global",     max: CONFIG.RATE_GLOBAL_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+    ip:           { keyPrefix: "rl:rpc:ip",   max: CONFIG.RATE_IP_LIMIT,     windowMs: CONFIG.RATE_WINDOW_MS },
+    global:       { key:       "rl:global",   max: CONFIG.RATE_GLOBAL_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+    enforceOnBlock: true,
   }, { store, logger }),
   rpcAfterAuth: createRateLimitMiddleware({
     routeName: "rpc",
-    pubkey: { keyPrefix: "rl:rpc:pk",     max: CONFIG.RATE_PUBKEY_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
-    paid:   { keyPrefix: "rl:rpc:paid",   baseMax: CONFIG.RATE_PAID_PUBKEY_BASE, windowMs: CONFIG.RATE_WINDOW_MS },
+    pubkey:       { keyPrefix: "rl:rpc:pk",   max: CONFIG.RATE_PUBKEY_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+    paid:         { keyPrefix: "rl:rpc:paid", baseMax: CONFIG.RATE_PAID_PUBKEY_BASE, windowMs: CONFIG.RATE_WINDOW_MS },
+    enforceOnBlock: true,
   }, { store, logger }),
   deposit: createRateLimitMiddleware({
     routeName: "deposit",
@@ -882,6 +886,27 @@ const rl = {
     ip: { keyPrefix: "rl:meta:ip", max: parseInt(process.env.META_IP_LIMIT || "120", 10), windowMs: CONFIG.RATE_WINDOW_MS },
   }, { store, logger }),
 };
+
+// Enforcement bridge: reads req.rateLimitState set by rpcEdge / rpcAfterAuth
+// (enforceOnBlock:true) and escalates via recordOffense → enforcementResponse.
+const rlEnforce = wrapRateLimitWithEnforcement({
+  store,
+  reasonForDimension: (dim) =>
+    dim === "ip"     ? REASONS.IP_RATE_LIMIT :
+    dim === "pubkey" ? REASONS.PUBKEY_RATE_LIMIT :
+    dim === "global" ? REASONS.GLOBAL_RATE_LIMIT :
+                       REASONS.IP_RATE_LIMIT,
+  trustScoreFromReq: async (req) => {
+    const pk = req.headers["x-x402-agent-pubkey"];
+    return pk ? await getTrustScore(pk) : 0;
+  },
+  pubkeyFirstPaidAtFromReq: async (req) => {
+    const pk = req.headers["x-x402-agent-pubkey"];
+    if (!pk) return undefined;
+    const rep = await store.getReputation(pk);
+    return rep?.firstPaidAt;
+  },
+});
 
 // Test-only hooks (gated behind env flags)
 if (process.env.X402_TEST_GLOBAL_ON_META === "1") {
@@ -1198,8 +1223,10 @@ app.use(
   "/rpc",
   rpcBodyLimit(CONFIG.BODY_LIMIT_RPC_BYTES),
   rl.rpcEdge,
+  rlEnforce,        // bridges rpcEdge rate-limit state → enforcement ladder
   x402Shield,
   rl.rpcAfterAuth,
+  rlEnforce,        // bridges rpcAfterAuth (pubkey) state → enforcement ladder
   qosMiddleware,
   createProxyMiddleware({
     target: CONFIG.REAL_RPC_URL,
