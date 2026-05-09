@@ -1164,6 +1164,22 @@ app.get("/agent/status", rl.meta, makeAgentStatusHandler({
   },
 }));
 
+// ─── Task 19: GET /metrics — Prometheus scrape endpoint ──────────────────────
+// Public (Prometheus scrapers don't send auth). Per-IP rate-limit: 10/min.
+const rlMetrics = createRateLimitMiddleware({
+  routeName: "metrics",
+  ip: { keyPrefix: "rl:metrics:ip", max: 10, windowMs: 60_000 },
+}, { store, logger });
+
+app.get("/metrics",
+  rlMetrics,
+  makeMetricsHandler(() => ({
+    qosInflightCount: qosInFlight,
+    qosQueueLen:      qosQueue.length,
+    store,
+  }))
+);
+
 // Recent activity for the live dashboard.
 // All fields below survive container restart — persisted in Redis (LIST + HASH).
 app.get("/stats/recent", rl.stats, async (req, res) => {
