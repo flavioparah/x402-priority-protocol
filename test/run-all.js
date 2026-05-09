@@ -53,6 +53,7 @@ const FILES = [
   "test/config-hotreload.test.js",
   "test/admin-hmac.test.js",
   "test/agent-status.test.js",
+  "test/admin-mass-ban-guard.test.js",
 ];
 
 let failed = 0;
