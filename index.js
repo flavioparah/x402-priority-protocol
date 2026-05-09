@@ -1388,6 +1388,140 @@ if (ADMIN_KEYS.size === 0) {
   });
 }
 
+// ─── Task 11: /admin/* router (only when ADMIN_KEYS configured) ───────────────
+const adminLib = require("./lib/admin");
+const { config: adminConfig } = require("./lib/config");
+const { auditAdminWrite, massBanGuard } = adminLib.makeAdminGuards({ store, config: adminConfig });
+
+if (ADMIN_KEYS.size > 0) {
+  const adminRouter = express.Router();
+
+  // Per-key-id rate-limit for admin endpoints (10 req/min per key-id).
+  // Uses the same massBanCounter store to avoid adding a new dependency.
+  // Note: this is a lightweight inline guard, not the sliding-window RL.
+  const adminKeyRateLimit = async (req, res, next) => {
+    const keyId = req.adminKeyId;
+    if (!keyId) return next();
+    const scope = `rl:admin:keyid:${keyId}`;
+    let count;
+    try { count = await store.incrMassBanCounter(scope, 60); }
+    catch (e) { return next(); }
+    if (count > 60) {
+      res.set("Retry-After", "60");
+      return res.status(429).json({ error: "admin_rate_limit", code: 429 });
+    }
+    next();
+  };
+
+  app.use("/admin",
+    adminLib.corsAdminLockdown,
+    adminLib.captureRawBody,
+    adminLib.verifyAdminAuth,
+    adminKeyRateLimit,
+    adminRouter
+  );
+
+  // ─── Task 12: GET /admin/abuse-log + GET /admin/agent/:pubkey ──────────────
+
+  // GET /admin/abuse-log?limit=N&since=ts&type=ip|pubkey
+  adminRouter.get("/abuse-log", async (req, res) => {
+    const rawLimit = req.query.limit;
+    const parsed = parseInt(rawLimit || "100", 10) || 100;
+    const limit = Math.min(500, Math.max(1, parsed));
+    if (rawLimit && (parsed < 1 || parsed > 500)) {
+      return res.status(400).json({ error: "limit_out_of_range", code: 400, max: 500 });
+    }
+    const since = req.query.since ? parseInt(req.query.since, 10) : null;
+    const type = req.query.type ? String(req.query.type) : null;
+    if (type && !["ip", "pubkey"].includes(type)) {
+      return res.status(400).json({ error: "invalid_type", code: 400 });
+    }
+    let entries = await store.getAuditAdmin(limit, since || 0);
+    res.json({ entries, count: entries.length, limit, since, type });
+  });
+
+  // GET /admin/agent/:pubkey — fuller detail than /agent/status
+  adminRouter.get("/agent/:pubkey", async (req, res) => {
+    const pubkey = req.params.pubkey;
+    const PUBKEY_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    if (!PUBKEY_RE.test(pubkey)) return res.status(400).json({ error: "invalid_pubkey", code: 400 });
+
+    const [rec, attestations, abuseHistory, ban, isPerm] = await Promise.all([
+      store.getReputation(pubkey),
+      store.getAttestations(pubkey, 100),
+      store.getAbuseHistory(pubkey, 200).catch(() => []),
+      enforcement.checkBan(store, `pk:${pubkey}`).catch(() => null),
+      store.isPermanent(`pk:${pubkey}`).catch(() => false),
+    ]);
+    const fraud = computeRisk(attestations, rec);
+
+    res.json({
+      pubkey,
+      reputation: rec,
+      trust_score: rec ? Math.min(100, rec.paidCount * 5) : 0,
+      attestations,
+      fraud_signals: { sybil_risk: fraud.sybil_risk, fraud_flags: fraud.fraud_flags, churn_pattern: fraud.churn_pattern },
+      ban_history: abuseHistory,
+      current_ban: ban,
+      permanent: isPerm,
+    });
+  });
+
+  // ─── Task 13: POST /admin/ban + POST /admin/unban ──────────────────────────
+
+  const VALID_TIERS = new Set([2, 3, 4]);
+
+  adminRouter.post("/ban", express.json({ limit: "4kb" }), massBanGuard, async (req, res) => {
+    const { key, type, tier, reason, ttl_s } = req.body || {};
+    if (typeof key !== "string" || !key.length) {
+      await auditAdminWrite(req, "ban", { key, type }, "rejected", { reason: "missing_key" });
+      return res.status(400).json({ error: "missing_key", code: 400 });
+    }
+    if (!["ip", "pubkey"].includes(type)) {
+      await auditAdminWrite(req, "ban", { key, type }, "rejected", { reason: "invalid_type" });
+      return res.status(400).json({ error: "invalid_type", code: 400 });
+    }
+    if (!VALID_TIERS.has(tier)) {
+      await auditAdminWrite(req, "ban", { key, type }, "rejected", { reason: "invalid_tier", tier });
+      return res.status(400).json({ error: "invalid_tier", code: 400, allowed: [...VALID_TIERS] });
+    }
+    if (typeof reason !== "string" || reason.trim().length < 3) {
+      await auditAdminWrite(req, "ban", { key, type }, "rejected", { reason: "reason_required" });
+      return res.status(400).json({ error: "reason_required", code: 400 });
+    }
+
+    if (tier === 4) {
+      // Tier 4: permanent ban — store as `pk:<key>` or `ip:<key>` prefix
+      const storeKey = type === "pubkey" ? `pk:${key}` : `ip:${key}`;
+      await store.addPermanent(storeKey, reason);
+      await auditAdminWrite(req, "ban", { type, key }, "ok", { tier, reason, permanent: true });
+      return res.json({ ok: true, tier: 4, permanent: true, key, type });
+    }
+    const ttlMs = tier === 3 ? (adminConfig.HARD_BAN_DURATION_MS) : (adminConfig.SOFT_BAN_DURATION_MS);
+    const effectiveTtl = ttl_s ? Math.max(60_000, Math.min(7 * 86400 * 1000, parseInt(ttl_s, 10) * 1000)) : ttlMs;
+    const storeKey = type === "pubkey" ? `pk:${key}` : `ip:${key}`;
+    await store.setBan(storeKey, tier, reason, effectiveTtl);
+    await auditAdminWrite(req, "ban", { type, key }, "ok", { tier, reason, ttl_ms: effectiveTtl });
+    res.json({ ok: true, tier, key, type, ttl_ms: effectiveTtl });
+  });
+
+  adminRouter.post("/unban", express.json({ limit: "4kb" }), async (req, res) => {
+    const { key, type, reason } = req.body || {};
+    if (typeof key !== "string" || !key.length || !["ip", "pubkey"].includes(type)) {
+      await auditAdminWrite(req, "unban", { key, type }, "rejected", { reason: "invalid_input" });
+      return res.status(400).json({ error: "invalid_input", code: 400 });
+    }
+    if (typeof reason !== "string" || reason.trim().length < 3) {
+      return res.status(400).json({ error: "reason_required", code: 400 });
+    }
+    const storeKey = type === "pubkey" ? `pk:${key}` : `ip:${key}`;
+    await store.clearBan(storeKey);
+    await store.removePermanent(storeKey);
+    await auditAdminWrite(req, "unban", { type, key }, "ok", { reason });
+    res.json({ ok: true, key, type });
+  });
+}
+
 if (
   bootGuards.isMainnet(process.env) &&
   process.env.RPC_LOAD_FORCE &&
