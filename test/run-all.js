@@ -41,6 +41,7 @@ const FILES = [
   "test/enforcement-checkban.test.js",
   "test/enforcement-ladder.test.js",
   "test/enforcement-whitelist.test.js",
+  "test/feedback-headers.test.js",
 ];
 
 let failed = 0;
