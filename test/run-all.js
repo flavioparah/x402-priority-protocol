@@ -44,6 +44,9 @@ const FILES = [
   "test/feedback-headers.test.js",
   "test/permanent-ban-promotion.test.js",
   "test/enforcement-cross-signal.test.js",
+  // Phase 4 additions
+  "test/code-of-conduct.test.js",
+  "test/store-slidingwindow-query.test.js",
 ];
 
 let failed = 0;
