@@ -137,6 +137,12 @@ const store = createStore();
 // Signals are computed lazily at /reputation/:pubkey query time.
 const { computeRisk } = require("./lib/detection");
 
+// ─── Phase 4 agent modules ────────────────────────────────────────────────────
+const { getCodeOfConduct } = require("./lib/code-of-conduct");
+const { makeAgentStatusHandler } = require("./lib/agent-status");
+const { getActiveFraudFlags } = require("./lib/detection");
+const { config: runtimeConfig } = require("./lib/config");
+
 /**
  * Lazily-initialized Solana Connection used to verify deposit transactions.
  * Reuses a single instance so getTransaction() calls share a keep-alive
@@ -1133,6 +1139,29 @@ app.get("/info", rl.meta, (req, res) => {
     trusted_deposits_enabled: CONFIG.TRUST_DEPOSITS,
   }, "Gateway info");
 });
+
+// ─── Agent endpoints (Phase 4) ───────────────────────────────────────────────
+
+// GET /agent/code-of-conduct — serves the versioned Code of Conduct document.
+// Accepts ?version=1.0 (default). Returns JSON or HTML (content-negotiation).
+app.get("/agent/code-of-conduct", rl.meta, (req, res) => {
+  const v = req.query.version || "1.0";
+  const doc = getCodeOfConduct(v);
+  if (!doc) return res.status(404).json({ error: "unknown_version", code: 404, version: v });
+  respondHtmlOrJson(req, res, doc, "Code of Conduct");
+});
+
+// GET /agent/status?pubkey=<base58> — read-only trust/enforcement snapshot
+// with 10 s response cache and per-IP rate-limit (10 req/min).
+app.get("/agent/status", rl.meta, makeAgentStatusHandler({
+  store,
+  config: runtimeConfig,
+  computeFraudFlagsForPubkey: async (pk) => {
+    const attestations = await store.getAttestations(pk, 100).catch(() => []);
+    const rep = await store.getReputation(pk).catch(() => null);
+    return getActiveFraudFlags(pk, attestations, rep);
+  },
+}));
 
 // Recent activity for the live dashboard.
 // All fields below survive container restart — persisted in Redis (LIST + HASH).
