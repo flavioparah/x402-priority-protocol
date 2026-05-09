@@ -11,7 +11,7 @@
     "bench": "node bench.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node test/run-all.js",
+    "test": "npm run build && npm run test:smoke && npm run --if-present test:phase0 && npm run test:atomic && npm run --if-present test:phase2 && npm run --if-present test:phase3 && npm run test:phase4 && npm run test:detection && npm run test:cooperative-qos",
     "test:smoke": "node test/smoke.js",
     "test:cooperative-qos": "npm run build && node test/cooperative-qos.test.js",
     "test:atomic": "node test/atomic-consume.test.js",
@@ -34,7 +34,16 @@
     "test:permanent": "node test/permanent-ban-promotion.test.js",
     "test:cross-signal": "node test/enforcement-cross-signal.test.js",
     "test:enforcement": "npm run test:abuse-reasons && npm run test:trust-multiplier && npm run test:fraud-flags && npm run test:checkban && npm run test:ladder && npm run test:whitelist && npm run test:feedback && npm run test:permanent && npm run test:cross-signal",
-    "test:enforcement-integration": "cross-env ENFORCEMENT_TEST_HOOKS=1 node test/enforcement-shield-integration.test.js"
+    "test:enforcement-integration": "cross-env ENFORCEMENT_TEST_HOOKS=1 node test/enforcement-shield-integration.test.js",
+    "test:code-of-conduct": "node test/code-of-conduct.test.js",
+    "test:agent-status": "node test/agent-status.test.js",
+    "test:admin:hmac": "node test/admin-hmac.test.js",
+    "test:admin:readonly": "node test/admin-readonly.test.js",
+    "test:admin:ban": "node test/admin-ban.test.js",
+    "test:admin:massban": "node test/admin-mass-ban-guard.test.js",
+    "test:admin:config": "node test/admin-config.test.js",
+    "test:metrics": "node test/metrics.test.js",
+    "test:phase4": "npm run test:code-of-conduct && npm run test:agent-status && npm run test:admin:hmac && npm run --if-present test:admin:readonly && npm run --if-present test:admin:ban && npm run test:admin:massban && npm run test:admin:config && npm run test:metrics"
   },
   "dependencies": {
     "@solana/web3.js": "1.91.0",
