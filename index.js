@@ -624,8 +624,33 @@ async function x402Shield(req, res, next) {
       req.x402Verified = result;
       return next();
     }
-    // Prova inválida — retorna 402 com novo desafio
+    // Prova inválida — retorna 402 com novo desafio + registra ofensa no ladder
     sampledWarn("x402_invalid_proof", { ip, error: result.reason, req_id: req.id });
+
+    // Section 8.2: wire failure reasons to the enforcement ladder.
+    // All calls are fire-and-forget — logged on failure; never block the 402 path.
+    if (/pubkey.*hint.*mismatch|pubkey_hint_mismatch/i.test(result.reason)
+        || result.reason === "Signer pubkey does not match the hinted pubkey for this challenge") {
+      // Offense goes on the pubkey scope (claimed key from token)
+      let pk = null;
+      try { pk = authHeader.slice(5).split(".")[1]; } catch {}
+      if (pk) {
+        const score = await getTrustScore(pk).catch(() => 0);
+        const rep = await store.getReputation(pk).catch(() => null);
+        enforcement.recordOffense(store, `pk:${pk}`, REASONS.PUBKEY_HINT_MISMATCH, {
+          trustScore: score,
+          pubkeyFirstPaidAt: rep?.firstPaidAt,
+        }).catch(err => logger.warn({ err: err.message }, "[enforcement] recordOffense failed"));
+      }
+    } else if (/Invalid signature|Malformed token|bad_base58|preflight:/i.test(result.reason)) {
+      enforcement.recordOffense(store, `ip:${ip}`, REASONS.INVALID_SIGNATURE_BURST, {
+        trustScore: 0,
+      }).catch(err => logger.warn({ err: err.message }, "[enforcement] recordOffense failed"));
+    } else if (/already used|nonce_already_used|nonce-replay/i.test(result.reason)) {
+      enforcement.recordOffense(store, `ip:${ip}`, REASONS.NONCE_REPLAY, {
+        trustScore: 0,
+      }).catch(err => logger.warn({ err: err.message }, "[enforcement] recordOffense failed"));
+    }
   }
 
   // Trust-Score discount: if the agent hints its pubkey (X-x402-Agent-Pubkey),
@@ -1014,6 +1039,11 @@ app.post("/escrow/deposit", rl.deposit, express.json({ limit: '1kb' }), async (r
       // Cache negative for 60s — same sig won't bother Solana again until TTL.
       await store.markDepositKnownBad(sig, CONFIG.DEPOSIT_NEGATIVE_CACHE_TTL_MS);
       bumpReqCounter("/escrow/deposit", "shield_deposit_validation", "blocked");
+      // Section 8.2: Tx sig invalid in /escrow/deposit → record IP offense
+      const depositIp = req.ip || req.socket.remoteAddress;
+      enforcement.recordOffense(store, `ip:${depositIp}`, REASONS.DEPOSIT_SIGNATURE_INVALID, {
+        trustScore: 0,
+      }).catch(err => logger.warn({ err: err.message }, "[enforcement] deposit recordOffense failed"));
       return res.status(400).json({ error: result.reason, code: 400 });
     }
     logger.info({
@@ -1219,9 +1249,30 @@ const upstreamAgent = upstreamIsHttps
   ? new https.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000, timeout: 15_000 })
   : new http.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000, timeout: 15_000 });
 
+// Wrap rpcBodyLimit so 413 also fires a recordOffense (Section 8.2).
+function rpcBodyLimitWithEnforcement(maxBytes) {
+  const inner = rpcBodyLimit(maxBytes);
+  return function (req, res, next) {
+    // Intercept 413 responses to record the offense before they go out
+    const origStatus = res.status.bind(res);
+    let intercepted = false;
+    res.status = function (code) {
+      if (code === 413 && !intercepted) {
+        intercepted = true;
+        const ip = req.ip || req.socket.remoteAddress;
+        enforcement.recordOffense(store, `ip:${ip}`, REASONS.BODY_TOO_LARGE, {
+          trustScore: 0,
+        }).catch(err => logger.warn({ err: err.message }, "[enforcement] body-limit recordOffense failed"));
+      }
+      return origStatus(code);
+    };
+    return inner(req, res, next);
+  };
+}
+
 app.use(
   "/rpc",
-  rpcBodyLimit(CONFIG.BODY_LIMIT_RPC_BYTES),
+  rpcBodyLimitWithEnforcement(CONFIG.BODY_LIMIT_RPC_BYTES),
   rl.rpcEdge,
   rlEnforce,        // bridges rpcEdge rate-limit state → enforcement ladder
   x402Shield,
