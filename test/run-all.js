@@ -49,6 +49,7 @@ const FILES = [
   "test/store-slidingwindow-query.test.js",
   "test/metrics-output.test.js",
   "test/admin-canonical.test.js",
+  "test/agent-status-handler.test.js",
 ];
 
 let failed = 0;
