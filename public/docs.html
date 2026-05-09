@@ -120,9 +120,9 @@
             <span class="nav-network-dot" style="background:#f9a826;"></span>Devnet
             <span class="nav-network-label">devnet.rpcpriority.com · testnet</span>
           </a>
-          <a href="https://demo.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
-            <span class="nav-network-dot" style="background:#9945FF;"></span>Trust Demo
-            <span class="nav-network-label">demo.rpcpriority.com · fake deposits</span>
+          <a href="https://github.com/flavioparah/x402-priority-protocol" class="nav-network-item" target="_blank" rel="noopener">
+            <span class="nav-network-dot" style="background:#9945FF;"></span>Source
+            <span class="nav-network-label">github.com/flavioparah/x402</span>
           </a>
         </div>
       </div>
@@ -209,7 +209,7 @@
           <div class="code-block">
             <button class="copy-btn" onclick="copyCode(this)">copy</button>
             <pre><span class="cmd">curl</span> -s -o /dev/null -w <span class="str">"%{http_code}"</span> \
-  -X POST https://demo.rpcpriority.com/rpc \
+  -X POST https://devnet.rpcpriority.com/rpc \
   -H <span class="str">"Content-Type: application/json"</span> \
   -d <span class="str">'{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'</span>
 <span class="comment"># → 402</span></pre>
@@ -220,14 +220,14 @@
           <div class="code-block">
             <button class="copy-btn" onclick="copyCode(this)">copy</button>
             <pre><span class="cmd">curl</span> -s \
-  -X POST https://demo.rpcpriority.com/rpc \
+  -X POST https://devnet.rpcpriority.com/rpc \
   -H <span class="str">"Content-Type: application/json"</span> \
   -d <span class="str">'{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'</span> | jq .
 <span class="comment"># → { "error": { "code": 402, "data": { "nonce": "...", "amount_micro_lamports": 1000, ... } } }</span></pre>
           </div>
         </div>
         <div class="p-3 rounded-lg text-xs text-white/50" style="background:rgba(153,69,255,0.07);border:1px solid rgba(153,69,255,0.15);">
-          <span style="color:#9945FF;">Note:</span> <code class="mono">demo.rpcpriority.com</code> runs with <code class="mono">RPC_LOAD_FORCE=0.9</code> — 402 fires on ~90% of requests so you can see the challenge without waiting for real load.
+          <span style="color:#9945FF;">Note:</span> <code class="mono">devnet.rpcpriority.com</code> runs with <code class="mono">RPC_LOAD_FORCE=0.9</code> — 402 fires on ~90% of requests so you can see the challenge without waiting for real load.
           Want to bypass with a signed payment? See the <strong>SDK</strong> tab.
         </div>
         <div class="pt-2">
@@ -357,7 +357,7 @@ RPC_LOAD_THRESHOLD=0 ESCROW_TRUST_DEPOSITS=1 \
 <span class="kw">const</span> pubkey = keypair.publicKey.toBase58();
 
 <span class="comment">// Deposit escrow (demo: trusted, no real SOL needed)</span>
-<span class="kw">await</span> fetch(<span class="str">'https://demo.rpcpriority.com/escrow/deposit-trusted'</span>, {
+<span class="kw">await</span> fetch(<span class="str">'https://devnet.rpcpriority.com/escrow/deposit-trusted'</span>, {
   method: <span class="str">'POST'</span>,
   headers: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> },
   body: JSON.stringify({ pubkey, amount_micro_lamports: 200_000 }),
@@ -373,7 +373,7 @@ RPC_LOAD_THRESHOLD=0 ESCROW_TRUST_DEPOSITS=1 \
             <pre><span class="kw">import</span> { X402Provider } <span class="kw">from</span> <span class="str">'./x402-client-sdk'</span>;
 
 <span class="kw">const</span> conn = <span class="kw">new</span> X402Provider(
-  <span class="str">'https://demo.rpcpriority.com/rpc'</span>,
+  <span class="str">'https://devnet.rpcpriority.com/rpc'</span>,
   keypair,
   { priorityBudget: 50_000 },   <span class="comment">// max µL per request</span>
 );</pre>
@@ -590,7 +590,7 @@ RPC_LOAD_THRESHOLD=0 <span class="cmd">npm</span> start   <span class="comment">
 <span class="kw">const</span> pubkey = keypair.publicKey.toBase58();
 
 <span class="comment">// Option A: demo (no real SOL) — for testing only</span>
-<span class="kw">await</span> fetch(<span class="str">'https://demo.rpcpriority.com/escrow/deposit-trusted'</span>, {
+<span class="kw">await</span> fetch(<span class="str">'https://devnet.rpcpriority.com/escrow/deposit-trusted'</span>, {
   method: <span class="str">'POST'</span>,
   headers: { <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> },
   body: JSON.stringify({ pubkey, amount_micro_lamports: 200_000 }),
@@ -621,7 +621,7 @@ RPC_LOAD_THRESHOLD=0 <span class="cmd">npm</span> start   <span class="comment">
               <pre><span class="kw">import</span> { X402Provider } <span class="kw">from</span> <span class="str">'./x402-client-sdk'</span>;
 
 <span class="kw">const</span> conn = <span class="kw">new</span> X402Provider(
-  <span class="str">'https://demo.rpcpriority.com/rpc'</span>,  <span class="comment">// or api.rpcpriority.com</span>
+  <span class="str">'https://devnet.rpcpriority.com/rpc'</span>,  <span class="comment">// or api.rpcpriority.com</span>
   keypair,
   {
     priorityBudget: 50_000,    <span class="comment">// max µL per request (refuse if over)</span>
@@ -751,7 +751,7 @@ console.log(res.balance_micro_lamports, <span class="str">'µL remaining'</span>
       </div>
       <div class="endpoint-row">
         <div>
-          <span class="mono text-sm">demo.rpcpriority.com</span>
+          <span class="mono text-sm">devnet.rpcpriority.com</span>
           <span class="text-xs text-white/40 ml-2">demo · trusted deposits · forced load</span>
         </div>
         <span class="status-pill status-loading" id="status-demo">
@@ -831,7 +831,7 @@ console.log(res.balance_micro_lamports, <span class="str">'µL remaining'</span>
   function refreshStatus() {
     checkEndpoint('status-mainnet', 'api.rpcpriority.com');
     checkEndpoint('status-devnet', 'devnet.rpcpriority.com');
-    checkEndpoint('status-demo', 'demo.rpcpriority.com');
+    checkEndpoint('status-demo', 'devnet.rpcpriority.com');
   }
   refreshStatus();
   setInterval(refreshStatus, 30_000);

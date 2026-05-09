@@ -521,9 +521,9 @@
                             <span class="nav-network-dot" style="background: #f9a826;"></span>Devnet
                             <div class="nav-network-label">devnet.rpcpriority.com · testnet</div>
                         </a>
-                        <a href="https://demo.rpcpriority.com/info" class="nav-network-item" target="_blank" rel="noopener">
-                            <span class="nav-network-dot" style="background: #9945FF;"></span>Trust Demo
-                            <div class="nav-network-label">demo.rpcpriority.com · fake deposits</div>
+                        <a href="https://github.com/flavioparah/x402-priority-protocol" class="nav-network-item" target="_blank" rel="noopener">
+                            <span class="nav-network-dot" style="background: #9945FF;"></span>Source
+                            <div class="nav-network-label">github.com/flavioparah/x402</div>
                         </a>
                     </div>
                 </div>
@@ -616,8 +616,8 @@
                 note: '<span class="accent">Mainnet — custo real.</span> Cada chamada gera um desafio 402 com destino real (<code>FE7UhuuW…9GgQ</code>) e upstream <code>api.mainnet-beta.solana.com</code>. Pra ver Trust-Score subir, é preciso pagar com SOL real on-chain.'
             },
             trust: {
-                url: 'https://demo.rpcpriority.com/rpc',
-                note: '<span class="accent">Demo de Trust-Score.</span> Depósitos confiados (sem on-chain), upstream devnet. Pra ver progressão de score 0 → 100 e 26% de economia, rode <code>SHIELD_URL=https://demo.rpcpriority.com npm run demo:trust</code> num terminal.'
+                url: 'https://devnet.rpcpriority.com/rpc',
+                note: '<span class="accent">Devnet — testnet grátis.</span> Upstream <code>api.devnet.solana.com</code>; deposits aceitam tx devnet (faucet: <code>solana airdrop 1</code>). Pra ver progressão de Trust-Score 0 → 100 com pagamentos reais sem custo, rode <code>SHIELD_URL=https://devnet.rpcpriority.com npm run demo:trust</code>.'
             }
         };
         function applyMode(mode) {
