@@ -734,7 +734,11 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       "default-src": ["'self'"],
-      "script-src":  ["'self'", "'unsafe-inline'"],
+      // Tailwind Play CDN (cdn.tailwindcss.com) é usado pelas páginas /, /live,
+      // /explorer, /docs.html. Requer 'unsafe-eval' porque o Tailwind Play
+      // CDN compila utilities em runtime via Function(). Em produção real
+      // substituir por build local (gera CSS estático e elimina unsafe-eval).
+      "script-src":  ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com"],
       "style-src":   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       "font-src":    ["'self'", "https://fonts.gstatic.com"],
       "img-src":     ["'self'", "data:", "https:"],
