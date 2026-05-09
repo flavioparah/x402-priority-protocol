@@ -23,7 +23,17 @@
     "test:store-ban": "node test/store-ban.test.js",
     "test:boot-guards": "node test/boot-guards.test.js",
     "test:graceful-shutdown": "node test/graceful-shutdown.test.js",
-    "operator:reference": "node examples/operator-qos-reference.js"
+    "operator:reference": "node examples/operator-qos-reference.js",
+    "test:abuse-reasons": "node test/abuse-reasons.test.js",
+    "test:trust-multiplier": "node test/trust-multiplier.test.js",
+    "test:fraud-flags": "node test/detection-fraud-flags.test.js",
+    "test:checkban": "node test/enforcement-checkban.test.js",
+    "test:ladder": "node test/enforcement-ladder.test.js",
+    "test:whitelist": "node test/enforcement-whitelist.test.js",
+    "test:feedback": "node test/feedback-headers.test.js",
+    "test:permanent": "node test/permanent-ban-promotion.test.js",
+    "test:cross-signal": "node test/enforcement-cross-signal.test.js",
+    "test:enforcement": "npm run test:abuse-reasons && npm run test:trust-multiplier && npm run test:fraud-flags && npm run test:checkban && npm run test:ladder && npm run test:whitelist && npm run test:feedback && npm run test:permanent && npm run test:cross-signal"
   },
   "dependencies": {
     "@solana/web3.js": "1.91.0",
