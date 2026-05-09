@@ -50,6 +50,9 @@ const FILES = [
   "test/metrics-output.test.js",
   "test/admin-canonical.test.js",
   "test/agent-status-handler.test.js",
+  "test/config-hotreload.test.js",
+  "test/admin-hmac.test.js",
+  "test/agent-status.test.js",
 ];
 
 let failed = 0;
