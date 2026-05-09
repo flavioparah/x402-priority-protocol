@@ -779,7 +779,12 @@ if (process.env.ENFORCEMENT_TEST_HOOKS === "1") {
 // Pre-flight ban check — runs before any other defense. If the IP or
 // (optionally) the pubkey-hint is in a ban tier, respond immediately with
 // the appropriate enforcementResponse.
+//
+// SKIP_BAN_CHECK=1 short-circuits the middleware (test-only knob — atomic
+// race tests do replay attacks that legitimately accumulate offenses but
+// would then 403 the test's own follow-up requests).
 app.use(async (req, res, next) => {
+  if (process.env.SKIP_BAN_CHECK === "1") return next();
   const ip = req.ip || req.socket.remoteAddress;
   const ipKey = `ip:${ip}`;
 

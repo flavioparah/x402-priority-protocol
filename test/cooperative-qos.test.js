@@ -131,13 +131,13 @@ async function main() {
     // ─── Assertion 2 + 3: paid request forwards priority headers ──────────
     const agent = Keypair.generate();
     const conn = new X402Provider(`http://127.0.0.1:${SHIELD_PORT}/rpc`, agent, {
-      priorityBudget: 200_000,
+      priorityBudget: 5_000_000,
     });
-    // Pre-fund escrow via trusted endpoint
+    // Pre-fund escrow via trusted endpoint (5M µL covers MAX_PRICE 1M under 20× tier)
     await fetch(`http://127.0.0.1:${SHIELD_PORT}/escrow/deposit-trusted`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pubkey: agent.publicKey.toBase58(), amount_micro_lamports: 200_000 }),
+      body: JSON.stringify({ pubkey: agent.publicKey.toBase58(), amount_micro_lamports: 5_000_000 }),
     });
 
     const resp = await conn.request("getHealth", []);
