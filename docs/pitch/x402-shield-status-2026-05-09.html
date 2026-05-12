@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="dcterms.date" content="2026-05-09" />
+  <title>x402-Shield · Status &amp; Camadas de Proteção</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="data:text/css,%40page%20%7B%0Asize%3A%20A4%3B%0Amargin%3A%2018mm%2016mm%3B%0A%40bottom%2Dcenter%20%7B%0Acontent%3A%20counter%28page%29%20%22%20%2F%20%22%20counter%28pages%29%3B%0Afont%2Dsize%3A%209pt%3B%0Acolor%3A%20%23888%3B%0A%7D%0A%7D%0A%2A%20%7B%20box%2Dsizing%3A%20border%2Dbox%3B%20%7D%0Ahtml%20%7B%20font%2Dsize%3A%2010%2E5pt%3B%20%7D%0Abody%20%7B%0Afont%2Dfamily%3A%20%27Inter%27%2C%20%27Segoe%20UI%27%2C%20system%2Dui%2C%20%2Dapple%2Dsystem%2C%20sans%2Dserif%3B%0Aline%2Dheight%3A%201%2E5%3B%0Acolor%3A%20%231a1a1a%3B%0Amargin%3A%200%3B%0Apadding%3A%200%3B%0A%7D%0Ah1%20%7B%0Afont%2Dsize%3A%2022pt%3B%0Acolor%3A%20%2314F195%3B%0Aborder%2Dbottom%3A%202px%20solid%20%2314F195%3B%0Apadding%2Dbottom%3A%206px%3B%0Amargin%2Dtop%3A%2028px%3B%0Amargin%2Dbottom%3A%2014px%3B%0Apage%2Dbreak%2Dbefore%3A%20always%3B%0A%7D%0Ah1%3Afirst%2Dof%2Dtype%20%7B%0Apage%2Dbreak%2Dbefore%3A%20auto%3B%0A%7D%0Ah2%20%7B%0Afont%2Dsize%3A%2014pt%3B%0Acolor%3A%20%239945FF%3B%0Amargin%2Dtop%3A%2020px%3B%0Amargin%2Dbottom%3A%2010px%3B%0A%7D%0Ah3%20%7B%0Afont%2Dsize%3A%2012pt%3B%0Acolor%3A%20%23333%3B%0Amargin%2Dtop%3A%2016px%3B%0Amargin%2Dbottom%3A%208px%3B%0A%7D%0Ap%20%7B%0Amargin%3A%208px%200%3B%0A%7D%0Atable%20%7B%0Awidth%3A%20100%25%3B%0Aborder%2Dcollapse%3A%20collapse%3B%0Amargin%3A%2012px%200%3B%0Afont%2Dsize%3A%209%2E5pt%3B%0Apage%2Dbreak%2Dinside%3A%20avoid%3B%0A%7D%0Ath%20%7B%0Abackground%3A%20%231a1a1a%3B%0Acolor%3A%20%2314F195%3B%0Afont%2Dweight%3A%20600%3B%0Atext%2Dalign%3A%20left%3B%0Apadding%3A%206px%208px%3B%0Aborder%3A%201px%20solid%20%231a1a1a%3B%0A%7D%0Atd%20%7B%0Apadding%3A%205px%208px%3B%0Aborder%3A%201px%20solid%20%23ddd%3B%0Avertical%2Dalign%3A%20top%3B%0A%7D%0Atr%3Anth%2Dchild%28even%29%20td%20%7B%0Abackground%3A%20%23f7f7f7%3B%0A%7D%0Acode%20%7B%0Afont%2Dfamily%3A%20%27JetBrains%20Mono%27%2C%20%27Consolas%27%2C%20%27Monaco%27%2C%20monospace%3B%0Abackground%3A%20%23f0f0f0%3B%0Apadding%3A%201px%205px%3B%0Aborder%2Dradius%3A%203px%3B%0Afont%2Dsize%3A%209pt%3B%0Acolor%3A%20%23cc0066%3B%0A%7D%0Apre%20%7B%0Abackground%3A%20%231a1a1a%3B%0Acolor%3A%20%23e0e0e0%3B%0Apadding%3A%2010px%2012px%3B%0Aborder%2Dradius%3A%204px%3B%0Afont%2Dsize%3A%208%2E5pt%3B%0Afont%2Dfamily%3A%20%27JetBrains%20Mono%27%2C%20%27Consolas%27%2C%20monospace%3B%0Aline%2Dheight%3A%201%2E4%3B%0Aoverflow%2Dx%3A%20auto%3B%0Apage%2Dbreak%2Dinside%3A%20avoid%3B%0Awhite%2Dspace%3A%20pre%2Dwrap%3B%0Aword%2Dwrap%3A%20break%2Dword%3B%0A%7D%0Apre%20code%20%7B%0Abackground%3A%20transparent%3B%0Acolor%3A%20%23e0e0e0%3B%0Apadding%3A%200%3B%0A%7D%0Ablockquote%20%7B%0Aborder%2Dleft%3A%203px%20solid%20%2314F195%3B%0Apadding%3A%204px%2012px%3B%0Amargin%3A%2010px%200%3B%0Afont%2Dstyle%3A%20italic%3B%0Acolor%3A%20%23555%3B%0Abackground%3A%20%23f9f9f9%3B%0A%7D%0Aul%2C%20ol%20%7B%0Apadding%2Dleft%3A%2022px%3B%0Amargin%3A%208px%200%3B%0A%7D%0Ali%20%7B%0Amargin%3A%203px%200%3B%0A%7D%0Aa%20%7B%0Acolor%3A%20%239945FF%3B%0Atext%2Ddecoration%3A%20none%3B%0A%7D%0Aa%3Ahover%20%7B%0Atext%2Ddecoration%3A%20underline%3B%0A%7D%0Ahr%20%7B%0Aborder%3A%20none%3B%0Aborder%2Dtop%3A%201px%20solid%20%23ddd%3B%0Amargin%3A%2018px%200%3B%0Apage%2Dbreak%2Dafter%3A%20auto%3B%0A%7D%0A%0A%2Etitle%2Dblock%20%7B%0Atext%2Dalign%3A%20center%3B%0Apadding%3A%2040px%2020px%3B%0Amargin%2Dbottom%3A%2030px%3B%0A%7D%0A%2Etitle%2Dblock%20h1%20%7B%0Afont%2Dsize%3A%2028pt%3B%0Aborder%3A%20none%3B%0Apage%2Dbreak%2Dbefore%3A%20auto%3B%0Amargin%2Dbottom%3A%208px%3B%0A%7D%0A%2Etitle%2Dblock%20%2Esubtitle%20%7B%0Afont%2Dsize%3A%2013pt%3B%0Acolor%3A%20%23666%3B%0Amargin%2Dbottom%3A%204px%3B%0A%7D%0A%2Etitle%2Dblock%20%2Edate%20%7B%0Afont%2Dsize%3A%2010pt%3B%0Acolor%3A%20%23999%3B%0A%7D%0A%0Astrong%20%7B%0Acolor%3A%20%231a1a1a%3B%0Afont%2Dweight%3A%20600%3B%0A%7D%0A%0Ah1%2C%20h2%2C%20h3%20%7B%0Apage%2Dbreak%2Dafter%3A%20avoid%3B%0A%7D%0A" />
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">x402-Shield · Status &amp; Camadas de Proteção</h1>
+<p class="subtitle">Maio 2026 — pré-hackathon</p>
+<p class="date">2026-05-09</p>
+</header>
+<h1 id="x402-shield">x402-Shield</h1>
+<h2 id="http-402-priority-gate-for-solana-rpc-operators">HTTP 402 priority gate for Solana RPC operators</h2>
+<p>Camada de defesa, monetização e enforcement agêntico — pluga na frente de qualquer RPC Solana existente (Helius, Triton, Ankr, validador self-hosted). Open-source, drop-in, sem mudar o RPC upstream.</p>
+<blockquote>
+<p><em>“It’s not an error — it’s an automated economic negotiation.”</em></p>
+</blockquote>
+<hr />
+<h1 id="status-atual">Status atual</h1>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Métrica</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Branch</strong></td>
+<td><code>feat/anti-flood-defense-v2</code></td>
+</tr>
+<tr class="even">
+<td><strong>Commits</strong></td>
+<td>70 (a partir de <code>main</code> em <code>d9ed203</code>)</td>
+</tr>
+<tr class="odd">
+<td><strong>Arquivos modificados</strong></td>
+<td>87</td>
+</tr>
+<tr class="even">
+<td><strong>Linhas</strong></td>
+<td>+9 461 / −470</td>
+</tr>
+<tr class="odd">
+<td><strong>Pull Request</strong></td>
+<td><a href="https://github.com/flavioparah/x402-priority-protocol/pull/1">#1 — github.com/flavioparah/x402-priority-protocol/pull/1</a></td>
+</tr>
+<tr class="even">
+<td><strong>Testes verdes</strong></td>
+<td>Phase 0–4 (~30 arquivos, 250+ asserções)</td>
+</tr>
+<tr class="odd">
+<td><strong>Cobertura defensiva</strong></td>
+<td>5 fases (Foundation, Edge, Core, Enforcement, Agent/Admin)</td>
+</tr>
+<tr class="even">
+<td><strong>Documentação operacional</strong></td>
+<td>Runbook 487 linhas, FAQ defensivo, deploy guide</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="defesa-em-profundidade-visão-geral">Defesa em profundidade — visão geral</h1>
+<p>Toda requisição passa por <strong>10 camadas</strong> antes de chegar ao Solana RPC upstream. Cada camada bloqueia uma classe específica de abuso:</p>
+<pre><code>Internet
+   │
+   ▼
+┌──────────────────────────────────────────────────────────┐
+│ 1. EDGE — Traefik (TLS + 4 middlewares)                  │  ← rejeita lixo bruto
+├──────────────────────────────────────────────────────────┤
+│ 2. EXPRESS BASELINE — helmet + trust proxy + req.id      │  ← headers de segurança
+├──────────────────────────────────────────────────────────┤
+│ 3. PRE-FLIGHT BAN CHECK — IP / pubkey banidos?           │  ← rejeita reincidentes
+├──────────────────────────────────────────────────────────┤
+│ 4. CORS ESCOPADO — public / proxied / protected          │  ← isola admin
+├──────────────────────────────────────────────────────────┤
+│ 5. RATE-LIMIT 3-DIM (IP + pubkey + global)               │  ← bloqueia flood
+├──────────────────────────────────────────────────────────┤
+│ 6. CHEAP-REJECT AUTHORIZATION + NONCE PRE-CHECK          │  ← rejeita assinatura inválida
+├──────────────────────────────────────────────────────────┤
+│ 7. BODY LIMITS por rota (Content-Length não-consumptivo) │  ← bloqueia payload obeso
+├──────────────────────────────────────────────────────────┤
+│ 8. /ESCROW/DEPOSIT BLINDADO — SIG_RE → cache → lock      │  ← idempotência + circuit
+├──────────────────────────────────────────────────────────┤
+│ 9. SOLANA RPC CIRCUIT BREAKER (opossum)                  │  ← isola upstream caído
+├──────────────────────────────────────────────────────────┤
+│ 10. ENFORCEMENT LADDER 5-TIER + AUDIT                    │  ← escalação determinística
+└──────────────────────────────────────────────────────────┘
+   │
+   ▼
+   Solana RPC upstream (Helius / Triton / Ankr / validator)</code></pre>
+<hr />
+<h1 id="camada-1-edge-traefik">Camada 1 — Edge Traefik</h1>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Middleware</th>
+<th>Função</th>
+<th>Limite</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>x402-ratelimit</code></td>
+<td>Token-bucket por IP</td>
+<td>30 req/s sustentado, burst 60</td>
+</tr>
+<tr class="even">
+<td><code>x402-inflight</code></td>
+<td>Cap de conexões concorrentes</td>
+<td>200 (cumulativo devnet+mainnet)</td>
+</tr>
+<tr class="odd">
+<td><code>x402-bodylimit</code></td>
+<td>Rejeita POST &gt; limite</td>
+<td>64 KB</td>
+</tr>
+<tr class="even">
+<td><code>x402-headers</code></td>
+<td>HSTS 1y + nosniff + referrer-policy + remove <code>Server</code> / <code>X-Powered-By</code></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Característica:</strong> roda <strong>antes</strong> do Node. Lixo bruto nunca toca CPU do Shield.</p>
+<p><strong>Smokes:</strong> 4 scripts shell em <code>tools/edge-smoke/</code> com <code>--dry-run</code>.</p>
+<hr />
+<h1 id="camada-2-express-baseline">Camada 2 — Express baseline</h1>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Componente</th>
+<th>Defesa</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>helmet</code></td>
+<td>CSP, HSTS 1 ano, X-Frame-Options DENY, no-sniff, referrer-policy</td>
+</tr>
+<tr class="even">
+<td><code>app.set(&#39;trust proxy&#39;, 1)</code></td>
+<td>IP real do cliente (não da VPS) — confia em 1 hop apenas</td>
+</tr>
+<tr class="odd">
+<td><code>app.disable(&#39;etag&#39;)</code> + <code>disable(&#39;x-powered-by&#39;)</code></td>
+<td>Sem cache stale, sem fingerprint do framework</td>
+</tr>
+<tr class="even">
+<td><code>app.set(&#39;query parser&#39;, &#39;simple&#39;)</code></td>
+<td>Rejeita <code>?foo[bar]=baz</code> (prototype pollution)</td>
+</tr>
+<tr class="odd">
+<td>Middleware de <strong>correlation ID</strong></td>
+<td><code>req.id</code> 8-hex, header <code>X-Request-ID</code> na resposta. Servidor sempre gera; ignora valor do cliente (anti log-injection)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="camada-3-pre-flight-ban-check">Camada 3 — Pre-flight ban check</h1>
+<pre><code>req.ip          → checkBan(`ip:${ip}`)        → tier 2/3/4? → 429/403 + Retry-After
+X-x402-Agent-Pk → checkBan(`pk:${pubkey}`)    → tier 2/3/4? → 429/403 + Retry-After</code></pre>
+<p>Roda <strong>antes</strong> de qualquer outra defesa. Reincidentes nunca custam CPU adicional.</p>
+<p><strong>Headers retornados:</strong> <code>X-x402-Reason</code> (vocabulário fechado), <code>X-x402-Tier</code>, <code>X-x402-Until</code>, <code>X-x402-Trust-Impact</code>.</p>
+<hr />
+<h1 id="camada-4-cors-escopado">Camada 4 — CORS escopado</h1>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Categoria</th>
+<th>Rotas</th>
+<th><code>Access-Control-Allow-Origin</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Public read-only</strong></td>
+<td><code>/info</code>, <code>/health</code>, <code>/stats/*</code>, <code>/reputation/*</code>, <code>/escrow/balance/*</code>, <code>/agent/code-of-conduct</code></td>
+<td><code>*</code></td>
+</tr>
+<tr class="even">
+<td><strong>Proxied</strong></td>
+<td><code>/rpc</code></td>
+<td><code>*</code> (compat SDK)</td>
+</tr>
+<tr class="odd">
+<td><strong>Protected</strong></td>
+<td><code>/escrow/deposit*</code>, <code>/admin/*</code></td>
+<td>só Origin na allowlist (<code>PROTECTED_ORIGIN_ALLOWLIST</code>)</td>
+</tr>
+<tr class="even">
+<td><strong>Default</strong></td>
+<td>qualquer outra</td>
+<td>sem ACAO (server-to-server passa)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="camada-5-rate-limit-3-dimensional">Camada 5 — Rate-limit 3-dimensional</h1>
+<p>Cada <code>/rpc</code> consome <strong>3 buckets independentes</strong> em ordem (Redis ZSET sliding-window via Lua atomic):</p>
+<pre><code>1. global    rl:global             5000 req/min   ← total do operador
+2. ip        rl:rpc:ip:{ip}         100 req/min   ← por IP
+3. pubkey    rl:rpc:pk:{pubkey}     200 req/min   ← por agente autenticado
+4. paid      rl:rpc:paid:{pubkey}   200×N req/min ← lane premium aditiva</code></pre>
+<p><strong>Paid lane = aditiva, NÃO bypass.</strong> Pubkey que paga consome IP + pubkey + global + paid (mesmo se for whale).</p>
+<p><strong>Trust multiplier:</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th>Trust Score</th>
+<th>Bucket paid ×</th>
+<th>Característica</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0–20</td>
+<td>1×</td>
+<td>Novo / suspeito</td>
+</tr>
+<tr class="even">
+<td>21–50</td>
+<td>2×</td>
+<td>Estabelecido</td>
+</tr>
+<tr class="odd">
+<td>51–80</td>
+<td>5×</td>
+<td>Confiável (imune a tier-4 auto)</td>
+</tr>
+<tr class="even">
+<td>81–100</td>
+<td>10×</td>
+<td>Premium (ban requer co-evidência de fraude)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="camada-6-cheap-reject-nonce-pre-check">Camada 6 — Cheap-reject + nonce pre-check</h1>
+<p>Defesa contra flood de <code>Authorization: x402 &lt;lixo&gt;</code>:</p>
+<pre><code>Etapa 1: preflightAuth(header)
+  - regex de comprimento (sig 87-88, pubkey 32-44, msg 50-500 base58)
+  - retorna reason em ~1µs
+
+Etapa 2: noncePreCheck(parts, store)
+  - bs58.decode(parts[2]) bounded em 1024 bytes
+  - JSON.parse → lê SOMENTE payload.nonce
+  - lookup no store; falha → reason fechada
+
+Etapa 3 (só se 1+2 passarem): nacl.sign.detached.verify</code></pre>
+<p><strong>Garantia provada por teste:</strong> 1000 headers garbage → <strong>0 chamadas</strong> a <code>nacl.verify</code> e <code>bs58.decode</code>. Verificado por spy em <code>test/cheap-reject.test.js</code>.</p>
+<p><strong>Invariante de segurança:</strong> <code>payload.pubkey</code>, <code>payload.amount</code>, <code>payload.destination</code> <strong>nunca são lidos</strong> antes de <code>nacl.verify</code> autenticar a mensagem (verificado por Proxy trace em <code>test/nonce-precheck-bounded.test.js</code>).</p>
+<hr />
+<h1 id="camada-7-body-limits-por-rota">Camada 7 — Body limits por rota</h1>
+<table>
+<thead>
+<tr class="header">
+<th>Rota</th>
+<th>Mecanismo</th>
+<th>Limite</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>/rpc</code></td>
+<td>Content-Length header inspection (não consome stream)</td>
+<td>32 KB</td>
+</tr>
+<tr class="even">
+<td><code>/escrow/deposit*</code></td>
+<td><code>express.json({ limit: &#39;1kb&#39; })</code></td>
+<td>1 KB</td>
+</tr>
+<tr class="odd">
+<td><code>/admin/*</code></td>
+<td><code>captureRawBody</code> middleware</td>
+<td>4 KB</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Crítico em <code>/rpc</code>:</strong> o middleware <strong>nunca consome</strong> o body. <code>http-proxy-middleware</code> continua bombeando bytes intactos pro Solana. Verificado por mock upstream que checa byte-equality.</p>
+<hr />
+<h1 id="camada-8-escrowdeposit-blindado">Camada 8 — <code>/escrow/deposit</code> blindado</h1>
+<p>5 portões antes de ligar pro Solana:</p>
+<pre><code>1. SIG_RE.test(sig)                    → 400 invalid_signature_format
+2. isDepositKnownBad(sig)              → 400 cached_negative (60s TTL)
+3. claimPendingDeposit(sig, 15s NX)    → 409 deposit_in_progress + Retry-After
+4. fireSolanaCircuit(sig)              → 503 circuit_open + Retry-After:30
+5. validation result.ok === true       → markDepositKnownBad(sig, 60s) se falhar
+finally: clearPendingDeposit(sig)</code></pre>
+<p><strong>Resultado:</strong> N requisições concorrentes com a <strong>mesma sig</strong> → Solana é chamado <strong>exatamente uma vez</strong>.</p>
+<hr />
+<h1 id="camada-9-solana-rpc-circuit-breaker">Camada 9 — Solana RPC circuit breaker</h1>
+<p>opossum config:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Parâmetro</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Threshold</td>
+<td>≥ 50% erros sobre janela de 30s</td>
+</tr>
+<tr class="even">
+<td>Reset timeout</td>
+<td>30s (OPEN → HALF_OPEN)</td>
+</tr>
+<tr class="odd">
+<td>Volume threshold</td>
+<td>5 requisições mínimas</td>
+</tr>
+<tr class="even">
+<td>Per-call timeout</td>
+<td>15s</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Estados:</strong> <code>CLOSED</code> (normal) → <code>OPEN</code> (Solana caído) → <code>HALF_OPEN</code> (tentativa) → <code>CLOSED</code>.</p>
+<p>Quando OPEN, todas as chamadas <code>getParsedTransaction</code> retornam <code>503 + Retry-After: 30</code> instantaneamente (sem custo de I/O).</p>
+<hr />
+<h1 id="camada-10-enforcement-ladder-5-tier">Camada 10 — Enforcement ladder 5-tier</h1>
+<p>Determinístico. Mesma entrada → mesma resposta. Sem mágica.</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tier</th>
+<th>Nome</th>
+<th>Trigger</th>
+<th>Duração</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0</td>
+<td>Warning</td>
+<td>80% do bucket atingido</td>
+<td>—</td>
+<td>Header <code>X-x402-Trust-Impact: warn</code>, request passa</td>
+</tr>
+<tr class="even">
+<td>1</td>
+<td>Throttle</td>
+<td>Bucket excedido</td>
+<td>—</td>
+<td>429 + <code>Retry-After</code></td>
+</tr>
+<tr class="odd">
+<td>2</td>
+<td>Soft-ban</td>
+<td>3 throttles em 5 min <strong>OU</strong> 10 invalid-sig em 60s</td>
+<td>5 min</td>
+<td>403</td>
+</tr>
+<tr class="even">
+<td>3</td>
+<td>Hard-ban</td>
+<td>3 soft-bans em 24h <strong>OU</strong> sinal de fraude + throttle</td>
+<td>1 h</td>
+<td>403</td>
+</tr>
+<tr class="odd">
+<td>4</td>
+<td>Permanent</td>
+<td>3 hard-bans em 7d</td>
+<td>sem TTL</td>
+<td>403</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Permanent é DESLIGADO por default em mainnet</strong> (<code>ENFORCEMENT_TIER_MAX=3</code>). Tier 4 só via:</p>
+<ol type="1">
+<li>Operador chamar <code>/admin/ban</code> com <code>target_type: pubkey, tier: 4, manual_promotion: true</code></li>
+<li>Pubkey <strong>fora</strong> da janela de whitelist (30 dias / 10 pagamentos)</li>
+<li>Score &lt; 51 (acima desse threshold é imune a tier-4 auto)</li>
+<li>Score &lt; 81 ou fraud signal corroborado (≥81 exige co-evidência)</li>
+</ol>
+<p><strong>Logado integralmente em <code>audit:admin</code> + push em <code>audit:abuse:history</code> por pubkey/IP.</strong></p>
+<hr />
+<h1 id="endpoints-públicos">Endpoints públicos</h1>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Path</th>
+<th>Método</th>
+<th>Função</th>
+<th>Rate-limit</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>/health</code></td>
+<td>GET</td>
+<td>Status JSON</td>
+<td>120/min/IP</td>
+</tr>
+<tr class="even">
+<td><code>/info</code></td>
+<td>GET</td>
+<td>Operador metadata, network, pricing</td>
+<td>120/min/IP</td>
+</tr>
+<tr class="odd">
+<td><code>/stats/recent</code></td>
+<td>GET</td>
+<td>20 últimos pagamentos</td>
+<td>60/min/IP</td>
+</tr>
+<tr class="even">
+<td><code>/stats/qos</code></td>
+<td>GET</td>
+<td>Métricas QoS</td>
+<td>60/min/IP</td>
+</tr>
+<tr class="odd">
+<td><code>/stats/leaderboard</code></td>
+<td>GET</td>
+<td>Top trust-scores</td>
+<td>60/min/IP</td>
+</tr>
+<tr class="even">
+<td><code>/reputation/:pubkey</code></td>
+<td>GET</td>
+<td>Trust-Score + risco + atestações</td>
+<td>30/min/IP</td>
+</tr>
+<tr class="odd">
+<td><code>/escrow/balance/:pubkey</code></td>
+<td>GET</td>
+<td>Saldo em µL</td>
+<td>60/min/IP</td>
+</tr>
+<tr class="even">
+<td><code>/escrow/deposit</code></td>
+<td>POST</td>
+<td>Verifica tx on-chain → credita</td>
+<td>5/min/IP</td>
+</tr>
+<tr class="odd">
+<td><code>/escrow/deposit-trusted</code></td>
+<td>POST</td>
+<td>(devnet only) Credita sem on-chain</td>
+<td>5/min/IP</td>
+</tr>
+<tr class="even">
+<td><code>/rpc</code></td>
+<td>POST</td>
+<td>Proxy x402 challenge → pagamento → forward</td>
+<td>IP+pubkey+global+paid</td>
+</tr>
+<tr class="odd">
+<td><code>/agent/code-of-conduct</code></td>
+<td>GET</td>
+<td>Documento JSON imutável v1.0</td>
+<td>120/min/IP</td>
+</tr>
+<tr class="even">
+<td><code>/agent/status?pubkey=...</code></td>
+<td>GET</td>
+<td>Snapshot do agente (trust, ban, throttles)</td>
+<td>10/min/IP, cache 10s</td>
+</tr>
+<tr class="odd">
+<td><code>/metrics</code></td>
+<td>GET</td>
+<td>Prometheus exposition</td>
+<td>10/min/IP</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="endpoints-agênticos-admin">Endpoints agênticos <code>/admin/*</code></h1>
+<p>Auth: <strong>HMAC-SHA256 canonical string</strong> + Origin allowlist + mass-ban guard.</p>
+<pre><code>canonical = method\npath\nquery_sorted\ntimestamp\nkey_id\nsha256_hex(body)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th>Path</th>
+<th>Método</th>
+<th>Função</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>/admin/abuse-log</code></td>
+<td>GET</td>
+<td>Audit log paginado (since, limit, type)</td>
+</tr>
+<tr class="even">
+<td><code>/admin/agent/:pubkey</code></td>
+<td>GET</td>
+<td>Diagnóstico completo do agente</td>
+</tr>
+<tr class="odd">
+<td><code>/admin/ban</code></td>
+<td>POST</td>
+<td>Tier 2/3/4 (tier-4 requer <code>manual_promotion: true</code>)</td>
+</tr>
+<tr class="even">
+<td><code>/admin/unban</code></td>
+<td>POST</td>
+<td>Remove ban + permanente</td>
+</tr>
+<tr class="odd">
+<td><code>/admin/config</code></td>
+<td>GET</td>
+<td>Snapshot de config efetiva</td>
+</tr>
+<tr class="even">
+<td><code>/admin/config</code></td>
+<td>POST</td>
+<td>Hot-reload via whitelist (RATE_<em>, RPC_LOAD_</em>, etc.)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Mass-ban guard:</strong> 10 bans/min por keyId, 50 bans/h global. Excedeu → 429 + audit alert.</p>
+<p><strong>Sem <code>ADMIN_KEYS_JSON</code> no env:</strong> <code>/admin/*</code> retorna 503 com <code>X-Admin-Status: not_configured</code>.</p>
+<hr />
+<h1 id="container-hardening">Container hardening</h1>
+<div class="sourceCode" id="cb7"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">user</span><span class="kw">:</span><span class="at"> </span><span class="st">&quot;1000:1000&quot;</span><span class="co">            # uid 1000 (node), nunca root</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">read_only</span><span class="kw">:</span><span class="at"> </span><span class="ch">true</span><span class="co">              # rootfs imutável</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">tmpfs</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">/tmp</span><span class="kw">]</span><span class="co">                # apenas /tmp gravável</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">cap_drop</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">ALL</span><span class="kw">]</span><span class="co">              # zero capabilities Linux</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="fu">security_opt</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="at">no-new-privileges:</span><span class="ch">true</span><span class="kw">]</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">ulimits</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="at"> </span><span class="fu">nofile</span><span class="kw">:</span><span class="at"> </span><span class="dv">65535</span><span class="at"> </span><span class="kw">}</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="fu">stop_grace_period</span><span class="kw">:</span><span class="at"> 30s</span><span class="co">       # SIGTERM → drain QoS → exit 0</span></span></code></pre></div>
+<p><code>Dockerfile</code>: <code>npm ci --omit=dev</code> + <code>chown node:node</code> + <code>USER node</code>.</p>
+<hr />
+<h1 id="observabilidade">Observabilidade</h1>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Telemetria</th>
+<th>Tecnologia</th>
+<th>Acesso</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Logs estruturados</td>
+<td>pino async (file fd 1, sync:false)</td>
+<td>stdout do container</td>
+</tr>
+<tr class="even">
+<td>Hot-path warnings</td>
+<td><code>sampledWarn</code> 1-em-50 após 100 eventos</td>
+<td>sem amplificação sob flood</td>
+</tr>
+<tr class="odd">
+<td>Audit log</td>
+<td>streams <code>kind: audit</code> (deposits) e <code>kind: admin</code> (ações)</td>
+<td>grep do stdout ou Loki</td>
+</tr>
+<tr class="even">
+<td>Métricas Prometheus</td>
+<td><code>prom-client</code></td>
+<td><code>GET /metrics</code></td>
+</tr>
+<tr class="odd">
+<td>Correlation ID</td>
+<td><code>X-Request-ID</code> 8-hex</td>
+<td>header em toda resposta</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Métricas expostas em <code>/metrics</code>:</strong></p>
+<ul>
+<li><code>x402_requests_total{route, stage, outcome}</code> — counter de eventos por estágio do pipeline</li>
+<li><code>x402_ratelimit_blocks_total{dimension, route}</code> — blocks por dimensão (ip / pubkey / global / paid)</li>
+<li><code>x402_solana_circuit_state</code> — gauge 0=closed, 1=half_open, 2=open</li>
+<li><code>x402_admin_actions_total{action, outcome}</code> — auditoria operacional</li>
+<li><code>x402_store_healthy</code> — gauge 0/1 (ioredis flag)</li>
+<li><code>x402_solana_rpc_duration_seconds</code> — histogram 10-bucket</li>
+<li><code>x402_abuse_events_total{reason}</code> — eventos da ladder</li>
+<li>Default Node.js metrics (heap, GC, event-loop lag)</li>
+</ul>
+<hr />
+<h1 id="boot-guards">Boot guards</h1>
+<p>3 verificações antes de aceitar tráfego:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Guard</th>
+<th>Condição</th>
+<th>Ação</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>A — Trusted+Mainnet</strong></td>
+<td><code>ESCROW_TRUST_DEPOSITS=1</code> AND mainnet upstream</td>
+<td><code>process.exit(1)</code></td>
+</tr>
+<tr class="even">
+<td><strong>B — Redis Required</strong></td>
+<td><code>REDIS_REQUIRED=true</code> (default em mainnet) AND Redis indisponível por 30s</td>
+<td><code>process.exit(1)</code></td>
+</tr>
+<tr class="odd">
+<td><strong>C — Admin Not Configured</strong></td>
+<td><code>ADMIN_KEYS_JSON</code> ausente</td>
+<td>Mount stub 503 com <code>X-Admin-Status: not_configured</code></td>
+</tr>
+</tbody>
+</table>
+<p>Warning não-bloqueante: <code>RPC_LOAD_FORCE</code> em mainnet → log.warn destacado (modo demo).</p>
+<hr />
+<h1 id="graceful-shutdown">Graceful shutdown</h1>
+<pre><code>SIGTERM ou SIGINT
+  ↓
+shuttingDown = true
+/health passa a retornar 503 status=shutting_down
+  ↓
+server.close() — refusa novas conexões
+  ↓
+poll a cada 200ms — espera qosInFlight=0 &amp;&amp; qosQueue=0
+deadline 25s
+  ↓
+store.close() — flush Redis
+  ↓
+setTimeout(100ms) → process.exit(0)</code></pre>
+<p>Compose alinha com <code>stop_grace_period: 30s</code> (5s de margem).</p>
+<hr />
+<h1 id="testes-cobertura">Testes — cobertura</h1>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Fase</th>
+<th>Arquivos</th>
+<th>Asserções aprovadas</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Phase 0 (foundation, store, boot)</td>
+<td>11</td>
+<td>70+</td>
+</tr>
+<tr class="even">
+<td>Phase 2 (preflight, rate-limit, body, deposit, circuit, CORS)</td>
+<td>9</td>
+<td>80+</td>
+</tr>
+<tr class="odd">
+<td>Phase 3 (enforcement ladder)</td>
+<td>10</td>
+<td>84</td>
+</tr>
+<tr class="even">
+<td>Phase 4 (admin, agent, metrics, config)</td>
+<td>8</td>
+<td>130+</td>
+</tr>
+<tr class="odd">
+<td><strong>Total novo</strong></td>
+<td><strong>38</strong></td>
+<td><strong>365+</strong></td>
+</tr>
+<tr class="even">
+<td>Pré-existentes (smoke + atomic-consume + cooperative-qos)</td>
+<td>3</td>
+<td>21 (todos verdes após fix)</td>
+</tr>
+</tbody>
+</table>
+<p>Todos rodam via <code>npm test</code> ou <code>npm run test:phase{0..4}</code>.</p>
+<hr />
+<h1 id="pacote-agêntico-para-ai-agents">Pacote agêntico — para AI Agents</h1>
+<p><code>/agent/code-of-conduct</code> retorna documento JSON imutável v1.0 contendo:</p>
+<ul>
+<li><strong>Rate budgets</strong> (per_ip, per_pubkey, global, paid_pubkey base)</li>
+<li><strong>Backoff protocol</strong> (429 → exponential backoff, 402 → pay challenge, 503 → wait 30s)</li>
+<li><strong>Identity rules</strong> (pubkey rotation policy, nonce single-use)</li>
+<li><strong>Deposit rules</strong> (signature validation, on-chain confirmation)</li>
+<li><strong>Enforcement tiers</strong> com triggers e durações</li>
+<li><strong>Trust multipliers</strong> lookup</li>
+<li><strong>Operator obligations</strong> (audit retention, key rotation)</li>
+</ul>
+<p>Versão semver. Bumps de major = breaking SDK contract change.</p>
+<hr />
+<h1 id="decisões-para-hackathon">Decisões para hackathon</h1>
+<p><strong>Networks ativas:</strong></p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>URL</th>
+<th>Tipo</th>
+<th>Custo SOL</th>
+<th>Para quê</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>api.rpcpriority.com</code></td>
+<td>Mainnet</td>
+<td>Real</td>
+<td>Demo “real deal” — pagamento on-chain</td>
+</tr>
+<tr class="even">
+<td><code>devnet.rpcpriority.com</code></td>
+<td>Devnet</td>
+<td>Faucet (grátis)</td>
+<td>Demo de mecânica + Trust-Score progression</td>
+</tr>
+<tr class="odd">
+<td><del><code>demo.rpcpriority.com</code></del></td>
+<td><del>Demo</del></td>
+<td>—</td>
+<td><strong>Aposentado</strong> (incompatível com Phase 0 Boot Guard A)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Modo demo:</strong> <code>RPC_LOAD_FORCE=0.9</code> em ambos compose → toda chamada <code>/rpc</code> força challenge 402 (mostra o protocolo sem precisar de carga real).</p>
+<p><strong>Riscos remanescentes (todos baixos):</strong></p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Risco</th>
+<th>Severidade</th>
+<th>Mitigação</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Júri tenta <code>/escrow/deposit</code> mainnet sem SOL</td>
+<td>Baixa</td>
+<td>Mensagem <code>transaction not found</code> é clara; demonstre em devnet primeiro</td>
+</tr>
+<tr class="even">
+<td>6+ deposits rápidos → 429</td>
+<td>Baixa</td>
+<td>Cenário improvável; uso normal não dispara</td>
+</tr>
+<tr class="odd">
+<td>Flood acidental → IP soft-banned 5min</td>
+<td>Baixa</td>
+<td>TTL 5 min; reseta após restart container</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="próximos-passos-24h-até-hackathon">Próximos passos (24h até hackathon)</h1>
+<div class="sourceCode" id="cb9"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Pull no kvm4</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> kvm4</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /root/x402</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> pull origin feat/anti-flood-defense-v2</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Subir devnet + mainnet (NÃO subir docker-compose.yml raiz — incompatível)</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose <span class="at">-f</span> docker-compose.devnet.yml up <span class="at">-d</span> <span class="at">--build</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> compose <span class="at">-f</span> docker-compose.mainnet.yml up <span class="at">-d</span> <span class="at">--build</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Smoke pós-deploy</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> https://devnet.rpcpriority.com/health</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> https://api.rpcpriority.com/info</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="fu">bash</span> tools/edge-smoke/test-security-headers.sh</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="fu">bash</span> tools/edge-smoke/test-bodylimit.sh</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Validar fluxo SDK em devnet (do laptop)</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="va">SHIELD_URL</span><span class="op">=</span>https://devnet.rpcpriority.com <span class="ex">npm</span> run demo:trust</span></code></pre></div>
+<hr />
+<h1 id="pitch-pontos-memoráveis-para-o-júri">Pitch — pontos memoráveis para o júri</h1>
+<ol type="1">
+<li><strong>Drop-in middleware</strong> — pluga na frente de qualquer Solana RPC sem mudar o upstream</li>
+<li><strong>DDoS vira receita</strong> — ataques pagam o operador (alinhamento de incentivos)</li>
+<li><strong>Defesa em 10 camadas</strong> — não é uma feature, é um sistema completo</li>
+<li><strong>Atomic atomic-atomic</strong> — Redis Lua scripts garantem zero double-spend, zero race</li>
+<li><strong>Public good open-source</strong> — qualquer operador (Helius, Triton, validador) pode auto-hospedar</li>
+<li><strong>Agentic-first</strong> — Code of Conduct versionado, /admin/* HMAC, /metrics Prometheus, sem painel HTML</li>
+<li><strong>Trust-Score portátil</strong> — reputação cross-operator que cresce com pagamentos</li>
+<li><strong>Cheap-reject de assinatura</strong> — flood de 1000 headers garbage = 0 nacl.verify (provado por teste)</li>
+<li><strong>Container hardened</strong> — uid 1000 + read_only + cap_drop ALL + stop_grace_period 30s</li>
+<li><strong>365+ testes verdes</strong> + runbook operacional de 487 linhas</li>
+</ol>
+<hr />
+<p><em>Gerado em 2026-05-09. Branch <code>feat/anti-flood-defense-v2</code> @ commit <code>da8bf1a</code>.</em> <em>Pull Request: <a href="https://github.com/flavioparah/x402-priority-protocol/pull/1">github.com/flavioparah/x402-priority-protocol/pull/1</a></em></p>
+</body>
+</html>

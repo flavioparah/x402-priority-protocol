@@ -14,6 +14,18 @@ const nacl = require("tweetnacl");
 const bs58 = require("bs58");
 const crypto = require("crypto");
 const { Connection, PublicKey, SystemProgram } = require("@solana/web3.js");
+const { logger, sampledWarn } = require("./lib/logger");
+const preflight = require("./lib/preflight");
+const { createRateLimitMiddleware } = require("./lib/ratelimit");
+const { rpcBodyLimit } = require("./lib/rpc-bodylimit");
+const { fireSolanaCircuit } = require("./lib/solana-circuit");
+const { SIG_RE } = require("./lib/preflight");
+const { corsForRoute } = require("./lib/cors-scoped");
+const { bumpReqCounter } = require("./lib/metrics-counters");
+
+// ─── Phase 3 enforcement integration ─────────────────────────────────────────
+const enforcement = require("./lib/enforcement-public");
+const { REASONS } = enforcement;
 
 // ─── Configuração ────────────────────────────────────────────────────────────
 
@@ -26,6 +38,10 @@ const CONFIG = {
   RPC_LOAD_THRESHOLD: parseFloat(process.env.RPC_LOAD_THRESHOLD || "0.75"),
   REQUESTS_PER_IP_LIMIT: parseInt(process.env.REQUESTS_PER_IP_LIMIT || "100"),
   RATE_WINDOW_MS: parseInt(process.env.RATE_WINDOW_MS || "60000"),
+  RATE_IP_LIMIT: parseInt(process.env.RATE_IP_LIMIT || "100"),
+  RATE_PUBKEY_LIMIT: parseInt(process.env.RATE_PUBKEY_LIMIT || "200"),
+  RATE_PAID_PUBKEY_BASE: parseInt(process.env.RATE_PAID_PUBKEY_BASE || "200"),
+  RATE_GLOBAL_LIMIT: parseInt(process.env.RATE_GLOBAL_LIMIT || "5000"),
 
   // Preço dinâmico (micro-lamports) — escala com a carga
   // Defaults Cenário 20×: 20 lamports (BASE) → 1000 lamports (MAX saturado)
@@ -82,12 +98,33 @@ const CONFIG = {
   QOS_QUEUE_TIMEOUT_MS: parseInt(process.env.QOS_QUEUE_TIMEOUT_MS || "10000"),
   QOS_BYPASS_THRESHOLD: parseFloat(process.env.QOS_BYPASS_THRESHOLD || "0.5"),
   QOS_MODE: process.env.QOS_MODE || "standalone",  // "standalone" | "cooperative" | "off"
+  // Phase 0 — boot guards & admin wiring (spec §10.8, §12)
+  NETWORK: process.env.NETWORK || "",
+  REDIS_REQUIRED:
+    typeof process.env.REDIS_REQUIRED === "string"
+      ? /^(true|1|yes)$/i.test(process.env.REDIS_REQUIRED)
+      : (() => {
+          const mn =
+            String(process.env.NETWORK || "").toLowerCase() === "mainnet" ||
+            (process.env.REAL_RPC_URL || "").includes("mainnet-beta");
+          return mn;
+        })(),
+  REDIS_REQUIRED_TIMEOUT_MS: parseInt(
+    process.env.TEST_REDIS_REQUIRED_TIMEOUT_MS || "30000",
+    10
+  ),
+  BODY_LIMIT_RPC_BYTES: parseInt(process.env.BODY_LIMIT_RPC_BYTES || "32768"),
+  DEPOSIT_PENDING_TTL_MS: parseInt(process.env.DEPOSIT_PENDING_TTL_MS || "15000"),
+  DEPOSIT_NEGATIVE_CACHE_TTL_MS: parseInt(process.env.DEPOSIT_NEGATIVE_CACHE_TTL_MS || "60000"),
+  SOLANA_CIRCUIT_THRESHOLD_PCT: parseInt(process.env.SOLANA_CIRCUIT_THRESHOLD_PCT || "50"),
+  SOLANA_CIRCUIT_RESET_MS: parseInt(process.env.SOLANA_CIRCUIT_RESET_MS || "30000"),
+  SOLANA_CIRCUIT_TIMEOUT_MS: parseInt(process.env.SOLANA_CIRCUIT_TIMEOUT_MS || "15000"),
+  ADMIN_ORIGIN_ALLOWLIST: (process.env.ADMIN_ORIGIN_ALLOWLIST || "https://api.rpcpriority.com,https://ops.rpcpriority.com").split(",").map(s => s.trim()).filter(Boolean),
+  PROTECTED_ORIGIN_ALLOWLIST: (process.env.PROTECTED_ORIGIN_ALLOWLIST || "https://rpcpriority.com,https://api.rpcpriority.com").split(",").map(s => s.trim()).filter(Boolean),
 };
 
-// ─── Estado em memória (substitua por Redis em produção) ──────────────────────
-
-/** @type {Map<string, { count: number, resetAt: number }>} */
-const ipCounters = new Map();
+// Graceful shutdown state — flipped by SIGTERM/SIGINT (spec §10.5).
+let shuttingDown = false;
 
 // ─── Persistence layer ────────────────────────────────────────────────────────
 // The four critical state pieces (escrow, nonces, reputation, deposit
@@ -99,6 +136,13 @@ const store = createStore();
 // Sybil / fraud / churn detection over the per-pubkey attestation log.
 // Signals are computed lazily at /reputation/:pubkey query time.
 const { computeRisk } = require("./lib/detection");
+
+// ─── Phase 4 agent modules ────────────────────────────────────────────────────
+const { getCodeOfConduct } = require("./lib/code-of-conduct");
+const { makeAgentStatusHandler } = require("./lib/agent-status");
+const { getActiveFraudFlags } = require("./lib/detection");
+const { config: runtimeConfig, getConfig, applyUpdate } = require("./lib/config");
+const { makeMetricsHandler, incAdminAction } = require("./lib/metrics");
 
 /**
  * Lazily-initialized Solana Connection used to verify deposit transactions.
@@ -354,15 +398,13 @@ async function verifyDepositTx(signature) {
     return { ok: false, reason: "signature already used for a deposit" };
   }
 
-  let tx;
-  try {
-    tx = await getSolanaConnection().getParsedTransaction(signature, {
-      commitment: CONFIG.DEPOSIT_COMMITMENT,
-      maxSupportedTransactionVersion: 0,
-    });
-  } catch (err) {
-    return { ok: false, reason: `RPC error fetching transaction: ${err.message}` };
-  }
+  // RPC errors propagate so the opossum circuit (lib/solana-circuit.js) can
+  // count them toward the failure threshold. Validation failures continue to
+  // return { ok: false } below — those don't count toward circuit.
+  const tx = await getSolanaConnection().getParsedTransaction(signature, {
+    commitment: CONFIG.DEPOSIT_COMMITMENT,
+    maxSupportedTransactionVersion: 0,
+  });
 
   if (!tx) {
     return { ok: false, reason: `transaction not found or not yet ${CONFIG.DEPOSIT_COMMITMENT}` };
@@ -426,18 +468,6 @@ async function recordPayment(pubkeyB58, amount) {
   });
 }
 
-/** Verifica se o IP excedeu o limite de requisições. */
-function isRateLimited(ip) {
-  const now = Date.now();
-  let counter = ipCounters.get(ip);
-  if (!counter || counter.resetAt < now) {
-    counter = { count: 0, resetAt: now + CONFIG.RATE_WINDOW_MS };
-    ipCounters.set(ip, counter);
-  }
-  counter.count++;
-  return counter.count > CONFIG.REQUESTS_PER_IP_LIMIT;
-}
-
 /**
  * Gera um nonce único e armazena os detalhes do desafio.
  * If a hinted pubkey was used to discount the price, bind the nonce to
@@ -487,9 +517,7 @@ if (CONFIG.QOS_MODE === "cooperative") {
         qosCoopHealthConsecutiveSuccesses >= QOS_HEALTH_REPROBE_REQUIRED &&
         qosOverloadFallbackUntil > Date.now()
       ) {
-        console.log(
-          `[qos] cooperative re-probe: ${QOS_HEALTH_REPROBE_REQUIRED} consecutive OK — ending fallback early`
-        );
+        logger.info({ reason: "qos_coop_reprobe_recovered", consecutive_successes: QOS_HEALTH_REPROBE_REQUIRED });
         qosOverloadFallbackUntil = 0;
       }
     } else {
@@ -501,9 +529,7 @@ if (CONFIG.QOS_MODE === "cooperative") {
         const newUntil = Date.now() + QOS_HEALTH_INTERVAL_MS * 2;
         if (newUntil > qosOverloadFallbackUntil) {
           qosOverloadFallbackUntil = newUntil;
-          console.warn(
-            `[qos] cooperative operator unreachable for >${QOS_HEALTH_UNREACHABLE_MS / 1000}s (${qosCoopHealthLastError}) — forcing fallback`
-          );
+          logger.warn({ reason: "qos_coop_unreachable_force_fallback", unreachable_threshold_ms: QOS_HEALTH_UNREACHABLE_MS, last_error: qosCoopHealthLastError });
         }
       }
     }
@@ -518,7 +544,7 @@ setInterval(() => {
     ts: Date.now(),
     load: parseFloat(getRpcLoad().toFixed(3)),
     rps: parseFloat((requestTimestamps.length / (CONFIG.LOAD_WINDOW_MS / 1000)).toFixed(2)),
-  }).catch((e) => console.error("[stats] pushLoadSample failed:", e.message));
+  }).catch((e) => logger.error({ reason: "stats_load_sample_failed", error: e.message }));
 }, 60_000);
 
 // ─── Verificação de assinatura (MVP off-chain) ────────────────────────────────
@@ -532,60 +558,58 @@ setInterval(() => {
  * Formato esperado: "x402 <base58(signature)>.<base58(pubkey)>.<base58(message)>"
  */
 async function verifyX402Authorization(authHeader) {
-  if (!authHeader || !authHeader.startsWith("x402 ")) return { ok: false, reason: "Missing x402 header" };
-
-  try {
-    const token = authHeader.slice(5); // remove "x402 "
-    const parts = token.split(".");
-    if (parts.length !== 3) return { ok: false, reason: "Malformed token (expected sig.pubkey.msg)" };
-
-    const [sigB58, pubkeyB58, msgB58] = parts;
-    const signature = bs58.decode(sigB58);
-    const pubkeyBytes = bs58.decode(pubkeyB58);
-    const messageBytes = bs58.decode(msgB58);
-
-    // Verifica a assinatura Ed25519
-    const valid = nacl.sign.detached.verify(messageBytes, signature, pubkeyBytes);
-    if (!valid) return { ok: false, reason: "Invalid signature" };
-
-    // Decodifica o payload
-    const payload = JSON.parse(Buffer.from(messageBytes).toString("utf8"));
-    const { nonce, pubkey, amount, destination } = payload;
-
-    if (pubkey !== pubkeyB58) return { ok: false, reason: "Pubkey mismatch" };
-    if (destination !== CONFIG.PAYMENT_DESTINATION) return { ok: false, reason: "Wrong destination" };
-
-    // Atomic consume: validates nonce existence, used flag, amount,
-    // hintedPubkey match, and escrow balance — and marks nonce used + debits
-    // escrow — all in one server-side operation (Redis Lua, or single
-    // synchronous JS tick for in-memory). This is what closes the
-    // double-spend race where two concurrent requests with the same signed
-    // nonce could both observe used:false before either marks it true.
-    const consume = await store.consumeNonceAndDebit(nonce, pubkeyB58, amount);
-    if (!consume.ok) {
-      // Map machine reason codes to friendlier messages for response/logs.
-      const friendly = {
-        nonce_not_found: "Unknown or expired nonce",
-        nonce_already_used: "Nonce already used (replay detected)",
-        nonce_expired: "Nonce expired",
-        insufficient_payment: `Insufficient payment for nonce`,
-        pubkey_hint_mismatch: "Signer pubkey does not match the hinted pubkey for this challenge",
-        insufficient_balance: `Insufficient escrow balance: ${consume.balance} < ${amount}`,
-      };
-      return { ok: false, reason: friendly[consume.reason] || consume.reason };
-    }
-
-    // Credit reputation so subsequent challenges for this pubkey are cheaper.
-    // Done after the atomic consume — if recordPayment fails, the debit
-    // already happened (acceptable: rep is best-effort metadata, debit is the
-    // money-critical op).
-    await recordPayment(pubkeyB58, amount);
-
-    const score = await getTrustScore(pubkeyB58);
-    return { ok: true, pubkey: pubkeyB58, amount, nonce, score };
-  } catch (err) {
-    return { ok: false, reason: `Verification error: ${err.message}` };
+  const pre = preflight.preflightAuth(authHeader);
+  if (pre) {
+    bumpReqCounter("/rpc", "shield_auth", "blocked");
+    return { ok: false, reason: `preflight:${pre}` };
   }
+
+  const token = authHeader.slice(5);
+  const parts = token.split(".");
+
+  // Bounded nonce pre-check happens BEFORE bs58.decode of sig/pubkey
+  // and BEFORE nacl.sign.detached.verify. Nonce must exist in Redis.
+  const np = await preflight.noncePreCheck(parts, store);
+  if (!np.ok) {
+    bumpReqCounter("/rpc", "shield_auth", "blocked");
+    return { ok: false, reason: `preflight:${np.reason}` };
+  }
+
+  const { nonce, messageBytes, payload } = np;
+
+  let signature, pubkeyBytes;
+  try {
+    signature = bs58.decode(parts[0]);
+    pubkeyBytes = bs58.decode(parts[1]);
+  } catch (err) {
+    return { ok: false, reason: `bad_base58_credential: ${err.message}` };
+  }
+
+  // Ed25519 verify — authenticates the entire messageBytes, after which
+  // payload.pubkey/amount/destination become trustworthy.
+  const valid = nacl.sign.detached.verify(messageBytes, signature, pubkeyBytes);
+  if (!valid) return { ok: false, reason: "Invalid signature" };
+
+  const { pubkey, amount, destination } = payload;
+  const pubkeyB58 = parts[1];
+  if (pubkey !== pubkeyB58) return { ok: false, reason: "Pubkey mismatch" };
+  if (destination !== CONFIG.PAYMENT_DESTINATION) return { ok: false, reason: "Wrong destination" };
+
+  const consume = await store.consumeNonceAndDebit(nonce, pubkeyB58, amount);
+  if (!consume.ok) {
+    const friendly = {
+      nonce_not_found: "Unknown or expired nonce",
+      nonce_already_used: "Nonce already used (replay detected)",
+      nonce_expired: "Nonce expired",
+      insufficient_payment: `Insufficient payment for nonce`,
+      pubkey_hint_mismatch: "Signer pubkey does not match the hinted pubkey for this challenge",
+      insufficient_balance: `Insufficient escrow balance: ${consume.balance} < ${amount}`,
+    };
+    return { ok: false, reason: friendly[consume.reason] || consume.reason };
+  }
+  await recordPayment(pubkeyB58, amount);
+  const score = await getTrustScore(pubkeyB58);
+  return { ok: true, pubkey: pubkeyB58, amount, nonce, score };
 }
 
 // ─── Middleware principal: x402 Rate Limiter + Challenger ─────────────────────
@@ -594,7 +618,7 @@ async function x402Shield(req, res, next) {
   recordRequest();
   const ip = req.ip || req.socket.remoteAddress;
   const load = getRpcLoad();
-  const challenged = load > CONFIG.RPC_LOAD_THRESHOLD || isRateLimited(ip);
+  const challenged = load > CONFIG.RPC_LOAD_THRESHOLD;
 
   if (!challenged) return next();
 
@@ -603,12 +627,37 @@ async function x402Shield(req, res, next) {
   if (authHeader) {
     const result = await verifyX402Authorization(authHeader);
     if (result.ok) {
-      console.log(`[x402] ✓ Payment accepted from ${result.pubkey} (${result.amount} µL, nonce: ${result.nonce}, trust=${result.score})`);
+      logger.info({ reason: "x402_payment_accepted", pubkey: result.pubkey, amount: result.amount, nonce: result.nonce, trust: result.score, req_id: req.id });
       req.x402Verified = result;
       return next();
     }
-    // Prova inválida — retorna 402 com novo desafio
-    console.warn(`[x402] ✗ Invalid proof from ${ip}: ${result.reason}`);
+    // Prova inválida — retorna 402 com novo desafio + registra ofensa no ladder
+    sampledWarn("x402_invalid_proof", { ip, error: result.reason, req_id: req.id });
+
+    // Section 8.2: wire failure reasons to the enforcement ladder.
+    // All calls are fire-and-forget — logged on failure; never block the 402 path.
+    if (/pubkey.*hint.*mismatch|pubkey_hint_mismatch/i.test(result.reason)
+        || result.reason === "Signer pubkey does not match the hinted pubkey for this challenge") {
+      // Offense goes on the pubkey scope (claimed key from token)
+      let pk = null;
+      try { pk = authHeader.slice(5).split(".")[1]; } catch {}
+      if (pk) {
+        const score = await getTrustScore(pk).catch(() => 0);
+        const rep = await store.getReputation(pk).catch(() => null);
+        enforcement.recordOffense(store, `pk:${pk}`, REASONS.PUBKEY_HINT_MISMATCH, {
+          trustScore: score,
+          pubkeyFirstPaidAt: rep?.firstPaidAt,
+        }).catch(err => logger.warn({ err: err.message }, "[enforcement] recordOffense failed"));
+      }
+    } else if (/Invalid signature|Malformed token|bad_base58|preflight:/i.test(result.reason)) {
+      enforcement.recordOffense(store, `ip:${ip}`, REASONS.INVALID_SIGNATURE_BURST, {
+        trustScore: 0,
+      }).catch(err => logger.warn({ err: err.message }, "[enforcement] recordOffense failed"));
+    } else if (/already used|nonce_already_used|nonce-replay/i.test(result.reason)) {
+      enforcement.recordOffense(store, `ip:${ip}`, REASONS.NONCE_REPLAY, {
+        trustScore: 0,
+      }).catch(err => logger.warn({ err: err.message }, "[enforcement] recordOffense failed"));
+    }
   }
 
   // Trust-Score discount: if the agent hints its pubkey (X-x402-Agent-Pubkey),
@@ -630,7 +679,7 @@ async function x402Shield(req, res, next) {
     load: parseFloat(load.toFixed(3)),
   });
 
-  console.log(`[x402] ⚡ Challenging ${ip} — load: ${(load * 100).toFixed(1)}%, base: ${basePrice} µL, trust: ${trustScore}, final: ${amount} µL`);
+  logger.info({ reason: "x402_challenge_issued", ip, load: parseFloat(load.toFixed(3)), base_price: basePrice, trust_score: trustScore, final_price: amount, req_id: req.id });
 
   res.status(402).set({
     "X-x402-Status": "challenged",
@@ -670,17 +719,101 @@ async function x402Shield(req, res, next) {
 
 const app = express();
 
+const helmet = require("helmet");
+const cryptoMod = require("crypto");
+
+// Per spec §10.1
+app.set("trust proxy", 1);
+app.disable("etag");
+app.disable("x-powered-by");
+app.set("query parser", "simple");
+
+app.use(helmet({
+  hsts: { maxAge: 31_536_000, includeSubDomains: true, preload: false },
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      // Tailwind Play CDN (cdn.tailwindcss.com) é usado pelas páginas /, /live,
+      // /explorer, /docs.html. Requer 'unsafe-eval' porque o Tailwind Play
+      // CDN compila utilities em runtime via Function(). Em produção real
+      // substituir por build local (gera CSS estático e elimina unsafe-eval).
+      "script-src":  ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com"],
+      "style-src":   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      "font-src":    ["'self'", "https://fonts.gstatic.com"],
+      "img-src":     ["'self'", "data:", "https:"],
+      "connect-src": ["'self'"],
+      "frame-ancestors": ["'none'"],
+    },
+  },
+  frameguard: { action: "deny" },
+  noSniff: true,
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+
+// Correlation ID — server always generates its own; client-supplied id ignored.
+app.use((req, res, next) => {
+  req.id = cryptoMod.randomBytes(4).toString("hex");
+  res.setHeader("X-Request-ID", req.id);
+  next();
+});
+
 // CORS middleware — must come BEFORE all routes so preflight OPTIONS resolves
 // without falling into the /rpc proxy.
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-x402-Agent-Pubkey");
-  res.setHeader(
-    "Access-Control-Expose-Headers",
-    "X-x402-Status, X-x402-Payment-Destination, X-x402-Amount, X-x402-Amount-Base, X-x402-Trust-Score, X-x402-Nonce, X-x402-Nonce-TTL"
-  );
-  if (req.method === "OPTIONS") return res.status(204).end();
+app.use(corsForRoute([
+  ...CONFIG.PROTECTED_ORIGIN_ALLOWLIST,
+  ...CONFIG.ADMIN_ORIGIN_ALLOWLIST,
+]));
+
+// Test-only endpoint for the integration suite. Mounted ONLY when
+// ENFORCEMENT_TEST_HOOKS=1 — production deploys never set this.
+if (process.env.ENFORCEMENT_TEST_HOOKS === "1") {
+  console.warn("[enforcement] ENFORCEMENT_TEST_HOOKS=1 — /__test/ban mounted (DO NOT enable in prod)");
+  app.post("/__test/ban", express.json(), async (req, res) => {
+    const { key, tier } = req.body || {};
+    if (tier === 4) await store.addPermanent(key, { reason: "test", by: "test-hook" });
+    else await store.setBan(key, tier, "ip-rate-limit", 300_000);
+    res.json({ ok: true });
+  });
+}
+
+// Pre-flight ban check — runs before any other defense. If the IP or
+// (optionally) the pubkey-hint is in a ban tier, respond immediately with
+// the appropriate enforcementResponse.
+//
+// SKIP_BAN_CHECK=1 short-circuits the middleware (test-only knob — atomic
+// race tests do replay attacks that legitimately accumulate offenses but
+// would then 403 the test's own follow-up requests).
+app.use(async (req, res, next) => {
+  if (process.env.SKIP_BAN_CHECK === "1") return next();
+  const ip = req.ip || req.socket.remoteAddress;
+  const ipKey = `ip:${ip}`;
+
+  const ipBan = await enforcement.checkBan(store, ipKey);
+  if (ipBan) {
+    enforcement.enforcementResponse(res, {
+      tier: ipBan.tier,
+      reason: enforcement.isKnownReason(ipBan.reason) ? ipBan.reason : "ip-rate-limit",
+      until: ipBan.until,
+    });
+    return;
+  }
+
+  const hintedPubkey = req.headers["x-x402-agent-pubkey"];
+  if (hintedPubkey) {
+    const pkBan = await enforcement.checkBan(store, `pk:${hintedPubkey}`);
+    if (pkBan) {
+      enforcement.enforcementResponse(res, {
+        tier: pkBan.tier,
+        reason: enforcement.isKnownReason(pkBan.reason) ? pkBan.reason : "pubkey-rate-limit",
+        until: pkBan.until,
+      });
+      return;
+    }
+  }
   next();
 });
 
@@ -753,8 +886,90 @@ function respondHtmlOrJson(req, res, data, title) {
 </html>`);
 }
 
+// ─── Rate-limit middleware (Phase 2, spec §6.3) ───────────────────────────────
+const { wrapRateLimitWithEnforcement } = require("./lib/ratelimit-enforcement");
+
+const rl = {
+  rpcEdge: createRateLimitMiddleware({
+    routeName: "rpc",
+    ip:           { keyPrefix: "rl:rpc:ip",   max: CONFIG.RATE_IP_LIMIT,     windowMs: CONFIG.RATE_WINDOW_MS },
+    global:       { key:       "rl:global",   max: CONFIG.RATE_GLOBAL_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+    enforceOnBlock: true,
+  }, { store, logger }),
+  rpcAfterAuth: createRateLimitMiddleware({
+    routeName: "rpc",
+    pubkey:       { keyPrefix: "rl:rpc:pk",   max: CONFIG.RATE_PUBKEY_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+    paid:         { keyPrefix: "rl:rpc:paid", baseMax: CONFIG.RATE_PAID_PUBKEY_BASE, windowMs: CONFIG.RATE_WINDOW_MS },
+    enforceOnBlock: true,
+  }, { store, logger }),
+  deposit: createRateLimitMiddleware({
+    routeName: "deposit",
+    ip: { keyPrefix: "rl:deposit:ip", max: 5, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+  balance: createRateLimitMiddleware({
+    routeName: "balance",
+    ip: { keyPrefix: "rl:balance:ip", max: 60, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+  reputation: createRateLimitMiddleware({
+    routeName: "reputation",
+    ip: { keyPrefix: "rl:reputation:ip", max: 30, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+  stats: createRateLimitMiddleware({
+    routeName: "stats",
+    ip: { keyPrefix: "rl:stats:ip", max: 60, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+  meta: createRateLimitMiddleware({
+    routeName: "meta",
+    ip: { keyPrefix: "rl:meta:ip", max: parseInt(process.env.META_IP_LIMIT || "120", 10), windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger }),
+};
+
+// Enforcement bridge: reads req.rateLimitState set by rpcEdge / rpcAfterAuth
+// (enforceOnBlock:true) and escalates via recordOffense → enforcementResponse.
+const rlEnforce = wrapRateLimitWithEnforcement({
+  store,
+  reasonForDimension: (dim) =>
+    dim === "ip"     ? REASONS.IP_RATE_LIMIT :
+    dim === "pubkey" ? REASONS.PUBKEY_RATE_LIMIT :
+    dim === "global" ? REASONS.GLOBAL_RATE_LIMIT :
+                       REASONS.IP_RATE_LIMIT,
+  trustScoreFromReq: async (req) => {
+    const pk = req.headers["x-x402-agent-pubkey"];
+    return pk ? await getTrustScore(pk) : 0;
+  },
+  pubkeyFirstPaidAtFromReq: async (req) => {
+    const pk = req.headers["x-x402-agent-pubkey"];
+    if (!pk) return undefined;
+    const rep = await store.getReputation(pk);
+    return rep?.firstPaidAt;
+  },
+});
+
+// Test-only hooks (gated behind env flags)
+if (process.env.X402_TEST_GLOBAL_ON_META === "1") {
+  rl.meta = createRateLimitMiddleware({
+    routeName: "meta",
+    ip:     { keyPrefix: "rl:meta:ip", max: parseInt(process.env.META_IP_LIMIT || "120", 10), windowMs: CONFIG.RATE_WINDOW_MS },
+    global: { key:       "rl:global",  max: CONFIG.RATE_GLOBAL_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger });
+}
+if (process.env.X402_ENABLE_TEST_ROUTES === "1") {
+  const rlPubkeyOnly = createRateLimitMiddleware({
+    routeName: "test-pubkey",
+    pubkey: { keyPrefix: "rl:test:pk", max: CONFIG.RATE_PUBKEY_LIMIT, windowMs: CONFIG.RATE_WINDOW_MS },
+  }, { store, logger });
+  app.get("/x-test/pubkey-bucket",
+    (req, _res, next) => { req.x402Verified = { pubkey: "TestPubkey1111111111111111111111111111111111" }; next(); },
+    rlPubkeyOnly,
+    (_req, res) => res.json({ ok: true })
+  );
+}
+
 // Health check (sem 402)
-app.get("/health", async (req, res) => {
+app.get("/health", rl.meta, async (req, res) => {
+  if (shuttingDown) {
+    return res.status(503).json({ status: "shutting_down", code: 503 });
+  }
   pruneRequestTimestamps();
   const rps = requestTimestamps.length / (CONFIG.LOAD_WINDOW_MS / 1000);
   const [nonces_active, escrow_accounts] = await Promise.all([
@@ -786,23 +1001,83 @@ app.get("/health", async (req, res) => {
 //
 // Trustless: the Shield never takes the client's word for the amount — only
 // for the signature, which the chain adjudicates.
-app.post("/escrow/deposit", express.json(), async (req, res) => {
-  const { tx_signature } = req.body || {};
-  if (!tx_signature) {
-    return res.status(400).json({ error: "tx_signature (base58) required" });
+app.post("/escrow/deposit", rl.deposit, express.json({ limit: '1kb' }), async (req, res) => {
+  const { tx_signature: sig } = req.body || {};
+
+  // 1. Format gate (free)
+  if (!sig || typeof sig !== "string" || !SIG_RE.test(sig)) {
+    return res.status(400).json({ error: "invalid_signature_format", code: 400 });
   }
-  const result = await verifyDepositTx(tx_signature);
-  if (!result.ok) {
-    return res.status(400).json({ error: result.reason });
+
+  // 2. Negative cache — same bad sig was rejected within the last TTL window
+  if (await store.isDepositKnownBad(sig)) {
+    bumpReqCounter("/escrow/deposit", "shield_deposit_validation", "blocked");
+    return res.status(400).json({
+      error: "deposit_signature_known_invalid",
+      code: 400,
+      reason: "cached_negative",
+    });
   }
-  console.log(`[escrow] ✓ Verified deposit from ${result.pubkey}: ${result.lamports} lamports = ${result.micro_lamports} µL (sig=${result.signature.slice(0, 12)}…, slot=${result.slot})`);
-  return res.json({
-    pubkey: result.pubkey,
-    credited_micro_lamports: result.micro_lamports,
-    balance: result.balance,
-    signature: result.signature,
-    slot: result.slot,
-  });
+
+  // 3. In-flight idempotency lock — N concurrent requests with same sig hit Solana once
+  const requestId = req.id || crypto.randomBytes(4).toString("hex");
+  const claim = await store.claimPendingDeposit(sig, requestId, CONFIG.DEPOSIT_PENDING_TTL_MS);
+  if (!claim.ok) {
+    const remainingMs = await store.pendingDepositPttl(sig);
+    const retryAfter = Math.max(1, Math.ceil((remainingMs > 0 ? remainingMs : 1000) / 1000));
+    res.set("Retry-After", String(retryAfter));
+    return res.status(409).json({
+      error: "deposit_in_progress",
+      code: 409,
+      sig,
+      retry_after_seconds: retryAfter,
+    });
+  }
+
+  try {
+    // 4. Fire through circuit breaker
+    const circuitResult = await fireSolanaCircuit(sig, { verify: verifyDepositTx });
+    if (circuitResult.ok === false && circuitResult.reason === "circuit_open") {
+      res.set("Retry-After", "30");
+      return res.status(503).json({
+        error: "solana_rpc_unavailable",
+        code: 503,
+        reason: "circuit_open",
+      });
+    }
+
+    const result = circuitResult.value;
+    if (!result.ok) {
+      // Cache negative for 60s — same sig won't bother Solana again until TTL.
+      await store.markDepositKnownBad(sig, CONFIG.DEPOSIT_NEGATIVE_CACHE_TTL_MS);
+      bumpReqCounter("/escrow/deposit", "shield_deposit_validation", "blocked");
+      // Section 8.2: Tx sig invalid in /escrow/deposit → record IP offense
+      const depositIp = req.ip || req.socket.remoteAddress;
+      enforcement.recordOffense(store, `ip:${depositIp}`, REASONS.DEPOSIT_SIGNATURE_INVALID, {
+        trustScore: 0,
+      }).catch(err => logger.warn({ err: err.message }, "[enforcement] deposit recordOffense failed"));
+      return res.status(400).json({ error: result.reason, code: 400 });
+    }
+    logger.info({
+      reason: "escrow_deposit_verified",
+      pubkey: result.pubkey,
+      lamports: result.lamports,
+      micro_lamports: result.micro_lamports,
+      sig_prefix: result.signature.slice(0, 12),
+      slot: result.slot,
+      req_id: req.id,
+    });
+    bumpReqCounter("/escrow/deposit", "forwarded", "deposit_called_solana");
+    return res.json({
+      pubkey: result.pubkey,
+      credited_micro_lamports: result.micro_lamports,
+      balance: result.balance,
+      signature: result.signature,
+      slot: result.slot,
+    });
+  } finally {
+    await store.clearPendingDeposit(sig).catch(() => {});
+  }
 });
 
 // DEMO/TEST ONLY: credit escrow without an on-chain tx. Mounts only when
@@ -810,8 +1085,8 @@ app.post("/escrow/deposit", express.json(), async (req, res) => {
 // benchmarks, and the Trust-Score progression demo where a round trip to
 // Solana for every deposit is prohibitive. NEVER enable in production.
 if (CONFIG.TRUST_DEPOSITS) {
-  console.warn("[escrow] ⚠️  ESCROW_TRUST_DEPOSITS=1 — /escrow/deposit-trusted mounted. Demo/test only.");
-  app.post("/escrow/deposit-trusted", express.json(), async (req, res) => {
+  logger.warn({ reason: "escrow_trusted_deposits_mounted", msg: "/escrow/deposit-trusted is exposed (demo/test only)" });
+  app.post("/escrow/deposit-trusted", rl.deposit, express.json({ limit: '1kb' }), async (req, res) => {
     const { pubkey, amount_micro_lamports } = req.body || {};
     if (!pubkey || !amount_micro_lamports) {
       return res.status(400).json({ error: "pubkey and amount_micro_lamports required" });
@@ -822,7 +1097,7 @@ if (CONFIG.TRUST_DEPOSITS) {
 }
 
 // Endpoint de consulta de reputação (Trust-Score) + risk classification
-app.get("/reputation/:pubkey", async (req, res) => {
+app.get("/reputation/:pubkey", rl.reputation, async (req, res) => {
   const pubkey = req.params.pubkey;
   const [rec, attestations] = await Promise.all([
     store.getReputation(pubkey),
@@ -848,7 +1123,7 @@ app.get("/reputation/:pubkey", async (req, res) => {
 });
 
 // Endpoint de consulta de saldo
-app.get("/escrow/balance/:pubkey", async (req, res) => {
+app.get("/escrow/balance/:pubkey", rl.balance, async (req, res) => {
   const balance = await store.getEscrow(req.params.pubkey);
   respondHtmlOrJson(req, res, { pubkey: req.params.pubkey, balance_micro_lamports: balance }, "Escrow balance");
 });
@@ -856,7 +1131,7 @@ app.get("/escrow/balance/:pubkey", async (req, res) => {
 // ─── Stats / dashboard endpoints ──────────────────────────────────────────────
 
 // Static metadata about this Shield deployment (consumed by /live, /try, /explorer pages).
-app.get("/info", (req, res) => {
+app.get("/info", rl.meta, (req, res) => {
   const upstream = CONFIG.REAL_RPC_URL;
   const network = upstream.includes("mainnet") ? "mainnet" : upstream.includes("devnet") ? "devnet" : "unknown";
   respondHtmlOrJson(req, res, {
@@ -871,9 +1146,48 @@ app.get("/info", (req, res) => {
   }, "Gateway info");
 });
 
+// ─── Agent endpoints (Phase 4) ───────────────────────────────────────────────
+
+// GET /agent/code-of-conduct — serves the versioned Code of Conduct document.
+// Accepts ?version=1.0 (default). Returns JSON or HTML (content-negotiation).
+app.get("/agent/code-of-conduct", rl.meta, (req, res) => {
+  const v = req.query.version || "1.0";
+  const doc = getCodeOfConduct(v);
+  if (!doc) return res.status(404).json({ error: "unknown_version", code: 404, version: v });
+  respondHtmlOrJson(req, res, doc, "Code of Conduct");
+});
+
+// GET /agent/status?pubkey=<base58> — read-only trust/enforcement snapshot
+// with 10 s response cache and per-IP rate-limit (10 req/min).
+app.get("/agent/status", rl.meta, makeAgentStatusHandler({
+  store,
+  config: runtimeConfig,
+  computeFraudFlagsForPubkey: async (pk) => {
+    const attestations = await store.getAttestations(pk, 100).catch(() => []);
+    const rep = await store.getReputation(pk).catch(() => null);
+    return getActiveFraudFlags(pk, attestations, rep);
+  },
+}));
+
+// ─── Task 19: GET /metrics — Prometheus scrape endpoint ──────────────────────
+// Public (Prometheus scrapers don't send auth). Per-IP rate-limit: 10/min.
+const rlMetrics = createRateLimitMiddleware({
+  routeName: "metrics",
+  ip: { keyPrefix: "rl:metrics:ip", max: 10, windowMs: 60_000 },
+}, { store, logger });
+
+app.get("/metrics",
+  rlMetrics,
+  makeMetricsHandler(() => ({
+    qosInflightCount: qosInFlight,
+    qosQueueLen:      qosQueue.length,
+    store,
+  }))
+);
+
 // Recent activity for the live dashboard.
 // All fields below survive container restart — persisted in Redis (LIST + HASH).
-app.get("/stats/recent", async (req, res) => {
+app.get("/stats/recent", rl.stats, async (req, res) => {
   const [
     payments,
     challenges,
@@ -910,7 +1224,7 @@ app.get("/stats/recent", async (req, res) => {
 // QoS dispatcher state — for the /live dashboard QoS card.
 // Cumulative counters are persisted in Redis (HASH); wait_samples stay in
 // memory as a rolling 200-sample window for percentile calculation.
-app.get("/stats/qos", async (req, res) => {
+app.get("/stats/qos", rl.stats, async (req, res) => {
   const sorted = [...qosWaitSamples].sort((a, b) => a - b);
   const qosTotals = await store.getQosStats();
   const total_settled = qosTotals.dispatched_total + qosTotals.bypassed_total;
@@ -952,7 +1266,7 @@ app.get("/stats/qos", async (req, res) => {
 });
 
 // Top 10 by Trust-Score for the leaderboard widget.
-app.get("/stats/leaderboard", async (req, res) => {
+app.get("/stats/leaderboard", rl.stats, async (req, res) => {
   const raw = await store.getLeaderboard(10);
   const top = raw.map((r) => ({
     pubkey: r.pubkey,
@@ -983,18 +1297,45 @@ app.get("/explorer", (_req, res) => res.sendFile(path.join(__dirname, "public", 
 // With keep-alive the marginal cost collapses to a single round trip.
 const upstreamIsHttps = CONFIG.REAL_RPC_URL.startsWith("https:");
 const upstreamAgent = upstreamIsHttps
-  ? new https.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000 })
-  : new http.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000 });
+  ? new https.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000, timeout: 15_000 })
+  : new http.Agent({ keepAlive: true, maxSockets: 64, keepAliveMsecs: 30_000, timeout: 15_000 });
+
+// Wrap rpcBodyLimit so 413 also fires a recordOffense (Section 8.2).
+function rpcBodyLimitWithEnforcement(maxBytes) {
+  const inner = rpcBodyLimit(maxBytes);
+  return function (req, res, next) {
+    // Intercept 413 responses to record the offense before they go out
+    const origStatus = res.status.bind(res);
+    let intercepted = false;
+    res.status = function (code) {
+      if (code === 413 && !intercepted) {
+        intercepted = true;
+        const ip = req.ip || req.socket.remoteAddress;
+        enforcement.recordOffense(store, `ip:${ip}`, REASONS.BODY_TOO_LARGE, {
+          trustScore: 0,
+        }).catch(err => logger.warn({ err: err.message }, "[enforcement] body-limit recordOffense failed"));
+      }
+      return origStatus(code);
+    };
+    return inner(req, res, next);
+  };
+}
 
 app.use(
   "/rpc",
+  rpcBodyLimitWithEnforcement(CONFIG.BODY_LIMIT_RPC_BYTES),
+  rl.rpcEdge,
+  rlEnforce,        // bridges rpcEdge rate-limit state → enforcement ladder
   x402Shield,
+  rl.rpcAfterAuth,
+  rlEnforce,        // bridges rpcAfterAuth (pubkey) state → enforcement ladder
   qosMiddleware,
   createProxyMiddleware({
     target: CONFIG.REAL_RPC_URL,
     changeOrigin: true,
     pathRewrite: { "^/rpc": "" },
     agent: upstreamAgent,
+    proxyTimeout: 15_000,
     // http-proxy-middleware v2.x uses top-level onProxyReq / onProxyRes /
     // onError callbacks. The v3 nested `on: { proxyReq, error }` shape is
     // silently ignored on v2 (which is what's installed via package.json
@@ -1012,9 +1353,7 @@ app.use(
       // upstream stack and trigger 30s fallback to standalone queueing.
       if (CONFIG.QOS_MODE === "cooperative" && proxyRes.headers["x-qos-overload"] === "1") {
         qosOverloadFallbackUntil = Date.now() + 30_000;
-        console.warn(
-          `[qos] cooperative operator returned X-QoS-Overload:1 — falling back to standalone queue for 30s`
-        );
+        logger.warn({ reason: "qos_coop_overload_fallback", duration_ms: 30_000 });
       }
     },
     onError: (err, req, res) => {
@@ -1025,17 +1364,335 @@ app.use(
   })
 );
 
-app.listen(CONFIG.PORT, () => {
-  console.log(`
-╔══════════════════════════════════════════════════════╗
-║              x402-Shield  v0.1.0  (MVP)              ║
-╠══════════════════════════════════════════════════════╣
-║  Listening  : http://localhost:${CONFIG.PORT}/rpc           ║
-║  Upstream   : ${CONFIG.REAL_RPC_URL.slice(0, 36).padEnd(36)} ║
-║  Destination: ${CONFIG.PAYMENT_DESTINATION.slice(0, 36).padEnd(36)} ║
-║  Threshold  : ${String(CONFIG.RPC_LOAD_THRESHOLD * 100).padEnd(36)}% ║
-╚══════════════════════════════════════════════════════╝
-  `);
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+
+const bootGuards = require("./lib/boot-guards");
+
+// Catch PayloadTooLargeError + parse errors from express.json across all routes.
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  if (err.type === "entity.too.large") {
+    return res.status(413).json({
+      error: "body_too_large",
+      code: 413,
+      limit: err.limit,
+      received: err.length,
+    });
+  }
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "invalid_json", code: 400 });
+  }
+  return next(err);
+});
+
+// Guard A: trusted-deposits + mainnet — hard exit before anything else.
+bootGuards.checkTrustedDepositsGuard(process.env);
+
+// Admin keys parsed once at boot. Empty Map → /admin/* mounted as 503 stubs.
+const ADMIN_KEYS = bootGuards.parseAdminKeys(process.env);
+
+// Mount /admin/* fall-through stub BEFORE proxy mount so it can intercept
+// every /admin/* path when ADMIN_KEYS is empty. Concrete handlers (Phase 4)
+// will register their own routes if ADMIN_KEYS.size > 0.
+if (ADMIN_KEYS.size === 0) {
+  app.use("/admin", (req, res) => {
+    res.set("X-Admin-Status", "not_configured");
+    res.status(503).json({
+      error: "admin_not_configured",
+      code: 503,
+      message:
+        "ADMIN_KEYS_JSON is not set on this deployment; /admin/* is unavailable",
+    });
+  });
+  logger.warn({
+    reason: "admin_not_configured",
+    msg: "ADMIN_KEYS_JSON missing — /admin/* mounted as 503 stub",
+  });
+}
+
+// ─── Task 11: /admin/* router (only when ADMIN_KEYS configured) ───────────────
+const adminLib = require("./lib/admin");
+const { config: adminConfig } = require("./lib/config");
+const { auditAdminWrite, massBanGuard } = adminLib.makeAdminGuards({ store, config: adminConfig });
+
+if (ADMIN_KEYS.size > 0) {
+  const adminRouter = express.Router();
+
+  // Per-key-id rate-limit for admin endpoints (10 req/min per key-id).
+  // Uses the same massBanCounter store to avoid adding a new dependency.
+  // Note: this is a lightweight inline guard, not the sliding-window RL.
+  const adminKeyRateLimit = async (req, res, next) => {
+    const keyId = req.adminKeyId;
+    if (!keyId) return next();
+    const scope = `rl:admin:keyid:${keyId}`;
+    let count;
+    try { count = await store.incrMassBanCounter(scope, 60); }
+    catch (e) { return next(); }
+    if (count > 60) {
+      res.set("Retry-After", "60");
+      return res.status(429).json({ error: "admin_rate_limit", code: 429 });
+    }
+    next();
+  };
+
+  // Parse req.rawBody (captured by captureRawBody) into req.body for POST routes.
+  // express.json() cannot re-read the already-consumed stream, so we do it here.
+  const parseAdminJson = (req, res, next) => {
+    if (!req.rawBody || !req.rawBody.length) return next();
+    const ct = (req.headers["content-type"] || "").split(";")[0].trim();
+    if (ct !== "application/json") return next();
+    try {
+      req.body = JSON.parse(req.rawBody.toString("utf8"));
+    } catch (e) {
+      return res.status(400).json({ error: "invalid_json", code: 400 });
+    }
+    next();
+  };
+
+  app.use("/admin",
+    adminLib.corsAdminLockdown,
+    adminLib.captureRawBody,
+    adminLib.verifyAdminAuth,
+    adminKeyRateLimit,
+    parseAdminJson,
+    adminRouter
+  );
+
+  // ─── Task 12: GET /admin/abuse-log + GET /admin/agent/:pubkey ──────────────
+
+  // GET /admin/abuse-log?limit=N&since=ts&type=ip|pubkey
+  adminRouter.get("/abuse-log", async (req, res) => {
+    const rawLimit = req.query.limit;
+    const parsed = parseInt(rawLimit || "100", 10) || 100;
+    const limit = Math.min(500, Math.max(1, parsed));
+    if (rawLimit && (parsed < 1 || parsed > 500)) {
+      return res.status(400).json({ error: "limit_out_of_range", code: 400, max: 500 });
+    }
+    const since = req.query.since ? parseInt(req.query.since, 10) : null;
+    const type = req.query.type ? String(req.query.type) : null;
+    if (type && !["ip", "pubkey"].includes(type)) {
+      return res.status(400).json({ error: "invalid_type", code: 400 });
+    }
+    let entries = await store.getAuditAdmin(limit, since || 0);
+    res.json({ entries, count: entries.length, limit, since, type });
+  });
+
+  // GET /admin/agent/:pubkey — fuller detail than /agent/status
+  adminRouter.get("/agent/:pubkey", async (req, res) => {
+    const pubkey = req.params.pubkey;
+    const PUBKEY_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    if (!PUBKEY_RE.test(pubkey)) return res.status(400).json({ error: "invalid_pubkey", code: 400 });
+
+    const [rec, attestations, abuseHistory, ban, isPerm] = await Promise.all([
+      store.getReputation(pubkey),
+      store.getAttestations(pubkey, 100),
+      store.getAbuseHistory(pubkey, 200).catch(() => []),
+      enforcement.checkBan(store, `pk:${pubkey}`).catch(() => null),
+      store.isPermanent(`pk:${pubkey}`).catch(() => false),
+    ]);
+    const fraud = computeRisk(attestations, rec);
+
+    res.json({
+      pubkey,
+      reputation: rec,
+      trust_score: rec ? Math.min(100, rec.paidCount * 5) : 0,
+      attestations,
+      fraud_signals: { sybil_risk: fraud.sybil_risk, fraud_flags: fraud.fraud_flags, churn_pattern: fraud.churn_pattern },
+      ban_history: abuseHistory,
+      current_ban: ban,
+      permanent: isPerm,
+    });
+  });
+
+  // ─── Task 13: POST /admin/ban + POST /admin/unban ──────────────────────────
+
+  const VALID_TIERS = new Set([2, 3, 4]);
+
+  adminRouter.post("/ban", massBanGuard, async (req, res) => {
+    const { key, type, tier, reason, ttl_s } = req.body || {};
+    if (typeof key !== "string" || !key.length) {
+      await auditAdminWrite(req, "ban", { key, type }, "rejected", { reason: "missing_key" });
+      return res.status(400).json({ error: "missing_key", code: 400 });
+    }
+    if (!["ip", "pubkey"].includes(type)) {
+      await auditAdminWrite(req, "ban", { key, type }, "rejected", { reason: "invalid_type" });
+      return res.status(400).json({ error: "invalid_type", code: 400 });
+    }
+    if (!VALID_TIERS.has(tier)) {
+      await auditAdminWrite(req, "ban", { key, type }, "rejected", { reason: "invalid_tier", tier });
+      return res.status(400).json({ error: "invalid_tier", code: 400, allowed: [...VALID_TIERS] });
+    }
+    if (typeof reason !== "string" || reason.trim().length < 3) {
+      await auditAdminWrite(req, "ban", { key, type }, "rejected", { reason: "reason_required" });
+      return res.status(400).json({ error: "reason_required", code: 400 });
+    }
+
+    if (tier === 4) {
+      // Tier 4: permanent ban — store as `pk:<key>` or `ip:<key>` prefix
+      const storeKey = type === "pubkey" ? `pk:${key}` : `ip:${key}`;
+      await store.addPermanent(storeKey, reason);
+      await auditAdminWrite(req, "ban", { type, key }, "ok", { tier, reason, permanent: true });
+      return res.json({ ok: true, tier: 4, permanent: true, key, type });
+    }
+    const ttlMs = tier === 3 ? (adminConfig.HARD_BAN_DURATION_MS) : (adminConfig.SOFT_BAN_DURATION_MS);
+    const effectiveTtl = ttl_s ? Math.max(60_000, Math.min(7 * 86400 * 1000, parseInt(ttl_s, 10) * 1000)) : ttlMs;
+    const storeKey = type === "pubkey" ? `pk:${key}` : `ip:${key}`;
+    await store.setBan(storeKey, tier, reason, effectiveTtl);
+    await auditAdminWrite(req, "ban", { type, key }, "ok", { tier, reason, ttl_ms: effectiveTtl });
+    res.json({ ok: true, tier, key, type, ttl_ms: effectiveTtl });
+  });
+
+  adminRouter.post("/unban", async (req, res) => {
+    const { key, type, reason } = req.body || {};
+    if (typeof key !== "string" || !key.length || !["ip", "pubkey"].includes(type)) {
+      await auditAdminWrite(req, "unban", { key, type }, "rejected", { reason: "invalid_input" });
+      return res.status(400).json({ error: "invalid_input", code: 400 });
+    }
+    if (typeof reason !== "string" || reason.trim().length < 3) {
+      return res.status(400).json({ error: "reason_required", code: 400 });
+    }
+    const storeKey = type === "pubkey" ? `pk:${key}` : `ip:${key}`;
+    await store.clearBan(storeKey);
+    await store.removePermanent(storeKey);
+    await auditAdminWrite(req, "unban", { type, key }, "ok", { reason });
+    res.json({ ok: true, key, type });
+  });
+
+  // ─── Task 16: GET /admin/config + POST /admin/config (hot-reload) ─────────
+
+  adminRouter.get("/config", async (req, res) => {
+    await auditAdminWrite(req, "config_read", null, "ok");
+    res.json({ config: getConfig() });
+  });
+
+  adminRouter.post("/config", async (req, res) => {
+    const updates = req.body?.updates;
+    const reason  = req.body?.reason;
+    const meta    = req.body?.meta || {};
+    if (!updates || typeof updates !== "object" || Array.isArray(updates)) {
+      return res.status(400).json({ error: "updates_object_required", code: 400 });
+    }
+    if (typeof reason !== "string" || reason.trim().length < 3) {
+      return res.status(400).json({ error: "reason_required", code: 400 });
+    }
+
+    // Validate + apply — first failure short-circuits before any further keys.
+    const applied = [];
+    for (const [k, v] of Object.entries(updates)) {
+      const r = applyUpdate(k, v, meta);
+      if (!r.ok) {
+        await auditAdminWrite(req, "config_update", null, "rejected",
+          { failed_key: k, reason: r.reason });
+        return res.status(400).json({
+          error: "update_rejected", failed_key: k, reason: r.reason, range: r.range,
+        });
+      }
+      applied.push(r);
+    }
+
+    await auditAdminWrite(req, "config_update", null, "ok", {
+      updates: applied.map(d => ({ key: d.key, oldValue: d.oldValue, newValue: d.newValue })),
+      reason, meta,
+    });
+    res.json({ ok: true, applied, config: getConfig() });
+  });
+}
+
+if (
+  bootGuards.isMainnet(process.env) &&
+  process.env.RPC_LOAD_FORCE &&
+  process.env.RPC_LOAD_FORCE !== "0" &&
+  process.env.RPC_LOAD_FORCE !== ""
+) {
+  logger.warn({
+    reason: "rpc_load_force_mainnet",
+    value: process.env.RPC_LOAD_FORCE,
+    msg: "RPC_LOAD_FORCE is active in mainnet — every request will see synthetic load",
+  });
+}
+
+async function boot() {
+  if (CONFIG.REDIS_REQUIRED) {
+    try {
+      await bootGuards.waitForRedisOrFail(store, {
+        timeoutMs: CONFIG.REDIS_REQUIRED_TIMEOUT_MS,
+      });
+    } catch (e) {
+      logger.fatal({
+        reason: "boot_guard_redis_required",
+        timeout_ms: CONFIG.REDIS_REQUIRED_TIMEOUT_MS,
+        msg: "REDIS_REQUIRED=true and Redis unreachable — exiting",
+      });
+      setTimeout(() => process.exit(1), 50);
+      return;
+    }
+  } else if (process.env.REDIS_URL) {
+    const healthy = await store.isStoreHealthy();
+    if (!healthy) {
+      logger.warn({
+        reason: "redis_unhealthy_memory_fallback",
+        msg: "REDIS_URL set but Redis is unhealthy and REDIS_REQUIRED=false — running in memory-fallback mode",
+      });
+    }
+  }
+
+  const server = app.listen(CONFIG.PORT, () => {
+    logger.info({
+      reason: "boot_listening",
+      port: CONFIG.PORT,
+      upstream: CONFIG.REAL_RPC_URL,
+      store_backend: store.backend,
+      msg: "x402-shield listening",
+    });
+  });
+  server.headersTimeout   = 10_000;
+  server.requestTimeout   = 30_000;
+  server.keepAliveTimeout = 5_000;
+  server.timeout          = 60_000;
+  return server;
+}
+
+let _server = null;
+boot().then((s) => {
+  _server = s;
+  if (!_server) return;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info({ reason: "shutdown_begin", signal });
+    _server.close((err) => {
+      if (err) logger.error({ reason: "shutdown_server_close_error", error: err.message });
+    });
+
+    const drainStart = Date.now();
+    const drainDeadlineMs = 25_000;
+
+    const tick = setInterval(async () => {
+      const drainedQos = qosInFlight === 0 && qosQueue.length === 0;
+      const elapsed = Date.now() - drainStart;
+
+      if (drainedQos || elapsed > drainDeadlineMs) {
+        clearInterval(tick);
+        try { await store.close(); } catch (e) {
+          logger.error({ reason: "shutdown_store_close_error", error: e.message });
+        }
+        logger.info({
+          reason: "shutdown_complete",
+          elapsed_ms: elapsed,
+          qos_in_flight: qosInFlight,
+          qos_queue_depth: qosQueue.length,
+        });
+        setTimeout(() => process.exit(0), 100);
+      }
+    }, 200);
+    tick.unref();
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT",  () => shutdown("SIGINT"));
+}).catch((e) => {
+  logger.fatal({ reason: "boot_failure", error: e.message });
+  setTimeout(() => process.exit(1), 50);
 });
 
 module.exports = { app, verifyX402Authorization, issueNonce };

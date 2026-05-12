@@ -1,8 +1,9 @@
 # x402-shield
 
-**HTTP 402 priority gate for Solana RPC nodes** — entry point to the
-**Trust Layer for AI agents on Solana**. Turn spam defense into revenue;
-build cross-operator reputation that compounds with every paid request.
+**HTTP 402 priority gate for existing Solana RPC operators** — a drop-in
+enforcement, monetization, and defense layer for the **Trust Layer for AI
+agents on Solana**. Turn spam defense into revenue; build cross-operator
+reputation that compounds with every paid request.
 
 > *"It's not an error — it's an automated economic negotiation."*
 
@@ -16,7 +17,9 @@ Public Solana RPC nodes get hammered by spam. The status-quo defense is per-IP r
 
 ## The solution
 
-**x402-shield** is a reverse proxy that sits in front of any Solana RPC and enforces payment-gated priority under load:
+**x402-shield does not replace RPC providers.** It is a reverse proxy that
+sits in front of any existing Solana RPC and enforces payment-gated priority
+under load:
 
 1. Agent sends a regular JSON-RPC request.
 2. Under load, the shield responds `HTTP 402 Payment Required` with a signed challenge (destination, amount, nonce, TTL).
@@ -216,7 +219,20 @@ npm run test:cooperative-qos    12/12  spec compliance + health-check exposure
 
 ## Positioning
 
-`x402-shield` operates at the **protocol infrastructure layer** (RPC network).
+`x402-shield` operates at the **RPC operator middleware layer**.
+
+It is not a new RPC network, not an Ankr-style RPC aggregator, and not a
+general-purpose x402 checkout. The natural customer is the RPC operator:
+Helius-, Triton-, Ankr-, Jito-, validator-, or regional-provider style
+infrastructure that already serves Solana JSON-RPC traffic and wants a
+programmable way to monetize priority, defend against agentic abuse, and build
+portable reputation.
+
+That makes incumbents potential adopters or partners, not just competitors.
+Ankr validates that RPC routing and provider aggregation are mature categories;
+x402.vip validates that x402-for-RPC is an emerging category. The differentiation
+here is the operator-grade policy layer: escrow, nonce replay defense, QoS,
+Trust-Score, anti-flood enforcement, auditability, and cooperative scheduling.
 
 Existing x402-adjacent projects (MCPay, Latinum) operate at the **application layer** — paying for MCP-exposed services. Both layers are valid, but the RPC layer has the broader blast radius and aligns directly with operators who already monetize priority (Helius, Triton, Jito).
 

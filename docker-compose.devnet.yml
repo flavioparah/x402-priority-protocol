@@ -37,6 +37,19 @@ services:
       dockerfile: Dockerfile
     container_name: x402-shield-devnet
     restart: unless-stopped
+    # Container hardening (spec §10.9). Defense-in-depth on top of the
+    # USER node directive in Dockerfile.
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile: 65535
+    stop_grace_period: 30s
     depends_on:
       - redis-devnet
     environment:
@@ -64,6 +77,36 @@ services:
       - "traefik.http.routers.x402-shield-devnet.entrypoints=websecure"
       - "traefik.http.routers.x402-shield-devnet.tls.certresolver=leresolver"
       - "traefik.http.services.x402-shield-devnet.loadbalancer.server.port=3000"
+
+      # ── x402-Shield edge middlewares (Phase 1 — Traefik) ─────────────────
+      # Spec: docs/superpowers/specs/2026-05-08-defesa-flood-e-enforcement-agentico-design.md §5
+      # Reversal: git revert the commit that introduced this block.
+
+      # Rate-limit per IP (token bucket): 30 req/s sustained, burst 60.
+      - "traefik.http.middlewares.x402-ratelimit.ratelimit.average=30"
+      - "traefik.http.middlewares.x402-ratelimit.ratelimit.period=1s"
+      - "traefik.http.middlewares.x402-ratelimit.ratelimit.burst=60"
+      - "traefik.http.middlewares.x402-ratelimit.ratelimit.sourcecriterion.ipstrategy.depth=1"
+
+      # Cap of 200 concurrent in-flight connections (global on this service).
+      - "traefik.http.middlewares.x402-inflight.inflightreq.amount=200"
+
+      # Body limit: 64KB max, buffer up to 16KB in memory before spilling to disk.
+      - "traefik.http.middlewares.x402-bodylimit.buffering.maxRequestBodyBytes=65536"
+      - "traefik.http.middlewares.x402-bodylimit.buffering.memRequestBodyBytes=16384"
+
+      # Security headers: HSTS 1y + subdomains, no-sniff, XSS filter, referrer policy,
+      # strip Server / X-Powered-By fingerprints.
+      - "traefik.http.middlewares.x402-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.x402-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.x402-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.x402-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.x402-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.x402-headers.headers.customResponseHeaders.Server="
+      - "traefik.http.middlewares.x402-headers.headers.customResponseHeaders.X-Powered-By="
+
+      # Apply chain to the router.
+      - "traefik.http.routers.x402-shield-devnet.middlewares=x402-ratelimit,x402-inflight,x402-bodylimit,x402-headers"
 
 networks:
   portainer_default:

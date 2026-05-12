@@ -30,13 +30,13 @@ function fail(msg) { console.error(`\x1b[31m✗\x1b[0m ${msg}`); }
 async function main() {
   const kp = Keypair.generate();
   const rpc = new X402Provider(SHIELD_URL + "/rpc", kp, {
-    priorityBudget: 100_000,
+    priorityBudget: 5_000_000,
     settlementMode: "offchain",
   });
 
-  // 1. Escrow pre-funding
-  const before = await rpc.depositEscrowTrusted(SHIELD_URL, 200_000);
-  if (before < 200_000) throw new Error(`deposit returned balance ${before}, expected >= 200000`);
+  // 1. Escrow pre-funding (5M µL = 5× MAX_PRICE; covers worst-case challenge under 20× pricing tier)
+  const before = await rpc.depositEscrowTrusted(SHIELD_URL, 5_000_000);
+  if (before < 5_000_000) throw new Error(`deposit returned balance ${before}, expected >= 5000000`);
   ok(`escrow credited — balance ${before} µL`);
 
   // 2. Connection method routing through the _rpcRequest override.

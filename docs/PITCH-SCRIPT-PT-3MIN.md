@@ -47,11 +47,11 @@
 
 > *(Pausa de 1s antes de começar.)*
 >
-> **"Boa tarde. Sou Flávio Furtado. **RPC Priority Protocol.** A primeira camada de prioridade paga em nós RPC da Solana."**
+> **"Boa tarde. Sou Flávio Furtado. **RPC Priority Protocol.** Uma camada plugável de prioridade paga para RPCs Solana existentes."**
 >
 > *(Pausa.)*
 >
-> **"Em três minutos, vou te mostrar como a gente transformou o spam que sobrecarrega o RPC em receita pro operador, e em prioridade pro agente que paga."**
+> **"Em três minutos, vou te mostrar como a gente transformou o spam que sobrecarrega o RPC em receita pro operador, e em prioridade pro agente que paga — sem substituir o RPC que ele já roda."**
 
 📝 **Notas:** olhar fixo na câmera. Tom confiante, sem afobamento. **Plantar "RPC Priority" já no primeiro segundo.**
 
@@ -105,7 +105,7 @@
 
 🎙️ **Fala (João):**
 
-> **"A gente construiu **a primeira camada de RPC priority na Solana.** Não bloqueia: cobra prioridade."**
+> **"A gente construiu **uma camada de RPC priority para Solana.** Não é outro RPC, nem agregador: entra na frente da infraestrutura existente. Não bloqueia: cobra prioridade."**
 >
 > **"Funciona em três batidas:"**
 >
@@ -117,7 +117,7 @@
 >
 > **"Terceira: defesa que paga a conta. **Atacante vira cliente involuntário do operador.**"**
 >
-> **"O trilho é o x402, padrão aberto da Coinbase. **A camada por cima — RPC priority — é nossa.**"**
+> **"O trilho é o x402, padrão aberto da Coinbase. **A camada por cima — enforcement, QoS e Trust-Score para o operador — é nossa.**"**
 
 ---
 

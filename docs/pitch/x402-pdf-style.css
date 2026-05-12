@@ -1,0 +1,179 @@
+@page {
+  size: A4;
+  margin: 18mm 16mm;
+  @bottom-center {
+    content: counter(page) " / " counter(pages);
+    font-size: 9pt;
+    color: #888;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 10.5pt; }
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  color: #1a1a1a;
+  margin: 0;
+  padding: 0;
+}
+
+h1 {
+  font-size: 22pt;
+  color: #14F195;
+  border-bottom: 2px solid #14F195;
+  padding-bottom: 6px;
+  margin-top: 28px;
+  margin-bottom: 14px;
+  page-break-before: always;
+}
+
+h1:first-of-type {
+  page-break-before: auto;
+}
+
+h2 {
+  font-size: 14pt;
+  color: #9945FF;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+h3 {
+  font-size: 12pt;
+  color: #333;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+p {
+  margin: 8px 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 9.5pt;
+  page-break-inside: avoid;
+}
+
+th {
+  background: #1a1a1a;
+  color: #14F195;
+  font-weight: 600;
+  text-align: left;
+  padding: 6px 8px;
+  border: 1px solid #1a1a1a;
+}
+
+td {
+  padding: 5px 8px;
+  border: 1px solid #ddd;
+  vertical-align: top;
+}
+
+tr:nth-child(even) td {
+  background: #f7f7f7;
+}
+
+code {
+  font-family: 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  background: #f0f0f0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9pt;
+  color: #cc0066;
+}
+
+pre {
+  background: #1a1a1a;
+  color: #e0e0e0;
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-size: 8.5pt;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  line-height: 1.4;
+  overflow-x: auto;
+  page-break-inside: avoid;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+pre code {
+  background: transparent;
+  color: #e0e0e0;
+  padding: 0;
+}
+
+blockquote {
+  border-left: 3px solid #14F195;
+  padding: 4px 12px;
+  margin: 10px 0;
+  font-style: italic;
+  color: #555;
+  background: #f9f9f9;
+}
+
+ul, ol {
+  padding-left: 22px;
+  margin: 8px 0;
+}
+
+li {
+  margin: 3px 0;
+}
+
+a {
+  color: #9945FF;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 18px 0;
+  page-break-after: auto;
+}
+
+/* Capa / título principal */
+.title-block {
+  text-align: center;
+  padding: 40px 20px;
+  margin-bottom: 30px;
+}
+
+.title-block h1 {
+  font-size: 28pt;
+  border: none;
+  page-break-before: auto;
+  margin-bottom: 8px;
+}
+
+.title-block .subtitle {
+  font-size: 13pt;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.title-block .date {
+  font-size: 10pt;
+  color: #999;
+}
+
+/* Strong/em */
+strong {
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+/* Avoid orphan headings */
+h1, h2, h3 {
+  page-break-after: avoid;
+}

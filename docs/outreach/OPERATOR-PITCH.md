@@ -6,7 +6,9 @@
 
 ## What you get (operator side)
 
-You add a reverse proxy in front of your existing Solana RPC node. We handle:
+You keep your RPC infrastructure. We add a reverse proxy in front of your
+existing Solana RPC node; the product is a monetization, defense, and
+enforcement layer, not a replacement RPC provider. We handle:
 
 - **Per-request micropayment via x402** (the open Coinbase HTTP-payment standard) — agents pay you in SOL, no API key, no whitelist, no contract negotiation.
 - **Trust-Score discount engine** — repeat customers get up to 50% off automatically (you keep them sticky); new agents pay full price (your spam defense pays for itself).

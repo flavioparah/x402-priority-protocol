@@ -4,7 +4,8 @@
 
 ## Em uma frase
 
-- "Transformamos spam em receita para o operador de RPC e em acesso prioritário pro agente pagador."
+- "Somos uma camada plugável para RPCs Solana existentes: transformamos spam em receita para o operador e em acesso prioritário pro agente pagador."
+- "Não substituímos RPCs. Ajudamos RPCs a monetizar e defender tráfego de agentes."
 
 ## O problema
 
@@ -29,13 +30,16 @@
 
 ## O diferencial
 
-- "MCPay e Latinum cobram pela aplicação. A gente cobra pelo acesso à rede."
+- "Ankr é prova de que RPC routing é uma categoria madura. x402.vip é prova de que x402 para RPC está emergindo. Nosso diferencial é a camada operacional segura para o operador: escrow, QoS, Trust-Score, anti-flood e auditoria."
+- "MCPay e Latinum cobram pela aplicação. A gente aplica prioridade, pagamento e enforcement no acesso ao RPC existente."
 - "Raio de impacto: toda IA que fala com Solana passa por um nó RPC. A gente fica no caminho de todo mundo."
 - "Código é commodity, dado é moat. Spec aberto, server aberto, SDK aberto. Trust-Score backend fechado."
 - "Autoramos três RFCs: x402-priority, x402-trust-score, x402-qos-cooperative. Quem define o spec controla compatibilidade."
 
 ## A defesa contra concorrência
 
+- "'Ankr já faz RPC agregador há anos.' Sim, e isso valida o mercado. A gente não é agregador RPC; é uma camada de enforcement e monetização que um operador ou agregador pode adotar."
+- "'x402.vip já faz algo parecido.' Ótimo sinal de categoria. A diferença que defendemos é operador-grade: política anti-abuso, reputação, QoS, audit log e integração com RPC existente."
 - "'Jito faz isso em 6 meses?' Código, sim. **Rede neutra de operadores, não.** Jito é concorrente direto de Helius e Triton — eles não compartilham dado de cliente com Jito. Mesmo se Jito shippar, vira Jito Score, fechado. Mercado de broker neutro continua aberto."
 - "Paralelo: Visa nunca virou banco. Plaid nunca virou fintech. Vivem da neutralidade. É exatamente onde a gente joga."
 
