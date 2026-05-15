@@ -1,6 +1,6 @@
-# x402-trust-score — Specification v0.1 (DRAFT)
+# x402-trust-score — Specification v0.2 (DRAFT)
 
-> **Status:** Draft v0.1. Maintainer: João Romeiro (CTO, RPC Priority Protocol).
+> **Status:** Draft v0.2 (2026-05-15). Maintainer: João Romeiro (CTO, RPC Priority Protocol).
 > Companion specs: [`x402-priority`](./x402-priority.md) (wire-level 402 challenge), [`x402-qos-cooperative`](./x402-qos-cooperative.md) (operator-side priority queueing).
 > Reference broker implementation: this repository's [`index.js`](../../index.js) (in-memory, single-broker MVP; see Section 11 for production deployment notes).
 > Open to comments at <https://github.com/flavioparah/x402-priority-protocol/issues> until 2026-06-30.
@@ -84,7 +84,7 @@ interface ReputationRecord {
 
 ### Field Semantics
 
-- **`global_trust_score`** is the value providers apply discounts against. Recommended formula in Section 5.
+- **`global_trust_score`** is the value providers apply discounts against. Computed by the broker per §5.1; intentionally decoupled from provider `weight(p)` (§5.2).
 - **`active_in_n_providers`** is the cross-provider visibility — the network-effect proof. SHOULD be hidden when `<2` to preserve provider privacy.
 - **`loyalty_concentration`** measures whether the agent is "loyal to one provider" (≈1.0) or "spreading across many" (≈1/N). Used by providers to differentiate "anchor customer" from "price shopper".
 - **`sybil_risk`** is computed by the broker from cross-provider velocity (Section 10).
@@ -136,27 +136,154 @@ Provider flags suspicious behavior. Same authentication as `/attest`.
 
 ### 4.4 GET /info
 
-Returns broker metadata: supported spec version(s), federation peers (if any), provider registration policy, broker-published discount formula. Used by clients to estimate prices ahead of time and by providers to verify protocol compatibility.
+Returns broker metadata: supported spec version(s), federation peers (if any), provider registration policy, **score component status (§5.1.3)**, **provider weight policy parameters (§5.2.3)**, and the broker-published discount formula. Used by clients to estimate prices ahead of time and by providers to verify protocol compatibility.
 
 ## 5. Score & Discount
 
-### 5.1 Score Calculation (broker)
+### 5.1 Agent Score Calculation (broker)
 
-Recommended:
+The broker computes `global_trust_score(pubkey)` from five normalized subscores and a network-effect multiplier. All subscores are scaled to 0-100 *before* weighting, so the published weights correspond to their actual contribution to the final score.
+
+#### 5.1.1 Subscores
 
 ```text
-provider_score(pubkey, p)  = min(100, paid_count_at_provider * 5)
-weighted_avg(pubkey)       = Σ_p (provider_score(pubkey, p) * weight(p)) / Σ_p weight(p)
-cross_provider_bonus(pubkey) = min(1.5, 1 + 0.1 * (active_in_n_providers - 1))
-
-global_trust_score(pubkey) = min(100, weighted_avg(pubkey) * cross_provider_bonus(pubkey))
+P1 = min(100, log10(1 + paid_count_total) * 20)                                   // persistence: volume, log-scaled
+P2 = min(100, sqrt(months_in_network) * 12)                                       // persistence: tenure
+D2 = (1 - loyalty_concentration) * 100                                            // distribution across providers
+H1 = ((paid_count_total - disputes + 1) / (paid_count_total + 2)) * 100           // hygiene: Laplace-smoothed no-dispute ratio
+R1 = exp(-idle_days / 60) * 100                                                   // recency: 60-day half-life decay
 ```
 
-Where `weight(p)` is the broker-assigned trust weight per provider (default 1.0; tier-1 providers MAY have higher weight per published policy).
+H1 uses **add-one (Laplace) smoothing** so a new pubkey with zero observed disputes does not begin at 100. A pubkey with 5 paid challenges and 0 disputes scores H1 ≈ 85.7; convergence to 100 requires sustained volume without disputes. This prevents zero-history agents from inheriting a perfect hygiene score from absence of evidence.
 
-The `cross_provider_bonus` rewards reputation built across multiple providers. A pubkey with score 50 at one provider caps at 50 globally; the same 50-point reputation distributed across 3 providers reaches 60 global, across 5 providers reaches 70. **This is the core network-effect mechanism**: providers benefit from joining because their customers' scores grow faster than they would in isolation.
+H2 is a binary gate (not a weighted subscore): `H2 = 0` if any active `fraud_flag` is present per Section 10; otherwise `H2 = 1`.
 
-### 5.2 Discount Application (provider)
+#### 5.1.2 Weighted aggregation
+
+Default weights (all subscores already on the 0-100 scale):
+
+| Subscore | Weight | Notes |
+|---|---|---|
+| P1 (paid_count, log) | 0.30 | |
+| P2 (tenure) | 0.15 | |
+| D2 (distribution) | 0.10 | |
+| H1 (no-dispute ratio) | 0.20 | Requires `/report`. Inactive in deployments without `/report` — see §5.1.3. |
+| R1 (recency) | 0.25 | |
+
+```text
+raw = 0.30*P1 + 0.15*P2 + 0.10*D2 + 0.20*H1 + 0.25*R1
+```
+
+#### 5.1.3 Conditional renormalization for inactive subscores
+
+When a subscore depends on infrastructure not yet deployed by a given broker (most notably H1, which requires `/report`), the broker MUST renormalize the remaining weights to sum to 1.0 rather than silently treating the missing subscore as zero. Silent-zero would lower the headline ceiling without lowering the published weights — an auditability footgun.
+
+```text
+// Phase 1 example: H1 inactive
+raw_phase1 = (0.30*P1 + 0.15*P2 + 0.10*D2 + 0.25*R1) / 0.80
+```
+
+Brokers MUST expose per-subscore status in `GET /info`:
+
+```json
+{
+  "score_components": [
+    {"id": "P1", "weight": 0.30, "status": "active"},
+    {"id": "P2", "weight": 0.15, "status": "active"},
+    {"id": "D2", "weight": 0.10, "status": "active"},
+    {"id": "H1", "weight": 0.20, "status": "inactive_until_report_v1"},
+    {"id": "R1", "weight": 0.25, "status": "active"}
+  ],
+  "normalization": "renormalize_remaining_to_one"
+}
+```
+
+Status values are free-form strings of the form `inactive_until_<feature>`; clients SHOULD treat any value other than `"active"` as inactive and recompute the effective weights accordingly.
+
+#### 5.1.4 Cross-provider bonus and final score
+
+```text
+cross_provider_bonus = min(1.5, 1 + 0.1 * (active_in_n_providers - 1))
+global_trust_score   = H2 * min(100, raw * cross_provider_bonus)
+```
+
+`cross_provider_bonus` counts distinct providers **binarily** — a small operator contributes the same +0.1 increment as a large operator. **This is the structural mechanism that gives small operators network leverage:** their presence increments `active_in_n_providers` by 1 regardless of their attested volume.
+
+A pubkey with `raw = 60` and `active_in_n_providers = 3` reaches `60 * 1.2 = 72`; with `N = 5`, it reaches `60 * 1.4 = 84`. The multiplier saturates at 1.5 (N ≥ 6) so a single deep-pocketed agent cannot accumulate unbounded bonus by spreading across dozens of providers.
+
+#### 5.1.5 Reference values
+
+The following sanity-check values illustrate the formula for three canonical agents. Phase 1.5+ assumes H1 active; Phase 1 assumes H1 inactive with renormalization.
+
+| Agent profile | P1 | P2 | D2 | H1 | R1 | raw (1.5+) | raw (P1) | bonus | score (1.5+) | score (P1) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Top: 1k paid / 6mo / 4 ops / 0 disputes / active | 60 | 29 | 60 | ~100 | 97 | ~72 | ~70 | 1.3 | **~94** | **~91** |
+| Mid: 50 paid / 1mo / 2 ops / 0 disputes / active | 34 | 12 | 50 | ~96 | 100 | ~55 | ~50 | 1.1 | **~61** | **~55** |
+| New: 5 paid / 0.5mo / 1 op / 0 disputes / active | 16 | 8 | 0 | ~86 | 100 | ~48 | ~39 | 1.0 | **~48** | **~39** |
+
+### 5.2 Provider Weight Policy
+
+While `global_trust_score` measures *agent behavior*, the broker MUST also assign each provider a `weight(p)` used for provider-credibility-aware decisions — most notably weighing `/report` submissions (§4.3). Weights and the policy parameters that govern them are published in `GET /info`.
+
+`weight(p)` and `global_trust_score(pubkey)` are **deliberately decoupled**. RFC v0.1 mixed them through a `weighted_avg(provider_score(pubkey, p) * weight(p))` term, which let attestation volume dominate agent score. v0.2 removes that coupling: operator credibility (political/economic) and agent behavior (per-pubkey aggregates) cannot be conflated.
+
+#### 5.2.1 Raw weight
+
+```text
+raw_weight(p) = tier_base(p) * log10(1 + attested_count_30d) * sqrt(max(1, months_in_network))
+```
+
+Tier base values:
+
+| Tier | tier_base | Promotion criterion |
+|---|---|---|
+| alpha | 0.5 | Initial, after admin registration |
+| beta | 1.0 | 30 days without disputes |
+| production | 1.5 | 90 days at beta + ≥1 cross-op signal in good standing |
+
+#### 5.2.2 Active cohort
+
+Statistics on provider weights (median, percentiles) MUST be computed over an *active cohort* — never over all registered providers. Zero-traffic or dormant providers would otherwise collapse the median to zero and inflate the cap:
+
+```text
+active_cohort = { p : raw_weight(p) > 0
+                       AND status(p) == "production"
+                       AND last_attest_at >= now - active_window_days
+                       AND distinct_pubkeys_attested_30d >= pubkey_reach_threshold }
+```
+
+`pubkey_reach_threshold` and `active_window_days` are governance parameters published in `GET /info.provider_weight_policy`.
+
+#### 5.2.3 Cap and floor
+
+```text
+network_median = median({ raw_weight(p) : p in active_cohort })
+
+floor(p) = floor_weight  if  p in active_cohort  AND  no_disputes_in_last_30d(p)
+         = 0              otherwise
+
+weight(p) = max( floor(p), min( raw_weight(p), cap_multiple_of_active_median * network_median ) )
+```
+
+- **Cap** prevents any single high-volume provider from dominating cross-op-derived signals.
+- **Floor** protects small but legitimately active providers from being weighted to irrelevance, while requiring real reach (`pubkey_reach_threshold`) and clean recent history (`no_disputes_in_last_30d`) so it cannot be claimed by production-zombie operators.
+
+Default policy published in `GET /info`:
+
+```json
+{
+  "provider_weight_policy": {
+    "pubkey_reach_threshold": 25,
+    "cap_multiple_of_active_median": 3,
+    "floor_weight": 0.3,
+    "active_window_days": 7
+  }
+}
+```
+
+Changes to any value MUST go through the public change-window described in the broker governance document. Brokers MAY publish historical values to demonstrate stability.
+
+### 5.3 Discount Application (provider)
 
 Recommended:
 
@@ -167,7 +294,7 @@ final_price  = base_price * (1 - global_trust_score / 200)
 
 Providers MAY implement custom discount functions but SHOULD publish them on `GET /info` so clients can estimate.
 
-### 5.3 Floor
+### 5.4 Floor on final_price
 
 `final_price` MUST NOT go below a configurable `BASE_PRICE` (provider policy). This prevents top-tier agents from effectively DDoSing the provider with free traffic.
 
@@ -183,7 +310,7 @@ The security model assumes that the broker is neutral and that providers authent
 
 ## 7. Versioning
 
-Header `X-TrustScore-Spec-Version: 1.0` carries spec version on every request and response. Providers and clients MUST reject incompatible major versions (`HTTP 400`). Minor versions (`1.x`) are backward-compatible additions: new optional fields, new categories, new endpoints. Major versions (`2.x`) signal breaking changes.
+Header `X-TrustScore-Spec-Version: 0.2` carries spec version on every request and response. Providers and clients MUST reject incompatible major versions (`HTTP 400`). Minor versions (`1.x`) are backward-compatible additions: new optional fields, new categories, new endpoints. Major versions (`2.x`) signal breaking changes.
 
 ## 8. Adoption Path for Providers
 
@@ -249,7 +376,6 @@ A separate `trust-score-broker` repository will house the production broker; v0.
 
 ## 12. Open Issues
 
-- **Provider weighting policy** — how a broker assigns `weight(p)` without favoritism. Proposed: weight by attested volume × time-in-network, with a published formula on `GET /info`.
 - **Cross-chain reputation portability** (Tier 4 vision) — agents using the same Ed25519 keypair on Sui, Aptos, NEAR, or Base. Spec extension to attest cross-chain payments deferred to v1.x.
 - **Privacy-preserving aggregation** — zk-attestations so the broker can publish "this pubkey has score >50" without revealing per-attestation amounts. Active research; deferred.
 - **Decentralized broker federation** between multiple neutral brokers — gossip protocol deferred to v1.1.
@@ -268,4 +394,5 @@ A separate `trust-score-broker` repository will house the production broker; v0.
 
 ## 14. Changelog
 
+- **v0.2 (DRAFT, 2026-05-15)** — Agent score and provider weight decoupled. All subscores (P1, P2, D2, H1, R1) normalized to 0-100 before weighting. H1 uses Laplace (add-one) smoothing so new pubkeys do not inherit a perfect hygiene score from absence of evidence. Conditional renormalization rule (§5.1.3) for inactive subscores with `inactive_until_<feature>` status marker exposed in `/info`. Explicit `weight(p)` formula (§5.2) with active-cohort median, cap (`cap_multiple_of_active_median`, default 3), and conditional floor (`floor_weight`, default 0.3); governance parameters published as `provider_weight_policy` in `/info`. `cross_provider_bonus` mechanics preserved binarily so small operators retain network leverage. Resolved §12 "Provider weighting policy" open issue.
 - **v0.1 (DRAFT, 2026-04-26)** — Initial draft. Data model with `per_provider` and `churn_pattern`, HTTP API (4 endpoints), score formula with `cross_provider_bonus`, federation outline, fraud signal taxonomy (5 signals), adoption path, reference implementation notes mapping to `index.js`.
