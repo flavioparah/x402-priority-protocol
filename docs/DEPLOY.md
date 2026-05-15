@@ -317,7 +317,7 @@ docker compose -f docker-compose.devnet.yml down
   `fraud_flags`, `churn_pattern`); two are active in single-op mode,
   three activate when a 2nd operator joins with a distinct
   `OPERATOR_ID`. See `lib/detection.js` and
-  `docs/TRUST-SCORE-RFC-DRAFT.md` §10.
+  `docs/rfc/x402-trust-score.md` §10.
 
 **Still pending for production scale (post-hackathon):**
 

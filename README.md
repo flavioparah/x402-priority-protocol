@@ -7,8 +7,6 @@ reputation that compounds with every paid request.
 
 > *"It's not an error — it's an automated economic negotiation."*
 
-> *"It's not an error — it's an automated economic negotiation."*
-
 ---
 
 ## The problem
@@ -170,7 +168,7 @@ All configurable via env vars (see `index.js`):
 |---|---|
 | Sem 1 — MVP | Off-chain escrow, Ed25519 signed nonces, dynamic pricing, proxy pass-through |
 | Sem 2 — Trust-Score | Reputation ledger per pubkey, score 0–100, up to 50% off via discount, hint-bound to signer pubkey. Progression: `npm run demo:trust` (22 reqs, 26.1% avg savings) |
-| Sem 3 — Open-source spec | [`docs/QOS-COOPERATIVE-SPEC.md`](./docs/QOS-COOPERATIVE-SPEC.md) v1.0 + [`docs/TRUST-SCORE-RFC-DRAFT.md`](./docs/TRUST-SCORE-RFC-DRAFT.md) v0.1 |
+| Sem 3 — Open-source spec | [`docs/rfc/x402-qos-cooperative.md`](./docs/rfc/x402-qos-cooperative.md) v1.0 + [`docs/rfc/x402-trust-score.md`](./docs/rfc/x402-trust-score.md) v0.2 |
 | Sem 4-5 — QoS Path A | Standalone priority queue + rate-limited dispatcher in `qosMiddleware`. Live metrics at `/stats/qos`, dashboard at `/live`. Preserves 8.7 ms p95 |
 | Sem 4-5 — QoS Path B | Cooperative subprotocol spec + operator-side reference impl (`examples/operator-qos-reference.js`) + 30s overload fallback + 60s health-check + 3-consecutive-success re-probe (`QOS_MODE=cooperative`). Validated by `npm run test:cooperative-qos` (12/12) |
 | Sem 4-5 — Persistence | Redis-backed store (`lib/store.js`): escrow, nonces, reputation, used signatures. AOF + `volatile-lru` eviction. Restart-safe. Multi-instance ready (state shared); per-shield Redis sidecar in compose |
