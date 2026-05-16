@@ -25,6 +25,8 @@ app.use(require("./routes/attest"));
 app.use(require("./routes/report"));
 app.use(require("./routes/reputation"));
 app.use(require("./routes/info"));
+app.use(require("./routes/audit"));
+app.use("/admin", require("./routes/admin"));
 
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 

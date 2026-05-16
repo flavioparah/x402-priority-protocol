@@ -16,6 +16,7 @@ const router = express.Router();
 const store = require("../store");
 const { defaultPolicy: defaultScorePolicy } = require("../../lib/trust-score");
 const { defaultPolicy: defaultWeightPolicy } = require("../lib/weight");
+const { signalDefinitions } = require("../lib/detection");
 
 const BROKER_ID = process.env.BROKER_ID || "x402-broker-mvp";
 
@@ -30,6 +31,7 @@ router.get("/info", (req, res) => {
     decay_days: scorePolicy.decay_days,
     provider_weight_policy: defaultWeightPolicy(),
     providers_registered: store.providersCount(),
+    detection_signals: signalDefinitions(),
     federation_peers: [],
   });
 });
