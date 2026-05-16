@@ -6,8 +6,42 @@ dist/
 .DS_Store
 *.log
 
-# Team-internal context (pitch deck, exported chats). Not for the public repo.
+# Team-internal context (pitch deck, exported chats, patent docs). Not for the public repo.
 docs/context/
+
+# Pitch / investor materials — CEO teleprompter, slide notes, 2-pagers.
+# Source markdown lives outside the public repo; only the final blog/RFC text is public.
+docs/pitch/
+
+# Outreach internals — operator letters, BR-specific drafts, CRM-lite.
+# Generic templates that ARE meant to be public should live in docs/outreach/templates/.
+docs/outreach/LETTERS-BR-*.md
+docs/outreach/EMAIL-TEMPLATES.md
+docs/outreach/DEMO-FLOW.md
+docs/outreach/TRACKER.md
+
+# Internal strategy / planning specs — not for external readers.
+docs/superpowers/
+
+# Internal benchmark + scratch analyses.
+bench-options-pitches.json
+
+# Claude Code + agent tooling state (not part of project).
+.claude/
+.agents/
+skills-lock.json
+prompt-assistente/
+
+# Playwright captures + debug screenshots.
+.playwright-mcp/
+*-forced-visible.png
+
+# IDE / editor.
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
 
 # Stress test artifacts: agents.json contains private keys; results.json/csv
 # are derived run output. Both are local-only, never versioned.
@@ -20,3 +54,4 @@ tools/stress-test/stress-results.csv
 docs/*.pdf
 docs/*.html
 docs/.pandoc-style.css
+public/.favicon-backup/

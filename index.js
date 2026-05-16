@@ -83,7 +83,7 @@ const CONFIG = {
 
   // ─── QoS Path A: standalone priority queue + rate-limited dispatcher ────────
   // Independent of operator adoption (cooperative QoS lives in a separate
-  // header-based protocol; see docs/TRUST-SCORE-RFC-DRAFT.md companion spec).
+  // header-based protocol; see docs/rfc/x402-qos-cooperative.md companion spec).
   //
   // Behavior:
   //   - Below QOS_BYPASS_THRESHOLD utilization: fast-path, no queueing.
@@ -208,10 +208,10 @@ let qosInFlight = 0;
 const qosWaitSamples = [];
 
 // Cooperative QoS — when the operator returns X-QoS-Overload:1, we fall back
-// to standalone queueing for 30 seconds (per QOS-COOPERATIVE-SPEC.md §5).
+// to standalone queueing for 30 seconds (per docs/rfc/x402-qos-cooperative.md §5).
 let qosOverloadFallbackUntil = 0;
 
-// Cooperative QoS health probe state (QOS-COOPERATIVE-SPEC.md §5.3-5.4).
+// Cooperative QoS health probe state (docs/rfc/x402-qos-cooperative.md §5.3-5.4).
 // During cooperative mode we periodically OPTIONS the operator's /qos-status
 // endpoint. If unreachable for >60s we force fallback. After 3 consecutive
 // successes during a fallback window, we end the fallback early and resume
@@ -273,7 +273,7 @@ function qosMiddleware(req, res, next) {
 
   // Cooperative mode: forward priority hint to operator and let their stack
   // do the queueing. Falls back to standalone behavior for 30s after the
-  // operator emits X-QoS-Overload:1 (per QOS-COOPERATIVE-SPEC.md §5).
+  // operator emits X-QoS-Overload:1 (per docs/rfc/x402-qos-cooperative.md §5).
   if (CONFIG.QOS_MODE === "cooperative" && Date.now() >= qosOverloadFallbackUntil) {
     req.headers["x-priority-score"] = String(qosBaseScore(req));
     req.headers["x-qos-spec-version"] = "1";
@@ -490,7 +490,7 @@ async function issueNonce(amount, hintedPubkey) {
 // interval inside the in-memory implementation). No app-level sweeper here.
 
 // Cooperative QoS health probe — only runs when QOS_MODE=cooperative.
-// Implements QOS-COOPERATIVE-SPEC.md §5.3 (60s unreachable → fallback)
+// Implements docs/rfc/x402-qos-cooperative.md §5.3 (60s unreachable → fallback)
 // and §5.4 (3 consecutive successes → end fallback early).
 if (CONFIG.QOS_MODE === "cooperative") {
   setInterval(async () => {

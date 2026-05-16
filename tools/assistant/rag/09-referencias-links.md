@@ -118,7 +118,7 @@ Lista mapeada interna em `docs/outreach/OPERATORS-LIST.md` — 15 operadores BR/
 ### Engenharia
 - `docs/ENGINEERING.md` — decisões técnicas
 - `docs/DEPLOY.md` — deploy + gotchas
-- `docs/QOS-COOPERATIVE-SPEC.md` — spec interna
+- `docs/rfc/x402-qos-cooperative.md` — spec canônica (RFC pública)
 
 ## Tools (utilitários do repo)
 

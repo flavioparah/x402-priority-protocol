@@ -61,7 +61,7 @@ priorityScore = verifiedAmountMicroLamports + verifiedTrustScore * 100
 
 Where:
 - `verifiedAmountMicroLamports` is the µ-lamport amount paid for the current request (post-discount).
-- `verifiedTrustScore` is the agent's 0-100 reputation score (see [TRUST-SCORE-RFC-DRAFT.md](./TRUST-SCORE-RFC-DRAFT.md)).
+- `verifiedTrustScore` is the agent's 0-100 reputation score (see [x402-trust-score.md](./x402-trust-score.md)).
 
 Operators MAY use the score directly or apply a custom transform. Operators MUST NOT trust the score as a security primitive — it is a **hint**, not an authentication.
 
@@ -192,14 +192,14 @@ A Shield deployed to point at the integrated operator simply sets `QOS_MODE=coop
 
 - **Multi-region operators**: how to coordinate score forwarding across regions when a Shield instance hits a regional load balancer.
 - **Validator-internal QoS** (e.g., Jito-Solana modification): defining a standard hook so future Solana validator clients can implement the spec at the validator layer rather than at the gateway layer.
-- **Decentralized score attestation**: when multiple Shields cooperate without a central Trust-Score broker, how the score itself is computed and verified. Tracked in [TRUST-SCORE-RFC-DRAFT.md](./TRUST-SCORE-RFC-DRAFT.md) Open Issues.
+- **Decentralized score attestation**: when multiple Shields cooperate without a central Trust-Score broker, how the score itself is computed and verified. Tracked in [x402-trust-score.md](./x402-trust-score.md) Open Issues.
 
 ---
 
 ## 13. References
 
 - [x402 spec](https://x402.org) — Coinbase, 2024-2025
-- [TRUST-SCORE-RFC-DRAFT.md](./TRUST-SCORE-RFC-DRAFT.md) — companion spec for cross-operator reputation
+- [x402-trust-score.md](./x402-trust-score.md) — companion spec for cross-operator reputation
 - [RFC 7231](https://datatracker.ietf.org/doc/html/rfc7231) — HTTP/1.1 Semantics (Retry-After)
 - [Standalone QoS implementation](../../index.js) — `qosMiddleware`, `qosOnSlotFree`
 
