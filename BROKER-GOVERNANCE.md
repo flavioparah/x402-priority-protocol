@@ -60,9 +60,9 @@ Per RFC v0.2 §5.2, every provider sits in exactly one of three tiers. The tier 
 
 ### 3.1 Promotion mechanics
 
-Promotion is **automatic when criteria are met**. The broker runs a daily job that evaluates all `alpha` and `beta` providers against the criteria and promotes any that qualify. Promotion events are written to the audit log and announced in the quarterly governance report.
+Promotion is currently **admin-triggered** via `POST /admin/providers/:id/promote`. The 30-day / 90-day criteria above are the governance criteria that the operator/admin process MUST honor when deciding to promote — they are not optional. An automatic scheduler that monitors providers and triggers promotions when criteria are met is planned for a future release; until then, the admin endpoint is the only path and every promotion event is written to the audit log and announced in the quarterly governance report.
 
-The broker operator can **pause auto-promotion** during incident response — for example, while investigating a coordinated burst that may implicate multiple operators. Pauses are documented as broker actions and are themselves disputable (see §5.3). A pause cannot last more than 14 calendar days without a public incident report justifying the extension.
+Even after the scheduler ships, the broker operator will retain the ability to **pause auto-promotion** during incident response — for example, while investigating a coordinated burst that may implicate multiple operators. Pauses are documented as broker actions and are themselves disputable (see §5.3). A pause cannot last more than 14 calendar days without a public incident report justifying the extension.
 
 ### 3.2 Demotion mechanics
 
@@ -163,11 +163,11 @@ If the dispute remains unresolved after the response, the escalation path is a *
 
 The broker operator commits to the following, in order of priority:
 
-1. **Publish weight policy at all times.** `GET /info` returns the current `provider_weight_policy` block with all four parameters from §4. Already implemented in the scaffold. This is the highest-priority commitment because the entire weighting system is unverifiable without it.
+1. **Publish weight policy at all times.** `GET /info` returns the current `provider_weight_policy` block with all four parameters from §4. *Status: implemented in the broker scaffold.* This is the highest-priority commitment because the entire weighting system is unverifiable without it.
 
-2. **Publish operator list.** A public read-only endpoint listing all registered providers, their tier, their last-active date, and their cumulative attestation count. Implementation: WS-H part 2. Until then, the operator list is published on the repository wiki and updated when providers are registered or change tier.
+2. **Publish operator list.** A read-only endpoint listing all registered providers, their tier, their last-active date, and their cumulative attestation count. *Status: implemented as `GET /admin/providers` (admin-authenticated). A public unauthenticated `GET /providers` view is planned.* Until the public view ships, the broker operator publishes a digest of the admin list on the repository wiki and updates it when providers are registered or change tier.
 
-3. **Publish audit log.** All `/attest` and `/report` events with provider signatures, queryable by date at `GET /audit/:date`. Implementation: WS-H part 2 (Phase 4 of the roadmap). The audit log is append-only and immutable; corrections (e.g., voided attestations) are written as new audit entries that reference the original.
+3. **Publish audit log.** All `/attest` and `/report` events with provider signatures, queryable by date at `GET /audit/:date`. *Status: implemented as `GET /audit/:date` in the broker scaffold (in-memory; persists across requests but not across restarts until Postgres is wired in WS-H part 2).* The audit log is append-only and immutable; corrections (e.g., voided attestations) are written as new audit entries that reference the original.
 
 4. **Publish incident reports.** For any operational anomaly, including:
    - Broker downtime exceeding 1 hour
@@ -178,6 +178,8 @@ The broker operator commits to the following, in order of priority:
 
    Incident reports are published **within 7 calendar days** of the incident being resolved (or, for ongoing incidents, within 7 days of detection with rolling updates).
 
+   *Status: operational commitment — will be honored once the broker is operating with production participants. There have been no production incidents to report yet because the broker is not in production.*
+
 5. **Publish quarterly governance reports.** Every calendar quarter, the broker operator publishes a summary including:
    - Providers registered, promoted, demoted, churned
    - Weight policy changes (proposed, accepted, rejected, emergency)
@@ -187,11 +189,13 @@ The broker operator commits to the following, in order of priority:
 
    Quarterly reports are due within 30 days of quarter-end.
 
+   *Status: operational commitment — will be honored once the broker has production participants. Until then, the repository commit history and the local audit endpoint are the source of truth; no quarterly report has been issued because there is not yet a quarter of production operation to summarize.*
+
 ---
 
 ## 7. Open-source commitment
 
-The broker reference implementation is open source under **Apache-2.0**, per the decision recorded in memory `broker_oss_decision_2026_05_13`. The license file lives in the parent repository pending the post-hackathon LICENSE resolution on 2026-05-30; if a different license is chosen for the parent repo, the broker subdirectory retains Apache-2.0 explicitly.
+The broker reference implementation is open source. License status: **the parent repository is currently under the MIT license, and the broker subdirectory inherits the parent license.** A decision to apply Apache-2.0 explicitly to the broker (with its own `broker/LICENSE` file before extraction) is **pending** and will be resolved alongside the parent license consolidation post-hackathon (target 2026-05-30). The intent — per the decision recorded in memory `broker_oss_decision_2026_05_13` — is Apache-2.0 for the extracted broker, but that change has not been applied to the repository yet. Treat the current MIT license as authoritative until the broker is extracted and re-licensed; this section will be updated when the change lands.
 
 Specific commitments:
 
@@ -211,7 +215,7 @@ The broker operator (RPC Priority Protocol) may also be a provider — operating
 
 1. **No preferential tier_base.** The broker operator's own provider attestations are weighted **identically** to any other production-tier operator. The `tier_base` is 1.5 for both, with no special multipliers, side-channels, or boosts.
 
-2. **Excluded from median calculation.** The broker operator's own provider weight is **excluded from the `network_median` calculation** used to derive the `cap_multiple_of_active_median` cap. This prevents the broker operator from self-inflating the cap by accumulating weight on its own provider and dragging the median upward.
+2. **Excluded from median calculation.** The broker operator's own provider is registered with `isBrokerSelf: true`. The `networkMedian` function in `broker/lib/weight.js` excludes self-tagged providers from the active-cohort median, preventing the broker operator from inflating the cap on its own weight via its own attestation volume. The self provider's own weight is still computed normally (cap derived from others; conditional floor applies). The self provider is listed transparently in `GET /admin/providers` with its flag visible.
 
 3. **Daily transparency.** The broker operator publishes their own provider's daily attestation count and dispute count alongside other providers' aggregates in the public operator list (§6, item 2). Anyone auditing the broker can compare the broker operator's own provider behavior against the rest of the network.
 

@@ -15,65 +15,75 @@ You're writing code (an agent, indexer, MEV bot, or any HTTP client) that calls 
 The entire flow, as one Node.js block. Run it against the devnet shield and it works without spending real SOL.
 
 ```js
+// Save as quickstart.js, then: node quickstart.js
 // npm install @solana/web3.js tweetnacl bs58
 const nacl = require("tweetnacl");
 const bs58 = require("bs58");
-const { Keypair, Connection, SystemProgram, Transaction,
+const { Keypair, Connection, PublicKey, SystemProgram, Transaction,
         sendAndConfirmTransaction, LAMPORTS_PER_SOL } = require("@solana/web3.js");
 
 const SHIELD_URL = "https://devnet.rpcpriority.com";        // production-grade devnet
 const SOLANA_RPC = "https://api.devnet.solana.com";
 const RPC_BODY   = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth", params: [] });
 
-// 1. Keypair (Solana convention: Ed25519, 64-byte secret)
-const agent  = Keypair.generate();
-const pubkey = agent.publicKey.toBase58();
+async function main() {
+  // 1. Keypair (Solana convention: Ed25519, 64-byte secret)
+  const agent  = Keypair.generate();
+  const pubkey = agent.publicKey.toBase58();
 
-// 2. Fund the agent + escrow with an on-chain transfer (devnet)
-const conn = new Connection(SOLANA_RPC, "confirmed");
-await conn.requestAirdrop(agent.publicKey, 0.01 * LAMPORTS_PER_SOL)
-          .then((s) => conn.confirmTransaction(s, "confirmed"));
+  // 2. Fund the agent + escrow with an on-chain transfer (devnet)
+  const conn = new Connection(SOLANA_RPC, "confirmed");
+  await conn.requestAirdrop(agent.publicKey, 0.01 * LAMPORTS_PER_SOL)
+            .then((s) => conn.confirmTransaction(s, "confirmed"));
+  // If devnet airdrop is rate-limited, fund the generated pubkey manually and rerun from the deposit step.
 
-const info = await (await fetch(SHIELD_URL + "/info")).json();   // → operator_pubkey
-const destination = new (require("@solana/web3.js").PublicKey)(info.operator_pubkey);
-const tx = new Transaction().add(SystemProgram.transfer({
-  fromPubkey: agent.publicKey, toPubkey: destination, lamports: 100,
-}));
-const sig = await sendAndConfirmTransaction(conn, tx, [agent], { commitment: "confirmed" });
-await fetch(SHIELD_URL + "/escrow/deposit", {
-  method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ tx_signature: sig }),
-});   // 100 lamports → 100_000 µL credited to your pubkey
+  const info = await (await fetch(SHIELD_URL + "/info")).json();   // → operator_pubkey
+  const destination = new PublicKey(info.operator_pubkey);
+  const tx = new Transaction().add(SystemProgram.transfer({
+    fromPubkey: agent.publicKey, toPubkey: destination, lamports: 100,
+  }));
+  const sig = await sendAndConfirmTransaction(conn, tx, [agent], { commitment: "confirmed" });
+  await fetch(SHIELD_URL + "/escrow/deposit", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tx_signature: sig }),
+  });   // 100 lamports → 100_000 µL credited to your pubkey
 
-// 3. Make the request
-let r = await fetch(SHIELD_URL + "/rpc", {
-  method: "POST",
-  headers: { "Content-Type": "application/json", "X-x402-Agent-Pubkey": pubkey },
-  body: RPC_BODY,
-});
-
-// 4. Handle 402
-if (r.status === 402) {
-  const nonce       = r.headers.get("X-x402-Nonce");
-  const amount      = parseInt(r.headers.get("X-x402-Amount"), 10);
-  const destinationStr = r.headers.get("X-x402-Payment-Destination");
-
-  // 5. Sign the canonical payload with the Ed25519 secret
-  const payload = JSON.stringify({ nonce, pubkey, amount, destination: destinationStr });
-  const msgBytes = Buffer.from(payload, "utf8");
-  const signature = nacl.sign.detached(msgBytes, agent.secretKey);
-  const auth = `x402 ${bs58.encode(signature)}.${pubkey}.${bs58.encode(msgBytes)}`;
-
-  // 6. Retry
-  r = await fetch(SHIELD_URL + "/rpc", {
+  // 3. Make the request
+  let r = await fetch(SHIELD_URL + "/rpc", {
     method: "POST",
-    headers: { "Content-Type": "application/json",
-               "X-x402-Agent-Pubkey": pubkey,
-               Authorization: auth },
+    headers: { "Content-Type": "application/json", "X-x402-Agent-Pubkey": pubkey },
     body: RPC_BODY,
   });
+
+  // 4. Handle 402
+  if (r.status === 402) {
+    const nonce       = r.headers.get("X-x402-Nonce");
+    const amount      = parseInt(r.headers.get("X-x402-Amount"), 10);
+    const destinationStr = r.headers.get("X-x402-Payment-Destination");
+
+    // 5. Sign the canonical payload with the Ed25519 secret
+    const payload = JSON.stringify({ nonce, pubkey, amount, destination: destinationStr });
+    const msgBytes = Buffer.from(payload, "utf8");
+    const signature = nacl.sign.detached(msgBytes, agent.secretKey);
+    // Authorization format: bs58(sig).pubkey.bs58(utf8(payload)) — pubkey is already base58, do not re-encode.
+    const auth = `x402 ${bs58.encode(signature)}.${pubkey}.${bs58.encode(msgBytes)}`;
+
+    // 6. Retry
+    r = await fetch(SHIELD_URL + "/rpc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json",
+                 "X-x402-Agent-Pubkey": pubkey,
+                 Authorization: auth },
+      body: RPC_BODY,
+    });
+  }
+  console.log(r.status, await r.json());   // → 200 + the upstream RPC result
 }
-console.log(r.status, await r.json());   // → 200 + the upstream RPC result
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
 ```
 
 That's the whole protocol. The rest of this doc breaks it down.
@@ -186,7 +196,7 @@ const signature = nacl.sign.detached(msgBytes, agent.secretKey);   // 64-byte Ed
 The header is three base58-encoded components joined by `.`:
 
 ```
-Authorization: x402 <bs58(signature)>.<bs58(pubkey)>.<bs58(utf8(payload)))>
+Authorization: x402 <bs58(signature)>.<pubkey>.<bs58(utf8(payload))>
 ```
 
 ```js
@@ -223,7 +233,7 @@ curl -s https://devnet.rpcpriority.com/reputation/<your_pubkey> | jq
 
 ## 6. Trust progression
 
-Each paid request bumps your Trust-Score. Higher score = larger discount applied to future challenges (capped at 50% off; floored at `BASE_PRICE`).
+Paid requests generally improve your Trust-Score, but the final score also depends on recency, hygiene, provider diversity, and reports. Higher score = larger discount applied to future challenges (capped at 50% off; floored at `BASE_PRICE`).
 
 The discount formula (from [`docs/rfc/x402-priority.md`](./rfc/x402-priority.md) §3.3):
 
@@ -257,7 +267,7 @@ The Shield emits a closed vocabulary of `X-x402-Reason` values when it rejects a
 | `deposit-signature-invalid` | `tx_signature` you posted doesn't decode or doesn't exist on-chain | Confirm the tx finalized; check you posted the right signature. |
 | `deposit-amount-mismatch` | The on-chain transfer doesn't match the destination / sender the Shield expects | Send the transfer to the exact `PAYMENT_DESTINATION` from `/info`. |
 | `body-too-large` | Your `/rpc` JSON body exceeds the per-route limit (default 32 KB) | Chunk the request; the Shield rejects oversized bodies at the edge. |
-| `malformed-payload` | Authorization header doesn't have exactly 3 base58 parts, or the payload isn't valid JSON | Audit the signing code. The three components must be `bs58(sig).bs58(pubkey).bs58(utf8(payload))`. |
+| `malformed-payload` | Authorization header doesn't have exactly 3 parts, or the payload isn't valid JSON | Audit the signing code. The three components must be `bs58(sig).pubkey.bs58(utf8(payload))` — `pubkey` is the raw base58 string, not re-encoded. |
 
 For 402 responses themselves, the response body always includes a fresh nonce so you can immediately re-sign and retry — no need for a separate request.
 

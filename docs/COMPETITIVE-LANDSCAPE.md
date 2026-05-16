@@ -8,7 +8,7 @@
 
 ## TL;DR
 
-The Solana RPC market is fragmented across three loosely competing camps: (a) tier-1 SaaS providers competing on speed and developer experience, (b) validator clients that monetize MEV and transaction priority, and (c) self-hosted and tier-2 operators that compete on price or sovereignty. **Trust-derived pricing and per-request economic priority are missing from all three.** x402-shield is not a fourth competitor — it is a thin layer that any operator in any of the three camps can deploy in front of an existing endpoint to add HTTP 402 payment gating, dynamic backpressure, and portable cross-operator reputation.
+The Solana RPC market is fragmented across three loosely competing camps: (a) tier-1 SaaS providers competing on speed and developer experience, (b) validator clients that monetize MEV and transaction priority, and (c) self-hosted and tier-2 operators that compete on price or sovereignty. Incumbents are validating x402 as an access rail. x402-shield focuses on the harder operator problem: turning overload and abuse into priced priority, while making agent reputation portable across competing RPC providers.
 
 ---
 
@@ -19,9 +19,9 @@ The Solana RPC market is fragmented across three loosely competing camps: (a) ti
 | Tier-1 RPC SaaS | Helius, Triton One, QuickNode, Alchemy | API keys, fixed plans, enhanced indexers, archival nodes | Per-request economic gating; cross-operator reputation |
 | Validator clients with priority | Jito (Block Engine, ShredStream, bundles) | MEV capture, low-latency tx send, validator stack | RPC-layer read priority; gating for non-transaction calls |
 | Self-hosted & tier-2 operators | Regional providers, validator side-businesses, independent operators | Cheaper or sovereign access; niche geographies | Monetization beyond flat plans; defense against agentic spam |
-| Cross-chain platforms | Alchemy multichain, QuickNode multichain | Single API surface over many chains | Wire-level x402 gating that travels with the request |
+| Cross-chain platforms | Alchemy multichain, QuickNode multichain | Single API surface over many chains; QuickNode now ships x402 access docs | Cross-operator reputation and broker-neutral overload economics layered on top |
 
-These camps are not adversarial — many operators belong to more than one. The point of the table is that **no incumbent currently offers HTTP-layer payment gating with neutral cross-operator reputation**. That is the gap x402-shield fills.
+These camps are not adversarial — many operators belong to more than one. Several incumbents are now validating x402-style access for RPC and API infrastructure. That is good for the category. x402-shield is differentiated by what sits behind the 402: operator-controlled overload pricing, SOL/lamport escrow, Trust-Score discounts, and a neutral broker for cross-operator abuse and reputation signals.
 
 ---
 
@@ -62,11 +62,11 @@ The named tier-1 incumbents are listed in the README as "potential adopters or p
 
 **Adopter scenario.** Triton's bare-metal stack already targets latency-sensitive customers. x402-shield adds an explicit priority lane that lets those customers signal willingness-to-pay per request, not just per month. Their existing enterprise relationships are unchanged; the shield gives them a programmatic surface for traffic that does not fit a contract.
 
-**Not a competitor.** x402-shield does not run nodes, does not index, does not operate hardware. It is policy in front of nodes Triton already operates better than almost anyone.
+**Distinct layer.** x402-shield operates in a distinct scope from Triton's bare-metal stack: it does not run nodes, does not index, does not operate hardware. It is policy in front of nodes Triton already operates better than almost anyone.
 
 ### QuickNode
 
-**Adopter scenario.** QuickNode's multichain reach is its differentiator. x402-shield speaks HTTP 402 — a wire protocol — and the Tier-4 vision in our RFCs is explicitly cross-chain: the same Ed25519 key, the same x402 headers, a different upstream. QuickNode is therefore the most natural multichain adopter; the shield extends their existing developer story to "pay-per-request priority works the same on every chain we host".
+**Category validator.** QuickNode has already moved into x402 access patterns, including Solana RPC (see [QuickNode's x402 documentation](https://www.quicknode.com/docs/build-with-ai/x402-payments) and the [Solana x402 agent guide](https://www.quicknode.com/guides/solana-development/ai-agents/how-to-access-solana-rpc-with-x402-solana)). That makes QuickNode less a proof-of-need target and more a category validator. The partnership angle should focus on broker-neutral reputation and overload/abuse economics rather than basic pay-per-request access.
 
 ### Alchemy
 
@@ -108,7 +108,7 @@ Three concrete value props, in priority order:
 These are not asks — they are honest gaps. Anyone in the ecosystem who recognizes themselves here, please open an issue or email the team.
 
 - **Beta operator partner for cross-operator validation (Phase 3 of the roadmap).** The Trust-Score broker is meaningful at N ≥ 2 operators. We have the single-operator implementation in production. We need a second operator willing to run a 30-day shadow-mode pilot and attest to the broker.
-- **Solana Foundation grant interest for the broker as neutral infrastructure.** The broker is the kind of public-good infrastructure that, like Visa or Plaid in their respective markets, works best when it is not owned by a participant. We are interested in conversations about funding the broker as neutral infra rather than as a startup product.
+- **Solana Foundation grant interest for the broker as neutral infrastructure.** The broker is the kind of public-good infrastructure that, like other neutral coordination layers in infrastructure markets, works best when it is not owned by a participant. We are interested in conversations about funding the broker as neutral infra rather than as a startup product.
 - **RFC v0.2 feedback from operators with real load data.** The three RFCs are open for comments through 2026-06-30. The most useful feedback comes from operators who have real load curves, real abuse patterns, and real billing models — the kind of input we cannot synthesize from a single hackathon deployment.
 
 ---

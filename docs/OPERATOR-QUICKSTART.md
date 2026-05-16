@@ -30,23 +30,33 @@ cp .env.example .env
 $EDITOR .env
 ```
 
-The five env vars you actually need to set before booting (see [`.env.example`](../.env.example) and the [Configuration table in `README.md`](../README.md#configuration) for the full list):
+Configuration is split in three tiers. The **minimal block matches `.env.example` exactly** — that's all you need to boot. The production + advanced blocks are recommended additions for serious deployments. See the [Configuration table in `README.md`](../README.md#configuration) for the full list.
 
-| Var | What to put | Why |
-|---|---|---|
-| `PAYMENT_DESTINATION` | Your Solana wallet pubkey (base58) | Where priority payments land. **Must be a real pubkey** — the Shield rejects deposits to placeholder addresses. |
-| `REAL_RPC_URL` | Your upstream RPC (e.g. `https://api.mainnet-beta.solana.com` or your private node URL) | What the Shield proxies legitimate traffic to. |
-| `SOLANA_RPC_URL` | Defaults to `$REAL_RPC_URL`; override if deposit verification should hit a different RPC | The RPC the Shield calls to **verify on-chain deposits** via `getParsedTransaction`. |
-| `REDIS_URL` | `redis://localhost:6379` (or your managed Redis URL) | Persists escrow, nonces, reputation. **Required on mainnet** — `REDIS_REQUIRED` auto-enables when `REAL_RPC_URL` contains `mainnet-beta`. |
-| `BASE_PRICE` / `MAX_PRICE` | Defaults `20000` / `1000000` µ-lamports (= 20 / 1000 lamports) | Floor and ceiling of the dynamic priority price. |
+### Minimal local config (matches `.env.example`)
+
+- `PAYMENT_DESTINATION` — Solana wallet that receives x402 payments
+- `REAL_RPC_URL` — upstream Solana RPC (defaults to mainnet-beta)
+- `RPC_LOAD_THRESHOLD` — when `/rpc` load exceeds this, the 402 path fires
+- `REQUESTS_PER_IP_LIMIT` — per-IP rate limit ceiling
+- `RATE_WINDOW_MS` — sliding-window duration in ms
+- `BASE_PRICE` — minimum µ-lamports charged per priority request
+- `MAX_PRICE` — maximum µ-lamports under saturation
 
 > Env-var naming note: the README and `.env.example` use `BASE_PRICE` / `MAX_PRICE` (the env-var names). Internally these map to `BASE_PRICE_MICRO_LAMPORTS` / `MAX_PRICE_MICRO_LAMPORTS` (the unit). Both refer to the same setting.
 
-Optional but useful:
+### Production config (recommended additions)
 
-- `OPERATOR_ID=<short-string>` — tags attestations so cross-operator fraud signals activate once a second operator joins the broker. Defaults to `"self"`.
-- `RPC_LOAD_THRESHOLD=0.75` — fraction of `MAX_RPS` above which 402 gating kicks in. Set to `0` to force 402 on every request (demo mode).
-- `QOS_BYPASS_THRESHOLD=0.5` — utilization below which requests bypass the priority queue entirely.
+- `REDIS_URL` — required for multi-instance state durability
+- `REDIS_REQUIRED=1` — fail-fast on Redis disconnect instead of in-memory fallback (auto-enables when `REAL_RPC_URL` contains `mainnet-beta`)
+- `OPERATOR_ID` — your operator slug; used for cross-op attestations when broker is wired (defaults to `"self"`)
+- `MAX_RPS` — global throughput ceiling
+- `SOLANA_RPC_URL` — overrides `REAL_RPC_URL` if both set (used to verify on-chain deposits via `getParsedTransaction`)
+
+### Advanced QoS config
+
+- `QOS_BYPASS_THRESHOLD` — load below which the priority queue is bypassed entirely
+- `QOS_MAX_QUEUE_DEPTH` — max queued requests before reject-overflow
+- `QOS_QUEUE_TIMEOUT_MS` — max wait time in queue before reject-timeout
 
 ## 4. Run locally
 
@@ -125,8 +135,9 @@ curl -s https://your-shield.example.com/reputation/<base58_pubkey> | jq
 # QoS queue + dispatcher stats
 curl -s https://your-shield.example.com/stats/qos | jq
 
-# Live dashboard (HTML)
-open https://your-shield.example.com/live
+# Live dashboard (HTML) — open in a browser:
+#   Linux / macOS:  open https://your-shield.example.com/live
+#   Windows:        start https://your-shield.example.com/live
 ```
 
 Trigger the 402 path end-to-end:
@@ -181,8 +192,9 @@ Plug your own numbers in. Examples at the default `BASE_PRICE=20000` / `MAX_PRIC
 10 RPS × 86400 × 510 lamports × 1.0 paid_fraction
   = 440_640_000 lamports/day
   = 0.4406 SOL/day
-  ≈ US$ 88/day at SOL = US$200   (purely illustrative — not a promise)
 ```
+
+Convert SOL to USD using the current market price; the example is illustrative only.
 
 The framing the protocol is designed around: **spam defense becomes revenue**. An attacker forced to pay 50 lamports per request spends faster than they can attack — abuse becomes economically self-limiting, and the operator captures the cost. See `README.md` "Aligned Incentives" and `docs/rfc/x402-priority.md` §9.6.
 
@@ -199,6 +211,7 @@ Three knobs to tune for your hardware:
 | Symptom | Likely cause + fix |
 |---|---|
 | **No 402 ever fires, even under load** | `RPC_LOAD_THRESHOLD` too high, or `MAX_RPS` too high. Confirm with `curl /health` — `load` should be > `threshold` for gating to activate. For demos, set `RPC_LOAD_FORCE=1`. |
+| **`/health` reports `load_forced: true`** | You are in demo mode and should remove `RPC_LOAD_FORCE` before production traffic — every request will be gated regardless of real load. |
 | **Shield boots but logs `REDIS_URL set but Redis is unhealthy`** | Redis host unreachable. Check `REDIS_URL` and that the Redis container/service is up. On mainnet, `REDIS_REQUIRED=true` is the default — boot will refuse. Set `REDIS_REQUIRED=false` to allow memory-fallback (single-instance only). |
 | **`POST /escrow/deposit` returns 503 / 400 with "RPC error fetching transaction: 429"** | Public mainnet-beta throttles concurrent `getParsedTransaction` calls. Either retry client-side with backoff (3 s / 8 s / 15 s) or switch `SOLANA_RPC_URL` to a private RPC (Helius, Triton, QuickNode). See `docs/DEPLOY.md` "Public mainnet-beta RPC throttles bursts". |
 | **`POST /escrow/deposit` returns "deposit-amount-mismatch" or "deposit-signature-invalid"** | The on-chain tx doesn't match: wrong destination (not `PAYMENT_DESTINATION`), wrong sender pubkey, or signature already consumed (anti-replay). Each `tx_signature` is single-use. |

@@ -5,7 +5,7 @@
 > **Source of truth:** [`index.js`](../index.js), [`lib/admin.js`](../lib/admin.js), [`lib/abuse-reasons.js`](../lib/abuse-reasons.js), [`lib/agent-status.js`](../lib/agent-status.js), and the three RFCs under [`docs/rfc/`](./rfc/).
 > **Companion specs:** [`x402-priority`](./rfc/x402-priority.md) (wire-level 402 challenge) · [`x402-trust-score`](./rfc/x402-trust-score.md) v0.2 (reputation) · [`x402-qos-cooperative`](./rfc/x402-qos-cooperative.md) (operator-side priority queue)
 
-This document enumerates every endpoint mounted by the Shield process. Anything not listed here is not exposed. Broker endpoints (`/attest`, `/report`) live on a separate service and are noted at the end.
+This document enumerates the HTTP API surface plus the main static dashboard routes. Broker endpoints (`/attest`, `/report`, …) live on a separate service and are noted at the end.
 
 ---
 
@@ -19,7 +19,7 @@ This document enumerates every endpoint mounted by the Shield process. Anything 
 | `GET` | `/escrow/balance/:pubkey` | None | Read escrow balance for a pubkey | Yes — 60 req/min per IP |
 | `GET` | `/reputation/:pubkey` | None | Trust-Score + sybil / fraud / churn signals for a pubkey | Yes — 30 req/min per IP |
 | `GET` | `/info` | None | Static metadata about this Shield deployment | Yes — 120 req/min per IP |
-| `GET` | `/agent/status` | None | Read-only trust + enforcement snapshot for a pubkey (10 s cache) | Yes — 120 req/min per IP |
+| `GET` | `/agent/status?pubkey=<base58>` | None | Read-only trust + enforcement snapshot for a pubkey (10 s cache) | Yes — 120 req/min per IP |
 | `GET` | `/agent/code-of-conduct` | None | Versioned operator/agent Code of Conduct (JSON or HTML) | Yes — 120 req/min per IP |
 | `GET` | `/health` | None | Liveness + load + store backend | Yes — 120 req/min per IP |
 | `GET` | `/metrics` | None | Prometheus exposition format | Yes — 10 req/min per IP |
@@ -99,7 +99,7 @@ A request returns `402 Payment Required` when:
 The client retries with:
 
 ```
-Authorization: x402 <bs58(sig)>.<bs58(pubkey)>.<bs58(utf8(payload)))>
+Authorization: x402 <bs58(sig)>.<pubkey>.<bs58(utf8(payload))>
 ```
 
 Where `payload = JSON.stringify({ nonce, pubkey, amount, destination })` in that exact key order. See [`x402-priority` §5](./rfc/x402-priority.md#5-the-signed-retry) for the canonical signing rules. Reference: `verifyX402Authorization` in [`index.js`](../index.js).
@@ -256,6 +256,8 @@ QoS dispatcher state for the `/live` dashboard's QoS card. Counters persisted in
 ```
 
 Top 10 pubkeys by paid-count, sourced from the reputation index ZSET.
+
+The leaderboard widget returns an approximate score computed from `paidCount` and `lastPaidAt` only (no `firstPaidAt` in the leaderboard query payload). For canonical Trust-Score per pubkey, use `GET /reputation/:pubkey`.
 
 ### 4.4 Dashboard HTML pages
 
@@ -503,19 +505,28 @@ Other notable status codes:
 
 ---
 
-## 11. Broker endpoints (separate service — future)
+## 11. Broker endpoints (separate service)
 
-The neutral Trust-Score Broker described in [`x402-trust-score` §4](./rfc/x402-trust-score.md#4-http-api) is a **separate service**, not part of this Shield repo. When extracted (Phase 1 of the cross-operator roadmap), it will expose:
+Broker endpoints are served by the separate `broker/` service, not by the Shield process. A local MVP implementation exists in this repository (in-memory; `cd broker && npm start`); public neutral broker deployment is pending operational setup (VPS, DNS, persistence).
+
+The endpoints exposed by the local MVP today (matches the contract described in [`x402-trust-score` §4](./rfc/x402-trust-score.md#4-http-api)):
 
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/attest` | Operator reports a successful payment; signed with provider key |
 | `POST` | `/report` | Operator flags suspicious behavior; categories: `spam_burst`, `duplicate_signature`, `wash_payment`, `payment_dispute`, `refund_abuse`, `other` |
 | `GET` | `/reputation/:pubkey` | Aggregated cross-operator `ReputationRecord` |
-| `GET` | `/audit/:date` | Daily signed audit-log dump (immutability TBD — Phase 4) |
 | `GET` | `/info` | Broker metadata: spec version, provider weight policy, federation peers |
+| `GET` | `/audit/:date` | Daily signed audit-log dump (immutability TBD — Phase 4) |
+| `GET` | `/health` | Liveness + storage backend |
+| `POST` | `/admin/providers` | Register a new provider (operator) |
+| `GET` | `/admin/providers` | List registered providers |
+| `GET` | `/admin/providers/:id` | Fetch a single provider record |
+| `POST` | `/admin/providers/:id/suspend` | Mark provider as suspended (attestations/reports rejected) |
+| `POST` | `/admin/providers/:id/unsuspend` | Reverse a suspension |
+| `POST` | `/admin/providers/:id/promote` | Promote a provider weight tier |
 
-**Status:** Not yet on a public broker URL. The Shield's `/reputation/:pubkey` and `/info` provide the single-operator equivalents until the broker ships. See [`x402-trust-score` §4](./rfc/x402-trust-score.md#4-http-api) and §11 for the broker contract.
+**Status:** Local MVP usable for development and tests. The Shield's `/reputation/:pubkey` and `/info` provide the single-operator equivalents until a public broker deployment is announced. See [`x402-trust-score` §4](./rfc/x402-trust-score.md#4-http-api) for the full broker contract.
 
 ---
 

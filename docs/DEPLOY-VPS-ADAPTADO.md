@@ -3,6 +3,8 @@
 > **Por que este doc existe:** instruções simplificadas que circulam na internet (estilo "clone, `npm install`, `pm2 start`, libera porta 3000") **não batem** com a estrutura real do repositório. Este guia traduz essas instruções para o que de fato existe aqui.
 >
 > Para o guia de produção completo (atualmente em uso em `kvm4`), ver [`DEPLOY.md`](./DEPLOY.md).
+>
+> **NOTA HISTÓRICA (2026-05-16):** Algumas referências abaixo a `x402.rpcpriority.com` (o antigo deploy de trusted-deposit demo) refletem o estado anterior da infraestrutura. Os deploys ativos hoje são `api.rpcpriority.com` (mainnet canônico), `mainnet.rpcpriority.com` (alias), `devnet.rpcpriority.com` (devnet) e `app.rpcpriority.com/try` (UI). Os trechos `x402.rpcpriority.com` deste doc estão preservados como contexto histórico do trust-score-progression demo, mas o DNS já não resolve.
 
 ---
 
@@ -14,7 +16,7 @@ x402-priority-protocol/
 ├── lib/                  ← store, detection, qos
 ├── public/               ← painel estático (index, live, try, explorer)
 │                            servido pelo próprio gateway via express.static
-├── docker-compose.yml             ← deploy mainnet (x402-mainnet.rpcpriority.com)
+├── docker-compose.yml             ← deploy mainnet (api.rpcpriority.com)
 ├── docker-compose.devnet.yml      ← deploy devnet
 ├── docker-compose.mainnet.yml     ← deploy mainnet (verificado on-chain)
 ├── Dockerfile
@@ -62,8 +64,8 @@ Este é o método **em uso** nos três deploys live (`x402-mainnet`, `x402-devne
 - Traefik rodando com `entrypoints=websecure` em `:443` e `certresolver=leresolver`
 - DNS apontando para o IP do VPS:
   - `x402.rpcpriority.com` → demo (devnet upstream, trusted-deposit)
-  - `x402-devnet.rpcpriority.com` → devnet com depósitos verificados on-chain
-  - `x402-mainnet.rpcpriority.com` → mainnet com depósitos verificados on-chain
+  - `devnet.rpcpriority.com` → devnet com depósitos verificados on-chain
+  - `api.rpcpriority.com` → mainnet com depósitos verificados on-chain
 
 ### Deploy do zero
 
@@ -98,13 +100,13 @@ docker compose -f docker-compose.mainnet.yml up -d --build
 # 7. Verificar
 docker ps | grep x402
 curl -s https://x402.rpcpriority.com/health           | jq
-curl -s https://x402-devnet.rpcpriority.com/health    | jq
-curl -s https://x402-mainnet.rpcpriority.com/health   | jq
+curl -s https://devnet.rpcpriority.com/health    | jq
+curl -s https://api.rpcpriority.com/health   | jq
 
 # 8. Verificar painel estático (deve responder HTML)
-curl -sI https://x402-mainnet.rpcpriority.com/live   | head -1
-curl -sI https://x402-mainnet.rpcpriority.com/try    | head -1
-curl -sI https://x402-mainnet.rpcpriority.com/explorer | head -1
+curl -sI https://api.rpcpriority.com/live   | head -1
+curl -sI https://api.rpcpriority.com/try    | head -1
+curl -sI https://api.rpcpriority.com/explorer | head -1
 ```
 
 ### Atualizar para nova versão

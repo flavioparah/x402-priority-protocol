@@ -183,9 +183,10 @@ All configurable via env vars (see `index.js`):
 
 | URL | Mode | Network |
 |---|---|---|
-| https://x402.rpcpriority.com | Trusted-deposit demo (the 22-req Trust-Score progression runs here) | devnet upstream |
-| https://x402-devnet.rpcpriority.com | On-chain verified deposits | devnet |
-| https://x402-mainnet.rpcpriority.com | On-chain verified deposits | **mainnet** |
+| https://api.rpcpriority.com | Production Shield (on-chain verified deposits) | **mainnet** |
+| https://mainnet.rpcpriority.com | Mainnet alias of the above | **mainnet** |
+| https://devnet.rpcpriority.com | On-chain verified deposits | devnet |
+| https://app.rpcpriority.com/try | Interactive try-it dashboard | both |
 
 ### Test suite
 
