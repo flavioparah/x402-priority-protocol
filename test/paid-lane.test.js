@@ -9,12 +9,13 @@ function check(label, cond) {
   else { console.error(`  FAIL ${label}`); failed++; }
 }
 
-function makeFakeStore({ rep = null, healthy = true } = {}) {
+function makeFakeStore({ rep = null, attestations = [], healthy = true } = {}) {
   const consumed = [];
   return {
     consumed,
     isStoreHealthy: () => healthy,
     getReputation: async () => rep,
+    getAttestations: async () => attestations,
     slidingWindowConsume: async (key, max, windowMs, now, memberId) => {
       consumed.push({ key, max, windowMs });
       return { ok: true, count: consumed.length };
@@ -95,8 +96,21 @@ function fakeReqRes({ ip = "1.2.3.4", x402Verified = null } = {}) {
   }
 
   // CASE 3: paid bucket max scales with trust multiplier
+  // v0.2 formula: to reach score ≥ 81 (multiplier 10×) we need a high-paid + tenured + multi-op fixture.
+  // paidCount=1000 (P1=60), 6 months tenure (P2≈29), 4 ops (D2=60, bonus=1.3), recent (R1≈100)
+  // → raw_phase1 ≈ 66.8, score = 66.8 × 1.3 ≈ 86.8 → multiplier 10×.
   {
-    const store = makeFakeStore({ rep: { paidCount: 20 } }); // score = 100 → multiplier 10x
+    const now = Date.now();
+    const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+    const attestations = [];
+    for (let i = 0; i < 40; i++) attestations.push({ ts: now - i, amount: 100, operator_id: "op-A" });
+    for (let i = 0; i < 30; i++) attestations.push({ ts: now - i, amount: 100, operator_id: "op-B" });
+    for (let i = 0; i < 20; i++) attestations.push({ ts: now - i, amount: 100, operator_id: "op-C" });
+    for (let i = 0; i < 10; i++) attestations.push({ ts: now - i, amount: 100, operator_id: "op-D" });
+    const store = makeFakeStore({
+      rep: { paidCount: 1000, firstPaidAt: now - 6 * ONE_MONTH_MS, lastPaidAt: now, totalPaid: 1e6 },
+      attestations,
+    });
     const mw = createRateLimitMiddleware({
       routeName: "rpc",
       paid: { keyPrefix: "rl:rpc:paid", baseMax: 200, windowMs: 60_000 },
