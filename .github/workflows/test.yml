@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-flight runs when a new commit lands on the same branch / PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shield-unit:
+    name: Shield unit tests (Node 20)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      # Run the modules we know are clean from the v0.2 integration session.
+      # The aggregated `npm test` script requires a running shield (smoke.js
+      # integration test) and references two test files that don't exist on
+      # disk yet (admin-ban, metrics) — those gaps are tracked separately.
+      - run: node test/trust-score.test.js
+      - run: node test/detection.test.js
+      - run: node test/detection-fraud-flags.test.js
+      - run: node test/agent-status-handler.test.js
+      - run: node test/agent-status.test.js
+      - run: node test/paid-lane.test.js
+      - run: node test/ratelimit-3dim.test.js
+      - run: node test/ratelimit-enforcement-headers.test.js
+      - run: node test/atomic-consume.test.js
+      - run: node test/store-ratelimit.test.js
+      - run: node test/store-pending-deposit.test.js
+      - run: node test/store-abuse.test.js
+      - run: node test/store-ban.test.js
+      - run: node test/store-misc.test.js
+      - run: node test/store-slidingwindow-query.test.js
+      - run: node test/abuse-reasons.test.js
+      - run: node test/trust-multiplier.test.js
+      - run: node test/enforcement-checkban.test.js
+      - run: node test/enforcement-ladder.test.js
+      - run: node test/enforcement-whitelist.test.js
+      - run: node test/enforcement-cross-signal.test.js
+      - run: node test/permanent-ban-promotion.test.js
+      - run: node test/feedback-headers.test.js
+      - run: node test/code-of-conduct.test.js
+      - run: node test/cooperative-qos.test.js
+      - run: node test/admin-hmac.test.js
+      - run: node test/admin-canonical.test.js
+      - run: node test/admin-config.test.js
+      - run: node test/admin-mass-ban-guard.test.js
+      - run: node test/config-hotreload.test.js
+      - run: node test/metrics-output.test.js
+      - run: node test/audit.test.js
+      - run: node test/cheap-reject.test.js
+      - run: node test/nonce-precheck-bounded.test.js
+      - run: node test/rpc-content-length.test.js
+      - run: node test/headers-and-reqid.test.js
+      - run: node test/logger.test.js
+      - run: node test/boot-guards.test.js
+
+  broker-unit:
+    name: Broker unit tests (Node 20)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: broker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install broker dependencies
+        run: npm install
+      - name: canonical-json (38 tests)
+        run: node test/canonical-json.test.js
+      - name: signature (20 tests)
+        run: node test/signature.test.js
+      - name: weight (41 tests / 62 assertions)
+        run: node test/weight.test.js
+      - name: integration (11 end-to-end)
+        run: node test/integration.test.js
+
+  typecheck:
+    name: TypeScript typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run typecheck
