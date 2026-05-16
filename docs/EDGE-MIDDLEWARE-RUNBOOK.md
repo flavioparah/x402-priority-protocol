@@ -1,5 +1,7 @@
 # Edge Middleware Runbook — x402-Shield (Phase 1)
 
+> **For:** operators deploying x402-shield as edge middleware (Cloudflare Workers, etc.).
+
 This runbook covers the 4 Traefik middlewares applied at the TLS edge in front
 of `x402-shield-{devnet,mainnet}`:
 

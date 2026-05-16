@@ -1,5 +1,7 @@
 # RPC Priority Protocol — benefícios em uma página
 
+> **For:** investors, grant reviewers, and prospective operator partners.
+>
 > **x402** — padrão aberto de pagamento HTTP (Coinbase). Não é nosso: é o "trilho" que usamos.
 > **RPC Priority Protocol** — nosso produto. Usa o trilho x402 para oferecer prioridade paga em nós Solana.
 > **Nó RPC** — o servidor que responde quando um app ou bot fala com a blockchain Solana. Toda IA que conversa com Solana passa por um.

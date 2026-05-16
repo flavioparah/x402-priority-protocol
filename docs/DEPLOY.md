@@ -1,5 +1,7 @@
 # Deploy — x402-shield on VPS (kvm4)
 
+> **For:** operators deploying x402-shield to production VPS / bare-metal.
+
 Target: `ssh kvm4` → `/root/x402`, behind Traefik with TLS on `x402.rpcpriority.com`.
 
 This matches the Vokano / amiginvisivel pattern already running on this VPS: `portainer_default` external Docker network + Traefik labels + Let's Encrypt via `leresolver`.
