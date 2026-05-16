@@ -3,7 +3,7 @@
  * examples/operator-qos-reference.js
  *
  * Reference implementation of the OPERATOR side of the
- * x402-qos-cooperative spec (see docs/QOS-COOPERATIVE-SPEC.md).
+ * x402-qos-cooperative spec (see docs/rfc/x402-qos-cooperative.md).
  *
  * What this is: a minimal HTTP server that pretends to be a Solana RPC
  * operator's frontend. It demonstrates the four required behaviors:
