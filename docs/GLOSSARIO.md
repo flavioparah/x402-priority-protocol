@@ -1,5 +1,7 @@
 # Glossário — RPC Priority Protocol
 
+> **For:** all readers — terms used across the protocol, RFCs, and codebase.
+>
 > Glossário detalhado para leitores não-técnicos. Inclui termos do protocolo, jargões de blockchain, siglas de negócio e conceitos de mercado citados nos documentos estratégicos.
 
 ---
