@@ -1,5 +1,7 @@
 # Engineering Journal — x402-shield
 
+> **For:** internal engineering decisions and architecture context.
+
 Living record of what works, what broke, what we decided and why. Written for the team (Flávio, João, Felipe) and for hackathon judges who want depth beyond the README.
 
 Append entries chronologically. Don't delete — mark superseded.
