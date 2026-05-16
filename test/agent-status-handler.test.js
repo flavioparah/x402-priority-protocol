@@ -21,6 +21,7 @@ function makeFakeStore(overrides) {
   const base = {
     async getReputation(pubkey)         { return repMap.get(pubkey) || null; },
     async getAbuseHistory(key, _n)      { return histMap.get(key)   || []; },
+    async getAttestations(_pubkey, _n)  { return []; },
     async isPermanent(key)              { return permanent.has(key); },
     async getBan(key)                   { return bans.get(key) || null; },
     async slidingWindowQuery(bucket, max, windowMs) {
@@ -160,45 +161,69 @@ const VALID_PK = "DemoStudent111111111111111111111111111111111";
     assertEq(snap.rate_limit_reset_seconds, 60, "rate_limit_reset_seconds");
   });
 
-  // ── Reputation-derived trust score ─────────────────────────────────────────
+  // ── Reputation-derived trust score (v0.2 formula) ─────────────────────────
 
-  await test("trust_score = paidCount * 5, capped at 100", async () => {
+  await test("trust_score uses v0.2 formula (Phase 1, H1 inactive)", async () => {
     const store = makeFakeStore();
-    store._setReputation(VALID_PK, { paidCount: 10, firstPaidAt: Date.now() - 1000, lastPaidAt: Date.now(), totalPaid: 1000 });
+    const now = Date.now();
+    store._setReputation(VALID_PK, { paidCount: 10, firstPaidAt: now - 1000, lastPaidAt: now, totalPaid: 1000 });
     const snap = await buildAgentStatus(store, VALID_PK, {});
-    assertEq(snap.trust_score, 50, "trust_score @paidCount=10");
+    // Hand-computed: P1=20.79, P2≈0, D2=0, R1=100, raw_phase1=(0.30·20.79+0.25·100)/0.80=39.05, bonus=1.0
+    if (Math.abs(snap.trust_score - 39.05) > 0.5) {
+      throw new Error(`trust_score expected ~39.05, got ${snap.trust_score}`);
+    }
   });
 
-  await test("trust_score is capped at 100 when paidCount > 20", async () => {
+  await test("trust_score is bounded by tenure + recency, not just paidCount", async () => {
     const store = makeFakeStore();
+    // paidCount=999 but missing tenure/recency timestamps — high volume but unverifiable history
+    // Note: trust-score.js treats firstPaidAt=0/falsy as "missing" (P2=0) and lastPaidAt=0 as
+    // "no last activity" (idleDays=Infinity → R1=0). No D2 (no attestations).
     store._setReputation(VALID_PK, { paidCount: 999, firstPaidAt: 0, lastPaidAt: 0, totalPaid: 0 });
     const snap = await buildAgentStatus(store, VALID_PK, {});
-    assertEq(snap.trust_score, 100, "trust_score cap");
+    // P1=60, P2=0, D2=0, R1=0, raw=(0.30·60)/0.80=22.5, bonus=1.0
+    if (Math.abs(snap.trust_score - 22.5) > 0.5) {
+      throw new Error(`trust_score expected ~22.5, got ${snap.trust_score}`);
+    }
   });
 
   await test("trust_multiplier is 2 for score 21-50", async () => {
     const store = makeFakeStore();
-    store._setReputation(VALID_PK, { paidCount: 5, firstPaidAt: 0, lastPaidAt: 0, totalPaid: 0 });
+    const now = Date.now();
+    // paidCount=50, recent (P1=34.59, R1=100, P2≈0, D2=0)
+    // raw=(0.30·34.59+0.25·100)/0.80=44.22, bonus=1.0 → score≈44.22
+    store._setReputation(VALID_PK, { paidCount: 50, firstPaidAt: now - 1000, lastPaidAt: now, totalPaid: 0 });
     const snap = await buildAgentStatus(store, VALID_PK, {});
-    // paidCount=5 → score=25 → multiplier=2
     assertEq(snap.trust_multiplier, 2, "trust_multiplier");
     assertEq(snap.trust_band, "21-50", "trust_band");
   });
 
-  await test("trust_multiplier is 5 for score 51-80", async () => {
-    const store = makeFakeStore();
-    store._setReputation(VALID_PK, { paidCount: 12, firstPaidAt: 0, lastPaidAt: 0, totalPaid: 0 });
+  await test("trust_multiplier is 5 for score 51-80 (v0.2: needs cross-provider + recency)", async () => {
+    const now = Date.now();
+    const ops = ["op1", "op2", "op3", "op4", "op5"];
+    const attestations = ops.map(op => ({ ts: now - 1000, amount: 1, operator_id: op }));
+    const store = makeFakeStore({
+      async getAttestations(_pk, _n) { return attestations; },
+    });
+    store._setReputation(VALID_PK, { paidCount: 50, firstPaidAt: now - 1000, lastPaidAt: now, totalPaid: 0 });
     const snap = await buildAgentStatus(store, VALID_PK, {});
-    // paidCount=12 → score=60 → multiplier=5
+    // P1=log10(51)·20=34.59, P2≈0, loyalty=1/5=0.2 → D2=80, R1=100
+    // raw=(0.30·34.59+0.10·80+0.25·100)/0.80=54.22, bonus=1.4 → score≈75.91
     assertEq(snap.trust_multiplier, 5, "trust_multiplier");
     assertEq(snap.trust_band, "51-80", "trust_band");
   });
 
-  await test("trust_multiplier is 10 for score 81-100", async () => {
-    const store = makeFakeStore();
-    store._setReputation(VALID_PK, { paidCount: 20, firstPaidAt: 0, lastPaidAt: 0, totalPaid: 0 });
+  await test("trust_multiplier is 10 for score 81-100 (v0.2: high P1 + cross-provider + recency)", async () => {
+    const now = Date.now();
+    const ops = ["op1", "op2", "op3", "op4", "op5", "op6", "op7", "op8"];
+    const attestations = ops.map(op => ({ ts: now - 1000, amount: 1, operator_id: op }));
+    const store = makeFakeStore({
+      async getAttestations(_pk, _n) { return attestations; },
+    });
+    store._setReputation(VALID_PK, { paidCount: 200, firstPaidAt: now - 1000, lastPaidAt: now, totalPaid: 0 });
     const snap = await buildAgentStatus(store, VALID_PK, {});
-    // paidCount=20 → score=100 → multiplier=10
+    // P1=log10(201)·20=46.05, P2≈0, loyalty=1/8=0.125 → D2=87.5, R1=100
+    // raw=(0.30·46.05+0.10·87.5+0.25·100)/0.80=59.46, bonus=1.5 (capped) → score≈89.18
     assertEq(snap.trust_multiplier, 10, "trust_multiplier");
     assertEq(snap.trust_band, "81-100", "trust_band");
   });

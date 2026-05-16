@@ -245,7 +245,7 @@ Trust-Score was labeled "Week 2" in the pitch deck. Implementing it in Week 1 tu
 
 **Server (index.js):**
 - New `reputation: Map<pubkey, { paidCount, firstPaidAt, lastPaidAt, totalPaid }>`.
-- `getTrustScore(pubkey)` — `min(100, paidCount * 5)`; saturates at 20 successful payments.
+- `getTrustScore(pubkey)` — v0.2 formula via `lib/trust-score.js#computeScoreV02`. See `docs/rfc/x402-trust-score.md` §5.1 for the full subscore breakdown (P1, P2, D2, H1, R1) and Phase 1 renormalization rule (H1 inactive until /report endpoint).
 - `applyTrustDiscount(price, score)` — linear discount, 0..50 % off base price, clamped to `BASE_PRICE_MICRO_LAMPORTS` as a floor so discounts never drop below the minimum spam cost.
 - `recordPayment` called inside the successful branch of `verifyX402Authorization`, so reputation accumulates only on *cryptographically verified* payments.
 - New 402 response headers: `X-x402-Amount-Base`, `X-x402-Trust-Score`. Existing `X-x402-Amount` now carries the discounted price, and the response body adds `amount_base_micro_lamports` and `trust_score`.

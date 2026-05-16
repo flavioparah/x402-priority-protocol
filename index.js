@@ -22,6 +22,7 @@ const { fireSolanaCircuit } = require("./lib/solana-circuit");
 const { SIG_RE } = require("./lib/preflight");
 const { corsForRoute } = require("./lib/cors-scoped");
 const { bumpReqCounter } = require("./lib/metrics-counters");
+const { computeScoreV02 } = require("./lib/trust-score");
 
 // ─── Phase 3 enforcement integration ─────────────────────────────────────────
 const enforcement = require("./lib/enforcement-public");
@@ -368,11 +369,14 @@ function calcDynamicPrice(load) {
   return Math.round(CONFIG.BASE_PRICE_MICRO_LAMPORTS + ratio * (CONFIG.MAX_PRICE_MICRO_LAMPORTS - CONFIG.BASE_PRICE_MICRO_LAMPORTS));
 }
 
-/** Trust-Score for a pubkey: 0..100, saturating at 20 successful payments. */
+/** Trust-Score for a pubkey: 0..100 via v0.2 formula (lib/trust-score.js#computeScoreV02). */
 async function getTrustScore(pubkeyB58) {
-  const rec = await store.getReputation(pubkeyB58);
+  const [rec, attestations] = await Promise.all([
+    store.getReputation(pubkeyB58),
+    store.getAttestations(pubkeyB58, 100),
+  ]);
   if (!rec) return 0;
-  return Math.min(100, rec.paidCount * 5);
+  return computeScoreV02(rec, attestations, { h1Active: false });
 }
 
 /** Apply the Trust-Score discount to a base price. Score 0..100 → 0..50% off. */
@@ -454,18 +458,20 @@ async function verifyDepositTx(signature) {
 /** Record a successful payment against a pubkey's reputation. */
 async function recordPayment(pubkeyB58, amount) {
   const updated = await store.recordPayment(pubkeyB58, amount);
-  const score = Math.min(100, updated.paidCount * 5);
   const now = Date.now();
-  // Persisted dashboard log + cumulative payments_total counter (Redis-backed).
-  await store.pushPayment({ ts: now, pubkey: pubkeyB58, amount, score });
   // Per-pubkey attestation log — feeds the sybil/fraud detection engine.
   // Tagged with our operator_id so cross-op signals activate when the broker
   // sees attestations from another operator with a different OPERATOR_ID.
+  // Pushed BEFORE computing score so the persisted score reflects this event.
   await store.pushAttestation(pubkeyB58, {
     ts: now,
     amount,
     operator_id: CONFIG.OPERATOR_ID,
   });
+  const attestations = await store.getAttestations(pubkeyB58, 100);
+  const score = computeScoreV02(updated, attestations, { h1Active: false });
+  // Persisted dashboard log + cumulative payments_total counter (Redis-backed).
+  await store.pushPayment({ ts: now, pubkey: pubkeyB58, amount, score });
 }
 
 /**
@@ -1270,7 +1276,12 @@ app.get("/stats/leaderboard", rl.stats, async (req, res) => {
   const raw = await store.getLeaderboard(10);
   const top = raw.map((r) => ({
     pubkey: r.pubkey,
-    trust_score: Math.min(100, r.paidCount * 5),
+    // Leaderboard score is approximate — full score requires firstPaidAt + attestations log; see /reputation/:pubkey for canonical value.
+    trust_score: computeScoreV02(
+      { paidCount: r.paidCount, firstPaidAt: r.lastPaidAt, lastPaidAt: r.lastPaidAt, totalPaid: r.totalPaid },
+      [],
+      { h1Active: false }
+    ),
     paid_count: r.paidCount,
     total_paid_micro_lamports: r.totalPaid,
     last_paid_at: r.lastPaidAt,
@@ -1495,7 +1506,7 @@ if (ADMIN_KEYS.size > 0) {
     res.json({
       pubkey,
       reputation: rec,
-      trust_score: rec ? Math.min(100, rec.paidCount * 5) : 0,
+      trust_score: rec ? computeScoreV02(rec, attestations, { h1Active: false }) : 0,
       attestations,
       fraud_signals: { sybil_risk: fraud.sybil_risk, fraud_flags: fraud.fraud_flags, churn_pattern: fraud.churn_pattern },
       ban_history: abuseHistory,
