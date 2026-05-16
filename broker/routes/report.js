@@ -85,6 +85,7 @@ router.post("/report", (req, res) => {
     category: body.category,
     evidence,
     ts: body.timestamp,
+    provider_signature: body.provider_signature,
   });
 
   return res.status(200).json({ accepted: true });

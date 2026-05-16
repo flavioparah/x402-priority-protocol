@@ -15,12 +15,19 @@ const {
   extendReputationFields,
   computeScoreV02,
 } = require("../../lib/trust-score");
+const { computeBrokerRisk } = require("../lib/detection");
 
 function buildReputationRecord(pubkey) {
   const agg = store.getReputationAggregate(pubkey);
   const attestations = store.getAttestations(pubkey);
 
   if (!agg) {
+    // Zeroed record for unknown pubkey — but still run computeBrokerRisk on
+    // the empty inputs so the shape (especially churn_pattern: "ephemeral"
+    // for paidCount<3) matches what an attested-then-cleared pubkey would
+    // return. Today this returns {fraud_flags:[], sybil_risk:"low",
+    // churn_pattern:"ephemeral"} for the empty case.
+    const emptyRisk = computeBrokerRisk([], null, []);
     return {
       pubkey,
       global_trust_score: 0,
@@ -31,9 +38,9 @@ function buildReputationRecord(pubkey) {
       active_in_n_providers: 0,
       loyalty_concentration: 1.0,
       per_provider: {},
-      fraud_flags: [],
-      sybil_risk: "low",
-      churn_pattern: "stable",
+      fraud_flags: emptyRisk.fraud_flags,
+      sybil_risk: emptyRisk.sybil_risk,
+      churn_pattern: emptyRisk.churn_pattern,
     };
   }
 
@@ -43,6 +50,8 @@ function buildReputationRecord(pubkey) {
     h1Active: true,
     disputes,
   });
+  const reports = store.getReports(pubkey);
+  const risk = computeBrokerRisk(attestations, agg, reports);
 
   return {
     pubkey,
@@ -54,9 +63,9 @@ function buildReputationRecord(pubkey) {
     active_in_n_providers: ext.active_in_n_providers,
     loyalty_concentration: ext.loyalty_concentration,
     per_provider: ext.per_provider,
-    fraud_flags: [],
-    sybil_risk: "low",
-    churn_pattern: "stable",
+    fraud_flags: risk.fraud_flags,
+    sybil_risk: risk.sybil_risk,
+    churn_pattern: risk.churn_pattern,
   };
 }
 

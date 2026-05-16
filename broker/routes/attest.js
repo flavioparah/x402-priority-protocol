@@ -15,6 +15,7 @@ const router = express.Router();
 const store = require("../store");
 const { verify } = require("../lib/signature");
 const { canonicalize } = require("../lib/canonical-json");
+const { computeBrokerRisk } = require("../lib/detection");
 const {
   extendReputationFields,
   computeScoreV02,
@@ -35,8 +36,12 @@ function buildReputationRecord(pubkey) {
   const agg = store.getReputationAggregate(pubkey);
   const attestations = store.getAttestations(pubkey);
 
+  const reports = store.getReports(pubkey);
+  const risk = computeBrokerRisk(attestations, agg, reports);
+
   if (!agg) {
-    // Zeroed record for unknown / never-attested pubkey.
+    // Zeroed record for unknown / never-attested pubkey. Risk fields still
+    // come from the detection module (treats null reputation → "low" + ephemeral).
     return {
       pubkey,
       global_trust_score: 0,
@@ -47,9 +52,9 @@ function buildReputationRecord(pubkey) {
       active_in_n_providers: 0,
       loyalty_concentration: 1.0,
       per_provider: {},
-      fraud_flags: [],
-      sybil_risk: "low",
-      churn_pattern: "stable",
+      fraud_flags: risk.fraud_flags,
+      sybil_risk: risk.sybil_risk,
+      churn_pattern: risk.churn_pattern,
     };
   }
 
@@ -70,10 +75,9 @@ function buildReputationRecord(pubkey) {
     active_in_n_providers: ext.active_in_n_providers,
     loyalty_concentration: ext.loyalty_concentration,
     per_provider: ext.per_provider,
-    // Stubs — full detection module lands in WS-C parte 2.
-    fraud_flags: [],
-    sybil_risk: "low",
-    churn_pattern: "stable",
+    fraud_flags: risk.fraud_flags,
+    sybil_risk: risk.sybil_risk,
+    churn_pattern: risk.churn_pattern,
   };
 }
 
@@ -129,6 +133,7 @@ router.post("/attest", (req, res) => {
     tx_signature: body.tx_signature,
     provider_id: body.provider_id,
     ts: body.timestamp,
+    provider_signature: body.provider_signature,
   });
 
   // Touch canonicalize so the require isn't dead-weight (and to fail fast
