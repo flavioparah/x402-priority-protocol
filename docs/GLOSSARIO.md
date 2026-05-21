@@ -1,5 +1,7 @@
 # Glossário — RPC Priority Protocol
 
+> **For:** all readers — terms used across the protocol, RFCs, and codebase.
+>
 > Glossário detalhado para leitores não-técnicos. Inclui termos do protocolo, jargões de blockchain, siglas de negócio e conceitos de mercado citados nos documentos estratégicos.
 
 ---
@@ -22,7 +24,7 @@
 
 **Em uma frase:** transforma spam em receita para o operador e em acesso prioritário para o agente que paga.
 
-**Site:** `rpcpriority.com`. **Demo:** `x402.rpcpriority.com`.
+**Site:** `rpcpriority.com`. **Endpoints públicos:** `api.rpcpriority.com` (mainnet canônico), `mainnet.rpcpriority.com` (alias), `devnet.rpcpriority.com` (devnet), `app.rpcpriority.com/try` (try UI).
 
 ---
 
@@ -58,7 +60,7 @@ Blockchain de alta performance — promete ~50 mil transações por segundo (vs.
 - **Helius** — maior operador da Solana, baseado nos EUA, levantou US$ 25M (Series A em 2024). Reporta tráfego na casa de bilhões de requisições/mês.
 - **Triton** — concorrente direto, foco em low-latency para traders.
 - **Jito** — mais conhecido por MEV (ver abaixo), mas também opera RPC.
-- **QuickNode, Alchemy** — operadores multi-chain (não só Solana).
+- **QuickNode, Alchemy** — operadores multi-chain (não só Solana). QuickNode já valida x402 como trilha de acesso (ver QuickNode docs sobre x402 + Solana x402 agent guide). A diferença do RPC Priority Protocol não é simplesmente cobrar por RPC via 402; é combinar pagamento sob carga, reputação por pubkey e sinais cross-operator via broker neutro.
 
 ### Blockchain
 Banco de dados distribuído onde cada transação é registrada em "blocos" encadeados. Não tem dono central — é mantido por uma rede de validadores que concordam sobre o estado das contas.
@@ -129,7 +131,7 @@ Bot ou time que monta transações de MEV (arbitragem, liquidação, etc.) e com
 4. Bundle vencedor é incluído no próximo bloco
 5. Tip dividida ~50% validador, ~50% Jito
 
-**Por que importa pra nós:** Jito opera **dentro** da produção do bloco. Nós operamos **antes** do bloco — na camada de RPC que monta a chamada que vira transação. Não somos concorrentes; somos camadas diferentes.
+**Por que importa pra nós:** Jito opera **dentro** da produção do bloco. Nós operamos **antes** do bloco — na camada de RPC que monta a chamada que vira transação. Jito não concorre diretamente na mesma camada: opera na produção/ordenação de blocos, enquanto o x402-shield atua na camada de acesso RPC.
 
 **Atenção:** Jito tem um produto de RPC também (Jito-RPC). Esse sim é concorrente nosso na camada de RPC, mas não no leilão de bundles. Não confundir.
 
@@ -270,7 +272,7 @@ Implementação de teste com cliente, geralmente curta (30–90 dias) e com term
 ### Harmonic.gg
 **O que é:** marketplace aberto de construção de blocos para a blockchain Solana. Validadores rodam um cliente "drop-in" que agrega propostas de bloco de múltiplos builders independentes, otimizando a receita do validador e reduzindo exposição a sandwich attacks.
 
-**Por que aparece nas nossas docs:** o consultor do Colosseum citou Harmonic como exemplo de "infraestrutura neutra na Solana". Importante esclarecer: **Harmonic não é concorrente nosso.** Eles operam na **camada de produção de bloco** (concorrente do Jito Block Engine), enquanto nós operamos na **camada de RPC**, um andar acima. Mesmo princípio (neutralidade), camada diferente.
+**Por que aparece nas nossas docs:** o consultor do Colosseum citou Harmonic como exemplo de "infraestrutura neutra na Solana". Importante esclarecer: **Harmonic não concorre diretamente na mesma camada: opera na produção/ordenação de blocos, enquanto o x402-shield atua na camada de acesso RPC.** Mesmo princípio (neutralidade), camada diferente.
 
 ### Neutral broker
 **O que é:** ator que fica entre concorrentes, não favorece nenhum, e por isso é confiado por todos. Termo do mundo de pagamentos e finanças, popularizado por empresas como Visa, Plaid, Equifax e DTCC.
@@ -338,7 +340,7 @@ Percentis de latência. Em vez de média (que esconde outliers), medimos:
 - **p95** = 95% das requisições são mais rápidas que isso
 - **p99** = só 1% das requisições é mais lenta que isso
 
-**Nossa medição:** **8,7 ms p95** de overhead. Ou seja, em 95% das requisições, nosso servidor adiciona menos de 8,7 ms ao tempo total. (Meta era < 50 ms — batemos por 6×.)
+**Nossa medição:** **8,7 ms p95** de overhead, medido no benchmark do projeto, sob as condições descritas na documentação técnica. Ou seja, em 95% das requisições, nosso servidor adiciona menos de 8,7 ms ao tempo total. (Meta era < 50 ms — batemos por 6×.)
 
 ### Overhead
 Tempo adicional que o nosso protocolo introduz em comparação a uma chamada RPC normal sem proteção. Quanto menor, melhor — alto overhead mata adoção.

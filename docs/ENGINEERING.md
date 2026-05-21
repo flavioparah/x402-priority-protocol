@@ -1,5 +1,7 @@
 # Engineering Journal — x402-shield
 
+> **For:** internal engineering decisions and architecture context.
+
 Living record of what works, what broke, what we decided and why. Written for the team (Flávio, João, Felipe) and for hackathon judges who want depth beyond the README.
 
 Append entries chronologically. Don't delete — mark superseded.
@@ -192,7 +194,7 @@ Fixes **O-004**. Added `https.Agent({ keepAlive: true, maxSockets: 64, keepAlive
 
 #### D-009 — Production deploy via Docker + Traefik on `portainer_default`
 
-Matches the existing VPS pattern (Vokano, amiginvisivel). Service name `x402-shield`, domain `x402.rpcpriority.com`, TLS via Let's Encrypt `leresolver`, network `portainer_default` external.
+Matches the existing VPS pattern (Vokano, amiginvisivel). Service name `x402-shield`, domains `api.rpcpriority.com` (mainnet) + `devnet.rpcpriority.com` (devnet), TLS via Let's Encrypt `leresolver`, network `portainer_default` external.
 
 **Why:** The VPS already runs Traefik + Portainer in this configuration. Bolting on a new service is one compose file. A non-Docker deployment (systemd unit + nginx) would cost us an hour for zero upside.
 

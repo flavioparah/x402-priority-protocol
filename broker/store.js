@@ -30,7 +30,7 @@ const seenTxSignatures = new Set();
 
 // ─── Providers ───────────────────────────────────────────────────────────────
 
-function registerProvider(id, pubkey, tier = "alpha") {
+function registerProvider(id, pubkey, tier = "alpha", opts = {}) {
   if (!id || !pubkey) throw new Error("registerProvider: id and pubkey required");
   if (!["alpha", "beta", "production"].includes(tier)) {
     throw new Error(`registerProvider: invalid tier "${tier}"`);
@@ -41,6 +41,11 @@ function registerProvider(id, pubkey, tier = "alpha") {
     tier,
     registeredAt: Date.now(),
     status: "active",
+    // BROKER-GOVERNANCE.md §8: providers tagged isBrokerSelf=true are excluded
+    // from the network_median calculation in lib/weight.js so the broker
+    // operator cannot self-inflate the cap on its own provider's weight.
+    // Default false → existing callers and fixtures get the unchanged behavior.
+    isBrokerSelf: opts.isBrokerSelf === true,
   };
   providers.set(id, entry);
   return entry;
@@ -79,6 +84,19 @@ function setProviderTier(id, tier) {
   const p = providers.get(id);
   if (!p) return null;
   p.tier = tier;
+  return p;
+}
+
+/**
+ * Flag (or un-flag) a provider as the broker operator's own provider.
+ * Per BROKER-GOVERNANCE.md §8, the self-flagged provider is excluded from
+ * the active-cohort median used to derive the per-provider weight cap.
+ * Returns the updated provider, or null if the id is unknown.
+ */
+function setBrokerSelf(id, isBrokerSelf) {
+  const p = providers.get(id);
+  if (!p) return null;
+  p.isBrokerSelf = isBrokerSelf === true;
   return p;
 }
 
@@ -336,6 +354,7 @@ module.exports = {
   providersCount,
   setProviderStatus,
   setProviderTier,
+  setBrokerSelf,
   getProviderAttestedCount30d,
   getProviderLastAttestAt,
   hasSeenTx,

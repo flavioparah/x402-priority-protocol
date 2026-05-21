@@ -85,12 +85,32 @@ function activeCohort(providers, policy = DEFAULT_POLICY, now = Date.now()) {
  *
  * For odd n: middle element. For even n: average of the two middle elements.
  *
+ * Conflict-of-interest mitigation per BROKER-GOVERNANCE.md §8:
+ * Providers tagged `isBrokerSelf: true` are excluded from this median to
+ * prevent the broker operator from self-inflating the cap on its own weight
+ * via its own attestation volume. The self provider's own `weight(p)` is
+ * still computed normally — cap is derived from others, conditional floor
+ * still applies — so the self provider gets a real weight assignment, it
+ * just doesn't drag the cap upward through its own median contribution.
+ *
+ * The opts.excludeSelf flag (default true) is provided so tests can verify
+ * the pre-filter shape explicitly. Production callers should leave it at
+ * the default; the default IS the governance-mandated behavior.
+ *
  * @param {Array} activeProviders
+ * @param {object} [opts]
+ * @param {boolean} [opts.excludeSelf=true] — when true (default), filter out
+ *   any provider with `isBrokerSelf === true` before computing the median.
  * @returns {number}
  */
-function networkMedian(activeProviders) {
+function networkMedian(activeProviders, opts = {}) {
   if (!activeProviders || activeProviders.length === 0) return 0;
-  const values = activeProviders.map(rawWeight).sort((a, b) => a - b);
+  const excludeSelf = opts.excludeSelf !== false; // default true
+  const eligible = excludeSelf
+    ? activeProviders.filter(p => !(p && p.isBrokerSelf === true))
+    : activeProviders;
+  if (eligible.length === 0) return 0;
+  const values = eligible.map(rawWeight).sort((a, b) => a - b);
   const n = values.length;
   if (n % 2 === 1) return values[Math.floor(n / 2)];
   return (values[n / 2 - 1] + values[n / 2]) / 2;
@@ -109,6 +129,13 @@ function networkMedian(activeProviders) {
  * The floor still wins via max() if the provider qualifies. If the provider
  * doesn't qualify for the floor either, weight(p) = 0 — correct behavior for
  * a network with no active cohort yet (cold start).
+ *
+ * Conflict-of-interest note: `networkMedian(cohort)` is called with default
+ * opts, so any provider in the cohort tagged `isBrokerSelf: true` is excluded
+ * from the median per BROKER-GOVERNANCE.md §8. This applies even when the
+ * subject provider being weighted is itself the self provider — cap derives
+ * from non-self peers, but the self provider's own raw and floor still apply
+ * normally, so the self provider does receive a real weight assignment.
  *
  * @param {object} provider
  * @param {Array} cohort — precomputed active cohort

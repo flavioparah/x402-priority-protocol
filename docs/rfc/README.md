@@ -1,5 +1,7 @@
 # RPC Priority Protocol — RFC index
 
+> **For:** protocol implementers, ecosystem participants reviewing the RFCs.
+
 This directory contains the formal specifications of the RPC Priority Protocol — a triple of complementary subprotocols built on top of the [x402 HTTP payment standard](https://x402.org). Together they define how an HTTP gateway (Shield) gates Solana RPC traffic by payment, applies reputation-based discounts, and cooperates with the upstream node operator's scheduler when the operator chooses to participate.
 
 ## The 3 specs

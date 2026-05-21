@@ -254,6 +254,91 @@ test("unsorted input handled (sorted internally)", () => {
   approx(networkMedian([a, b, c, d]), 4, 1e-9, "unsorted → 4");
 });
 
+// ─── networkMedian: broker-self exclusion (BROKER-GOVERNANCE.md §8) ──────────
+
+test("self-only cohort → median 0 (self-providers filtered out by default)", () => {
+  // Single provider, isBrokerSelf=true. After filter, eligible set is empty
+  // → median 0. This is the "broker is alone on the network" cold-start case.
+  const self = makeProvider({
+    id: "broker-self", tier: "beta", attestedCount30d: 99, monthsInNetwork: 4,
+    isBrokerSelf: true,
+  });
+  approx(networkMedian([self]), 0, 1e-9, "self-only → 0");
+});
+
+test("3 non-self providers + 1 self → median over non-self only (raws 3,5,7 → 5)", () => {
+  // raws computed as 2 × sqrt(months) for beta/99/months.
+  const a = makeProvider({ id: "a", tier: "beta", attestedCount30d: 99, monthsInNetwork: 2.25 });   // raw 3
+  const b = makeProvider({ id: "b", tier: "beta", attestedCount30d: 99, monthsInNetwork: 6.25 });   // raw 5
+  const c = makeProvider({ id: "c", tier: "beta", attestedCount30d: 99, monthsInNetwork: 12.25 });  // raw 7
+  // Self provider with a huge raw — would shift the 4-element median to 6 if included.
+  const self = makeProvider({
+    id: "broker-self", tier: "production", attestedCount30d: 999, monthsInNetwork: 9,
+    isBrokerSelf: true,
+  });
+  approx(networkMedian([a, b, c, self]), 5, 1e-9, "median over a,b,c only");
+});
+
+test("self with extreme attestedCount30d does NOT skew median for others", () => {
+  // Compare median(non-self only) against median(all-incl-self with default exclusion).
+  // They must be identical no matter how large self's raw is.
+  const peers = [
+    makeProvider({ id: "p1", tier: "beta", attestedCount30d: 99, monthsInNetwork: 2.25 }),
+    makeProvider({ id: "p2", tier: "beta", attestedCount30d: 99, monthsInNetwork: 6.25 }),
+    makeProvider({ id: "p3", tier: "beta", attestedCount30d: 99, monthsInNetwork: 12.25 }),
+  ];
+  const baseline = networkMedian(peers);
+  const whaleSelf = makeProvider({
+    id: "broker-self", tier: "production",
+    attestedCount30d: 1_000_000_000, monthsInNetwork: 999,
+    isBrokerSelf: true,
+  });
+  const withSelf = networkMedian([...peers, whaleSelf]);
+  approx(withSelf, baseline, 1e-9, "self exclusion isolates non-self median");
+  approx(withSelf, 5, 1e-9, "median = 5 regardless of self size");
+});
+
+test("excludeSelf: false includes self-tagged providers (test-only escape hatch)", () => {
+  // Same fixture as the previous test, but with exclusion disabled. Now
+  // self contributes its raw and the median moves. Sanity-check the flag
+  // does what it advertises so we know the default isn't a no-op.
+  const a = makeProvider({ id: "a", tier: "beta", attestedCount30d: 99, monthsInNetwork: 2.25 }); // 3
+  const b = makeProvider({ id: "b", tier: "beta", attestedCount30d: 99, monthsInNetwork: 6.25 }); // 5
+  const c = makeProvider({ id: "c", tier: "beta", attestedCount30d: 99, monthsInNetwork: 12.25 }); // 7
+  const self = makeProvider({
+    id: "broker-self", tier: "production",
+    attestedCount30d: 999, monthsInNetwork: 9,
+    isBrokerSelf: true,
+  }); // 1.5 × 3 × 3 = 13.5
+  // Sorted raws: 3, 5, 7, 13.5 → median = (5+7)/2 = 6.
+  approx(
+    networkMedian([a, b, c, self], { excludeSelf: false }),
+    6,
+    1e-9,
+    "self included → median shifts up"
+  );
+  // Default still excludes:
+  approx(networkMedian([a, b, c, self]), 5, 1e-9, "default still excludes");
+});
+
+test("self provider still gets a real weight() — cap derives from non-self peers", () => {
+  // 3 non-self peers raws 1,2,3 → median 2 → cap = 6.
+  // Self has raw 13.5 (production/999/9) → capped at 6 (NOT zero, NOT inflated).
+  const lo = makeProvider({ id: "lo", tier: "alpha", attestedCount30d: 99, monthsInNetwork: 4 });   // 2.0
+  const mid = makeProvider({ id: "mid", tier: "alpha", attestedCount30d: 99, monthsInNetwork: 9 }); // 3.0
+  const hi  = makeProvider({ id: "hi",  tier: "alpha", attestedCount30d: 99, monthsInNetwork: 1 }); // 1.0
+  const self = makeProvider({
+    id: "broker-self", tier: "production", status: "production",
+    attestedCount30d: 999, monthsInNetwork: 9,
+    isBrokerSelf: true,
+  });
+  const cohort = activeCohort([lo, mid, hi, self], defaultPolicy(), NOW);
+  assertEq(cohort.length, 4, "self stays in cohort (admin visibility)");
+  const w = weight(self, cohort, defaultPolicy(), NOW);
+  // median(non-self) = 2 (raws 1,2,3); cap = 6. Self raw 13.5 → min(13.5, 6) = 6.
+  approx(w, 6, 1e-9, "self weight = 6, capped by non-self median");
+});
+
 // ─── weight (final) ──────────────────────────────────────────────────────────
 
 console.log("\nweight:");

@@ -738,11 +738,12 @@ app.use(helmet({
       // /explorer, /docs.html. Requer 'unsafe-eval' porque o Tailwind Play
       // CDN compila utilities em runtime via Function(). Em produção real
       // substituir por build local (gera CSS estático e elimina unsafe-eval).
-      "script-src":  ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com"],
+      "script-src":  ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://geragentes.assistent.top"],
       "style-src":   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       "font-src":    ["'self'", "https://fonts.gstatic.com"],
       "img-src":     ["'self'", "data:", "https:"],
-      "connect-src": ["'self'"],
+      "connect-src": ["'self'", "https://geragentes.assistent.top", "wss://geragentes.assistent.top"],
+      "frame-src":   ["https://geragentes.assistent.top"],
       "frame-ancestors": ["'none'"],
     },
   },

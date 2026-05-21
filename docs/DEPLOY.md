@@ -1,6 +1,8 @@
 # Deploy — x402-shield on VPS (kvm4)
 
-Target: `ssh kvm4` → `/root/x402`, behind Traefik with TLS on `x402.rpcpriority.com`.
+> **For:** operators deploying x402-shield to production VPS / bare-metal.
+
+Target: `ssh kvm4` → `/root/x402`, behind Traefik with TLS on `api.rpcpriority.com`.
 
 This matches the Vokano / amiginvisivel pattern already running on this VPS: `portainer_default` external Docker network + Traefik labels + Let's Encrypt via `leresolver`.
 
@@ -11,7 +13,7 @@ This matches the Vokano / amiginvisivel pattern already running on this VPS: `po
 - Docker + Docker Compose installed.
 - `portainer_default` network exists (`docker network ls | grep portainer`). Traefik joins this network.
 - Traefik is running with `entrypoints=websecure` on `:443` and `certresolver=leresolver` pointing at Let's Encrypt.
-- DNS record `x402.rpcpriority.com` → the VPS public IP.
+- DNS record `api.rpcpriority.com` → the VPS public IP.
 
 ## Files that go to the server
 
@@ -49,7 +51,7 @@ docker compose up -d --build
 
 # 5. Check it's up
 docker compose logs -f --tail=50 x402-shield
-curl -s https://x402.rpcpriority.com/health | jq
+curl -s https://api.rpcpriority.com/health | jq
 ```
 
 Expected `/health` output:
@@ -159,10 +161,10 @@ once at hour 0 / 12 / 24 of the soak window per the runbook.
 
 ```bash
 # Healthy?
-curl -i https://x402.rpcpriority.com/health
+curl -i https://api.rpcpriority.com/health
 
 # Trigger the 402 path from any client
-curl -i -X POST https://x402.rpcpriority.com/rpc \
+curl -i -X POST https://api.rpcpriority.com/rpc \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"getHealth","params":[]}'
 
@@ -174,7 +176,7 @@ To exercise the full handshake against the deployed Shield, run the demo
 script with `SHIELD_URL` pointing at the VPS:
 
 ```bash
-SHIELD_URL=https://x402.rpcpriority.com node demo.js
+SHIELD_URL=https://api.rpcpriority.com node demo.js
 ```
 
 ## Rollback
@@ -205,7 +207,7 @@ A second Shield runs alongside the mainnet container to demonstrate the **on-cha
 
 ### Required prep (one-time)
 
-1. **DNS** — add an A record `x402-devnet.rpcpriority.com` → VPS public IP (same IP as `x402.rpcpriority.com`). Wait ~5 min for propagation.
+1. **DNS** — add an A record `x402-devnet.rpcpriority.com` → VPS public IP (same IP as `api.rpcpriority.com`). Wait ~5 min for propagation.
 
 2. **Wallet for devnet payments** — set `PAYMENT_DESTINATION_DEVNET` in `/root/x402/.env`. Can be the **same** Solana pubkey used for mainnet (Solana addresses are universal across clusters); devnet SOL just won't show up in mainnet explorers.
 
@@ -225,7 +227,7 @@ docker compose -f docker-compose.devnet.yml up -d --build
 
 # Both containers are now running
 docker ps | grep x402
-# x402-shield          → x402.rpcpriority.com           (mainnet, trust-deposit ON)
+# x402-shield          → api.rpcpriority.com           (mainnet, trust-deposit ON)
 # x402-shield-devnet   → x402-devnet.rpcpriority.com    (devnet, on-chain verify only)
 ```
 
